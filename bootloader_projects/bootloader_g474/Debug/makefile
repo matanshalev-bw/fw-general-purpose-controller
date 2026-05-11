@@ -11,13 +11,13 @@ RM := rm -rf
 -include sources.mk
 -include Drivers/STM32G4xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
--include Core/Src/g474/SystemInterface/subdir.mk
--include Core/Src/g474/SchedulerInterface/subdir.mk
--include Core/Src/g474/NonVolatileMemoryInterface/subdir.mk
--include Core/Src/g474/GpioInterface/subdir.mk
--include Core/Src/g474/CommInterface/subdir.mk
--include Core/Src/g474/CanMessenger/subdir.mk
--include Core/Src/g474/AdcManager/subdir.mk
+-include Core/Src/interfaces_g474/SystemInterface/subdir.mk
+-include Core/Src/interfaces_g474/SchedulerInterface/subdir.mk
+-include Core/Src/interfaces_g474/NonVolatileMemoryInterface/subdir.mk
+-include Core/Src/interfaces_g474/GpioInterface/subdir.mk
+-include Core/Src/interfaces_g474/CommInterface/subdir.mk
+-include Core/Src/interfaces_g474/CanMessenger/subdir.mk
+-include Core/Src/interfaces_g474/AdcManager/subdir.mk
 -include Core/Src/bluelink_messages_include/PayloadStructs/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk
@@ -98,8 +98,8 @@ all: main-build
 main-build: fw-bootloader-g4.elf secondary-outputs
 
 # Tool invocations
-fw-bootloader-g4.elf fw-bootloader-g4.map: $(OBJS) $(USER_OBJS) /home/matan/fw_workspace/fw-dist-reverser/fw-bootloader-g4/STM32G474CETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-g++ -o "fw-bootloader-g4.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/matan/fw_workspace/fw-dist-reverser/fw-bootloader-g4/STM32G474CETX_FLASH.ld" -Wl,-Map="fw-bootloader-g4.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
+fw-bootloader-g4.elf fw-bootloader-g4.map: $(OBJS) $(USER_OBJS) /home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/STM32G474CETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-g++ -o "fw-bootloader-g4.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/STM32G474CETX_FLASH.ld" -Wl,-Map="fw-bootloader-g4.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

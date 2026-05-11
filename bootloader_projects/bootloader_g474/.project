@@ -39,22 +39,22 @@
 		<link>
 			<name>Core/Src/ConfigStructs</name>
 			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/configs/ConfigStructs</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/configs/ConfigStructs</locationURI>
 		</link>
 		<link>
 			<name>Core/Src/bluelink_messages_include</name>
 			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include</locationURI>
 		</link>
 		<link>
 			<name>Core/Src/bluelink_version</name>
 			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_version</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_version</locationURI>
 		</link>
 		<link>
-			<name>Core/Src/g474</name>
+			<name>Core/Src/interfaces_g474</name>
 			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/interface/g474</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>
