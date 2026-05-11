@@ -8,6 +8,8 @@
 #ifndef SRC_BOOTLOADER_MAIN_HPP_
 #define SRC_BOOTLOADER_MAIN_HPP_
 
+#include <memory>
+
 #include "main.h"
 #include "comm_interface.hpp"
 #include "non_volatile_memory_interface.hpp"
@@ -19,30 +21,17 @@
 #include "system_interface.hpp"
 #include "can_messenger.hpp"
 #include "gpio_interface.hpp"
+#include "scheduler_interface.hpp"
+#include "bootloader_defines.hpp"
+#include "led_status_handler.hpp"
 
 #define IS_APP_EXIST(app_addr) (((*(uint32_t*) app_addr) & 0x2FFE0000) == 0x20000000)
 typedef void (*pFunction)(void);
 
 class BootloaderMain {
 public:
-  enum class BootloaderState : uint8_t {
-    INIT,
-    WAITING_FOR_COMMAND,
-    PROGRAMMING_READY,
-    WAITING_FOR_PROGRAMMING_READY,
-    PROGRAMMING_IN_PROGRESS,
-    PROGRAMMING_COMPLETE,
-    ERROR_STATE,
-    JUMP_TO_APP
-  };
  private:
-  enum class FlashOperationState : uint8_t {
-    IDLE,
-    UNLOCKING,
-    ERASING,
-    WRITING,
-    LOCKING
-  };
+
 
   static constexpr uint16_t PROGRAMMING_TIMEOUT_MS_ = 3000;
   static constexpr uint16_t BOOT_TIMEOUT_MS_ = 3000;
@@ -52,8 +41,7 @@ public:
   static constexpr uint8_t BOOTLOADER_EXIT_DELAY_MS_ = 100;
   static constexpr uint32_t FLASH_PAGE_SIZE_ = FLASH_PAGE_SIZE;
   
-  static constexpr uint32_t LED_UPDATE_PERIOD_MS_ = 250;
-  static constexpr uint32_t LED_BLINK_PERIOD_MS_ = 500;
+  static constexpr float TASK_LED_STATUS_FREQ_HZ_ = 20.0f;  // 50ms period
 
   CommCan* comm_can_;
   CanMessenger* can_messenger_;
@@ -63,7 +51,6 @@ public:
   static BootloaderMain* interrupt_instance_;
 
   BootloaderState bootloader_state_ = BootloaderState::INIT;
-  FlashOperationState flash_state_ = FlashOperationState::IDLE;
   bluelink::CommandsPayload::ProgrammingCommand::ProgrammingState programming_state_ =
     bluelink::CommandsPayload::ProgrammingCommand::ProgrammingState::PROGRAMMING_STATE_NONE;
 
@@ -71,33 +58,35 @@ public:
   bool is_programming_command_received_ = false;
   bluelink::CommandsPayload::ProgrammingCommand received_programming_command_ = {};
 
-  uint32_t programming_timeout_start_ = 0;
-  uint32_t boot_start_time_ = 0;
+  std::unique_ptr<SchedulerOnce> programming_timeout_scheduler_;
 
-  // Simplified LED state
-  uint32_t led_last_update_time_ = 0;
-  bool led_state_ = false;
+  // Enhanced dual LED status with scheduler
+  LedStatusHandler* led_status_;
+  std::unique_ptr<SchedulerTimer> led_status_scheduler_;
   
-  GpioPin green_led_gpio_;
+  // Timeout schedulers
+  std::unique_ptr<SchedulerOnce> boot_timeout_scheduler_;
+  std::unique_ptr<SchedulerOnce> force_app_timeout_scheduler_;
 
   bool is_metadata_send_requested_ = false;
   uint8_t metadata_destination_id_ = 0;
   bool is_programming_data_send_requested_ = false;
   bluelink::CommandsPayload::ProgrammingCommand programming_data_to_send_;
 
- public:
-  BootloaderMain(CAN_HandleTypeDef* hcan);
+  // Double-word programming FSM
+  enum class DoubleWordState : uint8_t {
+    WAITING_FOR_FIRST_WORD,
+    WAITING_FOR_SECOND_WORD
+  };
+  
+  DoubleWordState double_word_state_ = DoubleWordState::WAITING_FOR_FIRST_WORD;
+  uint32_t first_word_addr_ = 0;
+  uint32_t first_word_data_ = 0;
+  uint32_t programming_checksum_ = 0;
 
-  inline bool isProgrammingInProgress() const {
-    return bootloader_state_ == BootloaderState::WAITING_FOR_PROGRAMMING_READY or
-           bootloader_state_ == BootloaderState::PROGRAMMING_IN_PROGRESS;
-  }
-  inline bool isBootTimeoutExceeded() const {
-    return (HAL_GetTick() - boot_start_time_) > BOOT_TIMEOUT_MS_;
-  }
-  inline bool isForceAppTimeoutExceeded() const {
-    return (HAL_GetTick() - boot_start_time_) > FORCE_APP_TIMEOUT_MS_;
-  }
+ public:
+  BootloaderMain(FDCAN_HandleTypeDef* hfdcan, TIM_HandleTypeDef* htim);
+
   inline bool isInProgrammingFlow() const {
     return (bootloader_state_ == BootloaderState::PROGRAMMING_READY or
             bootloader_state_ == BootloaderState::WAITING_FOR_PROGRAMMING_READY or
@@ -107,9 +96,11 @@ public:
   }
 
   int run();
-  void directEnqueueRxFromInterrupt(const CAN_RxHeaderTypeDef& header, const uint8_t* data, uint8_t length);
+  void directEnqueueRxFromInterrupt(const FDCAN_RxHeaderTypeDef& header, const uint8_t* data, uint8_t length);
 
  private:
+  template<typename ModuleType>
+  void executeTask(std::unique_ptr<SchedulerTimer>& scheduler, ModuleType* module);
   InterfaceStatus initializeCanInterface();
   InterfaceStatus configureCanFilter();
 
@@ -136,11 +127,15 @@ public:
 
   void sendProgrammingStartRequests();
   uint32_t handleSingleProgrammingCommand();
+  
+  // Helper methods for programming command handling
+  uint32_t handleProgrammingDone();
+  uint32_t handleProgrammingRestart();
+  uint32_t handleProgrammingChecksum();
+  uint32_t handleDataProgramming(uint32_t address, uint32_t data);
+  uint32_t processDoubleWordProgramming(uint32_t address, uint32_t data);
+  void sendProgrammingResponse(uint32_t address, uint32_t data);
 
-  bool unlockFlash();
-  void lockFlash();
-  bool eraseFlash();
-  bool writeFlashWord(uint32_t address, uint32_t data);
   bool isValidFlashAddress(uint32_t address) const;
   void prepareFlashForProgramming();
 
@@ -156,23 +151,18 @@ public:
   bool isProgrammingReadyCommand() const;
   bool isProgrammingDoneAddress(uint32_t address) const;
   bool isProgrammingRestartAddress(uint32_t address) const;
+  bool isProgrammingChecksumAddress(uint32_t address) const;
   bool isProgrammingCommandMetaDataPresent() const;
 
   void resetTimeout();
-  bool isTimeoutExpired(uint32_t start_time, uint32_t timeout_ms) const;
+  void resetToWaitingForCommand();
+
   uint32_t getFlashAddressForProgrammingState() const;
   uint32_t getFlashSizeForProgrammingState() const;
   void resetProgrammingState();
-
-  // Simplified LED control
-  void updateLedPattern();
-  inline void setLedState(bool on) {
-    GpioInterface::digitalWrite(green_led_gpio_, on ? GpioPinState::PIN_SET : GpioPinState::PIN_RESET);
-  }
-
-  inline uint32_t getCurrentTime() const { return HAL_GetTick(); }
+  void resetDoubleWordProgrammingState();
 };
 
-int bootloaderMain(CAN_HandleTypeDef* hcan);
+int bootloaderMain(FDCAN_HandleTypeDef* hfdcan, TIM_HandleTypeDef* htim);
 
 #endif /* SRC_BOOTLOADER_MAIN_HPP_ */

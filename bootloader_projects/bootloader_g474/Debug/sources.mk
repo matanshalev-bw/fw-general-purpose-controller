@@ -42,12 +42,13 @@ CPP_DEPS :=
 SUBDIRS := \
 Core/Src/bluelink_messages_include/PayloadStructs \
 Core/Src \
-Core/Src/f072/CanMessenger \
-Core/Src/f072/CommInterface \
-Core/Src/f072/GpioInterface \
-Core/Src/f072/NonVolatileMemoryInterface \
-Core/Src/f072/SchedulerInterface \
-Core/Src/f072/SystemInterface \
+Core/Src/g474/AdcManager \
+Core/Src/g474/CanMessenger \
+Core/Src/g474/CommInterface \
+Core/Src/g474/GpioInterface \
+Core/Src/g474/NonVolatileMemoryInterface \
+Core/Src/g474/SchedulerInterface \
+Core/Src/g474/SystemInterface \
 Core/Startup \
-Drivers/STM32F0xx_HAL_Driver/Src \
+Drivers/STM32G4xx_HAL_Driver/Src \
 

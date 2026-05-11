@@ -9,14 +9,15 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include Drivers/STM32F0xx_HAL_Driver/Src/subdir.mk
+-include Drivers/STM32G4xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
--include Core/Src/f072/SystemInterface/subdir.mk
--include Core/Src/f072/SchedulerInterface/subdir.mk
--include Core/Src/f072/NonVolatileMemoryInterface/subdir.mk
--include Core/Src/f072/GpioInterface/subdir.mk
--include Core/Src/f072/CommInterface/subdir.mk
--include Core/Src/f072/CanMessenger/subdir.mk
+-include Core/Src/g474/SystemInterface/subdir.mk
+-include Core/Src/g474/SchedulerInterface/subdir.mk
+-include Core/Src/g474/NonVolatileMemoryInterface/subdir.mk
+-include Core/Src/g474/GpioInterface/subdir.mk
+-include Core/Src/g474/CommInterface/subdir.mk
+-include Core/Src/g474/CanMessenger/subdir.mk
+-include Core/Src/g474/AdcManager/subdir.mk
 -include Core/Src/bluelink_messages_include/PayloadStructs/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk
@@ -65,40 +66,40 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := fw-bootloader
+BUILD_ARTIFACT_NAME := fw-bootloader-g4
 BUILD_ARTIFACT_EXTENSION := elf
 BUILD_ARTIFACT_PREFIX :=
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-fw-bootloader.elf \
+fw-bootloader-g4.elf \
 
 MAP_FILES += \
-fw-bootloader.map \
+fw-bootloader-g4.map \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-fw-bootloader.list \
+fw-bootloader-g4.list \
 
 OBJCOPY_HEX += \
-fw-bootloader.hex \
+fw-bootloader-g4.hex \
 
 OBJCOPY_BIN += \
-fw-bootloader.bin \
+fw-bootloader-g4.bin \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: fw-bootloader.elf secondary-outputs
+main-build: fw-bootloader-g4.elf secondary-outputs
 
 # Tool invocations
-fw-bootloader.elf fw-bootloader.map: $(OBJS) $(USER_OBJS) /home/matan/fw_workspace/fw-dist-reverser/fw-bootloader/STM32F072C8TX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-g++ -o "fw-bootloader.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m0 -T"/home/matan/fw_workspace/fw-dist-reverser/fw-bootloader/STM32F072C8TX_FLASH.ld" -Wl,-Map="fw-bootloader.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
+fw-bootloader-g4.elf fw-bootloader-g4.map: $(OBJS) $(USER_OBJS) /home/matan/fw_workspace/fw-dist-reverser/fw-bootloader-g4/STM32G474CETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-g++ -o "fw-bootloader-g4.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/matan/fw_workspace/fw-dist-reverser/fw-bootloader-g4/STM32G474CETX_FLASH.ld" -Wl,-Map="fw-bootloader-g4.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -107,24 +108,24 @@ default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-fw-bootloader.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "fw-bootloader.list"
+fw-bootloader-g4.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "fw-bootloader-g4.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-fw-bootloader.hex: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objcopy  -O ihex $(EXECUTABLES) "fw-bootloader.hex"
+fw-bootloader-g4.hex: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objcopy  -O ihex $(EXECUTABLES) "fw-bootloader-g4.hex"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-fw-bootloader.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "fw-bootloader.bin"
+fw-bootloader-g4.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "fw-bootloader-g4.bin"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) default.size.stdout fw-bootloader.bin fw-bootloader.elf fw-bootloader.hex fw-bootloader.list fw-bootloader.map
+	-$(RM) default.size.stdout fw-bootloader-g4.bin fw-bootloader-g4.elf fw-bootloader-g4.hex fw-bootloader-g4.list fw-bootloader-g4.map
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_HEX) $(OBJCOPY_BIN)

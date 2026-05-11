@@ -27,7 +27,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f0xx_hal.h"
+#include "stm32g4xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -57,10 +57,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define GREEN_LED_Pin GPIO_PIN_11
-#define GREEN_LED_GPIO_Port GPIOB
-#define BYPASS_EN_Pin GPIO_PIN_9
-#define BYPASS_EN_GPIO_Port GPIOA
+#define MAIN_EN_Pin GPIO_PIN_14
+#define MAIN_EN_GPIO_Port GPIOC
+#define GREEN_LED_2_Pin GPIO_PIN_13
+#define GREEN_LED_2_GPIO_Port GPIOB
+#define GREEN_LED_1_Pin GPIO_PIN_15
+#define GREEN_LED_1_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

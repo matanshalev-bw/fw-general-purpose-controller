@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>bootloader_g474</name>
+	<name>fw-bootloader-g4</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -32,40 +32,29 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>bluelink_version</name>
-			<type>2</type>
-			<locationURI>copy_PARENT/3rd_party/bluelink_sdk/bluelink_version</locationURI>
-		</link>
-		<link>
 			<name>Core/Inc/version.hpp</name>
 			<type>1</type>
-			<locationURI>copy_PARENT/version.hpp</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/version.hpp</locationURI>
 		</link>
 		<link>
 			<name>Core/Src/ConfigStructs</name>
 			<type>2</type>
-			<locationURI>copy_PARENT/configs/ConfigStructs</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/configs/ConfigStructs</locationURI>
 		</link>
 		<link>
 			<name>Core/Src/bluelink_messages_include</name>
 			<type>2</type>
-			<locationURI>copy_PARENT/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include</locationURI>
 		</link>
 		<link>
 			<name>Core/Src/bluelink_version</name>
 			<type>2</type>
-			<locationURI>copy_PARENT/3rd_party/bluelink_sdk/bluelink_version</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_version</locationURI>
 		</link>
 		<link>
-			<name>Core/Src/f072</name>
+			<name>Core/Src/g474</name>
 			<type>2</type>
-			<locationURI>copy_PARENT/interface/f072</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/interface/g474</locationURI>
 		</link>
 	</linkedResources>
-	<variableList>
-		<variable>
-			<name>copy_PARENT</name>
-			<value>$%7BPARENT-3-PROJECT_LOC%7D/fw_workspace/fw-general-purpose-controller/bootloader_projects</value>
-		</variable>
-	</variableList>
 </projectDescription>
