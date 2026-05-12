@@ -219,6 +219,7 @@ class CommCan : public CommInterface {
   InterfaceStatus configPayloadTypeFilters(uint32_t destination_id, const uint8_t* payload_types, uint8_t payload_count, bool use_fifo1, uint32_t start_filter_index);
   InterfaceStatus configHighPriorityFilters(uint32_t destination_id, const uint8_t* payload_types, uint8_t payload_count, uint32_t start_filter_index = 0);
   InterfaceStatus configDefaultDestinationFilter(uint32_t destination_id, uint32_t filter_index);
+  InterfaceStatus configGlobalFilter();
   InterfaceStatus activateNotifications(CanNotificationType notification_type);
   InterfaceStatus activateNotifications(uint32_t notification_mask);
   void kickStartTxInterrupts();

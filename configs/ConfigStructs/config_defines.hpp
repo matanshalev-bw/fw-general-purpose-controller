@@ -9,7 +9,7 @@
 #define SRC_CONFIGSTRUCTS_DRIVER_DEFINES_HPP_
 
 #include <stdint.h>
-#include "version.hpp"
+#include "versions.hpp"
 
 #define FLASH_CONFIG_SECTION __attribute__((used)) __attribute__((section(".config")))
 
@@ -52,9 +52,9 @@ enum AnalogChannelBit : uint8_t {
 };
 
 struct ConfigMemoryVersion {
-  uint8_t major = CONFIG_MEMORY_VERSION_MAJOR;
-  uint8_t minor = CONFIG_MEMORY_VERSION_MINOR;
-  uint8_t patch = CONFIG_MEMORY_VERSION_PATCH;
+  uint8_t major = CONFIG_READ_ONLY_MEMORY_VERSION_MAJOR;
+  uint8_t minor = CONFIG_READ_ONLY_MEMORY_VERSION_MINOR;
+  uint8_t patch = CONFIG_READ_ONLY_MEMORY_VERSION_PATCH;
 } __attribute__((packed));
 
 struct ConfigType {

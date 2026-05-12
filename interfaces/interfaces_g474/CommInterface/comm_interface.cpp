@@ -375,6 +375,24 @@ InterfaceStatus CommCan::initCanPeripheral(bool perform_reset) {
     return InterfaceStatus::INTERFACE_OK;
 }
 
+InterfaceStatus CommCan::configGlobalFilter() {
+    if (fdcan_handler_ == nullptr) {
+        return InterfaceStatus::INTERFACE_ERROR;
+    }
+
+    // Configure global filter by directly writing to register
+    // This can be done in INIT mode (before Start) or READY mode (after Start)
+    // The register can be written in INIT mode even though HAL function checks for READY
+    MODIFY_REG(fdcan_handler_->Instance->RXGFC, 
+               (FDCAN_RXGFC_ANFS | FDCAN_RXGFC_ANFE | FDCAN_RXGFC_RRFS | FDCAN_RXGFC_RRFE),
+               ((FDCAN_REJECT << FDCAN_RXGFC_ANFS_Pos) |
+                (FDCAN_ACCEPT_IN_RX_FIFO1 << FDCAN_RXGFC_ANFE_Pos) |
+                (FDCAN_REJECT_REMOTE << FDCAN_RXGFC_RRFS_Pos) |
+                (FDCAN_FILTER_REMOTE << FDCAN_RXGFC_RRFE_Pos)));
+
+    return InterfaceStatus::INTERFACE_OK;
+}
+
 InterfaceStatus CommCan::startCanPeripheral() {
     if (fdcan_handler_ == nullptr) {
         return InterfaceStatus::INTERFACE_ERROR;

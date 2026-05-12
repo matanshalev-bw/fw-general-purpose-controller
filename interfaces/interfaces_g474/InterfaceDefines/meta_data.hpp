@@ -10,7 +10,7 @@
 
 #include "distributed_can_id.hpp"
 #include "config_defines.hpp"
-#include "version.hpp"
+#include "versions.hpp"
 
 struct ApplicationVersion {
   uint8_t major = APPLICATION_VERSION_MAJOR;
