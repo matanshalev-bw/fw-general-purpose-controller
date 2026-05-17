@@ -7,6 +7,8 @@
 
 #include "scheduler_interface.hpp"
 
+#ifdef HAL_TIM_MODULE_ENABLED
+
 ///////////////////////////////// TIMER /////////////////////////////////
 
 SchedulerTimer::SchedulerTimer(TIM_HandleTypeDef *timer, const float freq, bool *timer_flag)
@@ -51,6 +53,8 @@ InterfaceStatus SchedulerTimerOnce::reset(const uint32_t millis) {
   setTimerPeriod(timer_, 1000.0 / millis);
   return static_cast<InterfaceStatus>(HAL_TIM_Base_Start_IT(timer_));
 }
+
+#endif  // HAL_TIM_MODULE_ENABLED
 
 //////////////////////////////// MAIN CLOCK /////////////////////////////
 

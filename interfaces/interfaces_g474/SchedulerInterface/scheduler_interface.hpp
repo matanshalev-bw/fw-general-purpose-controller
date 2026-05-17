@@ -11,13 +11,18 @@
 #include "interface_status.hpp"
 
 #include "stm32g4xx_hal.h"
+
+#ifdef HAL_TIM_MODULE_ENABLED
 #include "stm32g4xx_hal_tim.h"
+#endif
 
 class SchedulerInterface {
  public:
   virtual bool isDue() const { return false; }
   virtual InterfaceStatus restart() { return InterfaceStatus::INTERFACE_ERROR; }
 };
+
+#ifdef HAL_TIM_MODULE_ENABLED
 
 ///////////////////////////////// TIMER /////////////////////////////////
 
@@ -41,6 +46,8 @@ class SchedulerTimerOnce : public SchedulerTimer {
   SchedulerTimerOnce(TIM_HandleTypeDef *timer, bool *timer_flag) : SchedulerTimer(timer, 0, timer_flag) {}
   InterfaceStatus reset(const uint32_t millis);
 };
+
+#endif  // HAL_TIM_MODULE_ENABLED
 
 //////////////////////////////// MAIN CLOCK /////////////////////////////
 

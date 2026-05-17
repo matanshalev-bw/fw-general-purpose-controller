@@ -2,6 +2,7 @@
 #define SRC_CONFIGSTRUCTS_CONFIG_READ_ONLY_MEMORY_HPP_
 
 #include "config_defines.hpp"
+#include "memory_map.hpp"
 #include "sequences_configs.hpp"
 
 struct ConfigMemory {
@@ -12,5 +13,7 @@ struct ConfigMemory {
   SequencesConfig sequences_config;
   const char END_SIGN[sizeof(CONFIGS_END_SIGN)] = CONFIGS_END_SIGN;
 } __attribute__((packed));
+
+static_assert(sizeof(ConfigMemory) <= FLASH_CONFIG_BYTES_SIZE, "ConfigMemory exceeds CONFIG flash region");
 
 #endif  // SRC_CONFIGSTRUCTS_CONFIG_READ_ONLY_MEMORY_HPP_
