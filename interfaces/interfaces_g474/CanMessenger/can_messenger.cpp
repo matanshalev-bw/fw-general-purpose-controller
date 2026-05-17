@@ -400,6 +400,8 @@ CanMessenger::RxPriority CanMessenger::determineRxPriority(uint8_t payload_type_
         return RxPriority::METADATA_REQUEST;
     case bluelink::PayloadTypeIds::DRIVER_STATE_COMMAND:
         return RxPriority::DRIVER_STATE_COMMAND;
+    case bluelink::PayloadTypeIds::DRIVE_COMMAND:
+        return RxPriority::REVERSER_COMMAND;
     case bluelink::PayloadTypeIds::REVERSER_COMMAND:
         return RxPriority::REVERSER_COMMAND;
     case bluelink::PayloadTypeIds::TRANSM_OUT_SPD_TELEMETRY:

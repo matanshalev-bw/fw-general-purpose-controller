@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>fw-config-g4</name>
+	<name>config_g474</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -34,12 +34,18 @@
 		<link>
 			<name>Core/Src/InterfaceDefines</name>
 			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/interface/g474/InterfaceDefines</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/InterfaceDefines</locationURI>
 		</link>
 		<link>
 			<name>Core/Src/configs</name>
 			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/configs</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/configs</locationURI>
 		</link>
 	</linkedResources>
+	<variableList>
+		<variable>
+			<name>copy_PARENT</name>
+			<value>$%7BPARENT-3-PROJECT_LOC%7D/fw_workspace/fw-general-purpose-controller/config_projects</value>
+		</variable>
+	</variableList>
 </projectDescription>

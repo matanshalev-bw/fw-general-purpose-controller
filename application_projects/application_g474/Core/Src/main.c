@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "application_main.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,7 +52,16 @@ UART_HandleTypeDef huart2;
 PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
-
+/* Enable ADC1/ADC2 (+ DMA) and DAC1 in CubeMX, then define handles here for analog micro-ops. */
+#ifdef HAL_ADC_MODULE_ENABLED
+extern ADC_HandleTypeDef hadc1;
+extern ADC_HandleTypeDef hadc2;
+extern DMA_HandleTypeDef hdma_adc1;
+extern DMA_HandleTypeDef hdma_adc2;
+#endif
+#ifdef HAL_DAC_MODULE_ENABLED
+extern DAC_HandleTypeDef hdac1;
+#endif
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,7 +118,7 @@ int main(void)
   MX_USB_PCD_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-
+  applicationInit();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -119,6 +128,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    applicationTick();
   }
   /* USER CODE END 3 */
 }

@@ -57,7 +57,8 @@
 /* External variables --------------------------------------------------------*/
 
 /* USER CODE BEGIN EV */
-
+extern FDCAN_HandleTypeDef hfdcan2;
+extern FDCAN_HandleTypeDef hfdcan3;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -197,6 +198,11 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32g4xx.s).                    */
 /******************************************************************************/
+
+void FDCAN2_IT0_IRQHandler(void) { HAL_FDCAN_IRQHandler(&hfdcan2); }
+void FDCAN2_IT1_IRQHandler(void) { HAL_FDCAN_IRQHandler(&hfdcan2); }
+void FDCAN3_IT0_IRQHandler(void) { HAL_FDCAN_IRQHandler(&hfdcan3); }
+void FDCAN3_IT1_IRQHandler(void) { HAL_FDCAN_IRQHandler(&hfdcan3); }
 
 /* USER CODE BEGIN 1 */
 

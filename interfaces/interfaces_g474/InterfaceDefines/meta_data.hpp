@@ -26,7 +26,7 @@ enum ProgrammingState : uint8_t {
 };
 
 struct MetaData {
-  const bluelink::ComponentId MY_COMPONENT_ID = bluelink::ComponentId::COMPONENT_ID_REVERSER_DRIVER;
+  bluelink::ComponentId MY_COMPONENT_ID = bluelink::ComponentId::COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER;
   const ApplicationVersion APPLICATION_VERSION{};
   const ConfigMemoryVersion CONFIGURATION_VERSION{};
   ConfigType config_type = {"INVALID CONFIG", ConfigTypeEnum::UNDEFINED_CONFIG};
