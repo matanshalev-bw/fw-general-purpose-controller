@@ -2,13 +2,8 @@
 #define G474_GPC_CONFIG_MEMORY_HPP_
 
 #include "config_memory.hpp"
-#include "micro_op_builder.hpp"
 #include "distributed_can_id.hpp"
 #include "PayloadTypes.hpp"
-
-namespace {
-constexpr uint8_t kExampleCanPayload[] = {0x12, 0x34, 0x56, 0x78};
-}
 
 volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMORY = {
     .config_type = {
@@ -29,11 +24,26 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                 .sequence = {
                     .step_count = 5,
                     .steps = {
-                        micro_op_builder::digitalGpioWrite(1, 5, 1),
-                        micro_op_builder::adcRead(2, 0, 0, 1),
-                        micro_op_builder::dacWriteFromVar(1, 0),
-                        micro_op_builder::delayMs(500),
-                        micro_op_builder::canTransmit(1, 0x12, 4, kExampleCanPayload),
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {1, 5, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::ADC_READ,
+                            .adc_read = {2, 0, 0, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DAC_WRITE,
+                            .dac_write = {1, 1, 0, 0},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {500},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 4, 0x12, {0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0}},
+                        },
                     },
                 },
             },
