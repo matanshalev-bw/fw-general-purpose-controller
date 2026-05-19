@@ -53,9 +53,12 @@ async def repl_ws(websocket: WebSocket) -> None:
         while True:
             line = await websocket.receive_text()
             if line == "\t":
-                prefix = await websocket.receive_text()
-                matches = _repl.complete(prefix)
-                await websocket.send_json({"type": "complete", "matches": matches})
+                full_line = await websocket.receive_text()
+                matches = _repl.complete(full_line)
+                common = _repl.complete_common_prefix(full_line)
+                await websocket.send_json(
+                    {"type": "complete", "matches": matches, "common_prefix": common}
+                )
                 continue
 
             output, cont = _repl.execute(line)

@@ -63,6 +63,8 @@
       if (msg.type === "complete") {
         if (msg.matches.length === 1) {
           applyCompletion(msg.matches[0]);
+        } else if (msg.common_prefix && msg.common_prefix.length > currentWord(lineBuffer).length) {
+          applyCompletion(msg.common_prefix);
         } else if (msg.matches.length > 1) {
           term.writeln("\r\n" + msg.matches.join("  "));
           term.write("\r\n" + prompt + lineBuffer);
@@ -103,7 +105,7 @@
     }
     if (data === "\t") {
       ws.send("\t");
-      ws.send(currentWord(lineBuffer));
+      ws.send(lineBuffer);
       return;
     }
     if (data >= " ") {

@@ -124,8 +124,6 @@ class Schema:
         for name, body in structs.items():
             if "Union" in name or name.startswith("Micro"):
                 continue
-            if "Continuous" in name:
-                continue
             fields_raw = self._converter.parse_struct_fields(body, name)
             fields = [
                 FieldDef(cpp_type=t, name=n, array_size=a)

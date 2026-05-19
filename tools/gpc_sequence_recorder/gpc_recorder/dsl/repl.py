@@ -2,12 +2,12 @@
 
 import ast
 import io
-import re
 import traceback
 from contextlib import redirect_stdout
 from typing import List, Tuple
 
 from gpc_recorder.dsl.builtins import RecorderContext, build_namespace
+from gpc_recorder.dsl.completion import complete_line, longest_common_prefix
 
 
 class ReplEngine:
@@ -49,11 +49,20 @@ class ReplEngine:
         out = buf.getvalue().rstrip()
         return out if out else "OK", True
 
-    def complete(self, prefix: str) -> List[str]:
-        m = re.search(r"[A-Za-z_][A-Za-z0-9_]*$", prefix)
-        word = m.group(0) if m else prefix
-        names = sorted(self._namespace.keys())
-        return [n for n in names if n.startswith(word)]
+    def complete(self, line: str) -> List[str]:
+        return complete_line(
+            self.ctx.schema,
+            sorted(self._namespace.keys()),
+            line,
+        )
+
+    def complete_common_prefix(self, line: str) -> str:
+        matches = self.complete(line)
+        from gpc_recorder.dsl.completion import _word_at_end
+
+        word = _word_at_end(line)
+        common = longest_common_prefix(matches)
+        return common if len(common) > len(word) else ""
 
     def preview_hpp(self) -> str:
         return self.ctx.preview()
