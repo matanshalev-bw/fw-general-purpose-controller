@@ -94,16 +94,72 @@ def _pack_field(schema: Schema, field: FieldDef, value: Any) -> bytes:
     raise ValueError(f"Cannot pack type {field.cpp_type!r}")
 
 
+def _parse_default_literal(schema: Schema, field: FieldDef, raw: str) -> Any:
+    raw = raw.strip().rstrip(",")
+    if "::" in raw:
+        raw = raw.split("::")[-1].strip()
+    if raw in ("false", "true"):
+        return raw == "true"
+    if raw.startswith("0x"):
+        return int(raw, 16)
+    try:
+        if "." in raw:
+            return float(raw)
+        return int(raw)
+    except ValueError:
+        pass
+    t = _normalize_type(field.cpp_type)
+    if t in schema.enums:
+        return raw
+    return raw
+
+
+def _zero_default(schema: Schema, field: FieldDef) -> Any:
+    t = _normalize_type(field.cpp_type)
+    if t == "bool":
+        return False
+    if t in schema.enums:
+        return 0
+    if t == "float":
+        return 0.0
+    if t in ("uint8_t", "int8_t", "char", "uint16_t", "int16_t", "uint32_t", "int32_t"):
+        return 0
+    return 0
+
+
+def _resolve_field_value(
+    schema: Schema, field: FieldDef, value: Any | None = None
+) -> Any:
+    if value is not None:
+        return value
+    if field.default_raw:
+        return _parse_default_literal(schema, field, field.default_raw)
+    return _zero_default(schema, field)
+
+
+def fill_struct_fields(
+    schema: Schema,
+    struct_def: StructDef,
+    field_values: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Merge user fields with C++ header defaults (or zero) for any omitted members."""
+    merged: Dict[str, Any] = {}
+    for field in struct_def.fields:
+        merged[field.name] = _resolve_field_value(
+            schema, field, field_values.get(field.name)
+        )
+    return merged
+
+
 def pack_struct(
     schema: Schema,
     struct_def: StructDef,
     field_values: Dict[str, Any],
 ) -> bytes:
+    merged = fill_struct_fields(schema, struct_def, field_values)
     out = bytearray()
     for field in struct_def.fields:
-        if field.name not in field_values:
-            raise ValueError(f"Missing field {field.name!r} for {struct_def.name}")
-        out.extend(_pack_field(schema, field, field_values[field.name]))
+        out.extend(_pack_field(schema, field, merged[field.name]))
     return bytes(out)
 
 

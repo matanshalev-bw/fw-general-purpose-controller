@@ -28,6 +28,18 @@ def test_repl_builds_example_binding():
     assert ".delay_ms = {500}" in hpp
 
 
+def test_begin_binding_partial_struct_fields():
+    engine = ReplEngine()
+    line = (
+        "begin_binding(trigger=BRAKES_CONTINUOUS_COMMAND,"
+        "BrakesContinuousCommand(brake_mode=BRAKE_MODE_FULLY_RELEASED))"
+    )
+    out, cont = engine.execute(line)
+    assert cont, out
+    assert engine.ctx.session.current_binding.field_values["brake_mode"] == "BRAKE_MODE_FULLY_RELEASED"
+    assert engine.ctx.session.current_binding.field_values["desired_brakes_position_in_percentage"] == 0
+
+
 def test_begin_binding_trigger_then_struct_syntax():
     engine = ReplEngine()
     line = (

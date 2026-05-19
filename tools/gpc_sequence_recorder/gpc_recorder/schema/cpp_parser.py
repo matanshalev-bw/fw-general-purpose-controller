@@ -20,6 +20,14 @@ class FieldDef:
     cpp_type: str
     name: str
     array_size: Optional[str] = None
+    default_raw: Optional[str] = None  # from "= value" in header, if any
+
+
+def _default_from_comment(comment: str) -> Optional[str]:
+    if not comment:
+        return None
+    m = re.search(r"#\s*Default:\s*(.+?)\s*$", comment)
+    return m.group(1).strip() if m else None
 
 
 @dataclass
@@ -126,8 +134,13 @@ class Schema:
                 continue
             fields_raw = self._converter.parse_struct_fields(body, name)
             fields = [
-                FieldDef(cpp_type=t, name=n, array_size=a)
-                for t, n, _c, a, _b in fields_raw
+                FieldDef(
+                    cpp_type=t,
+                    name=n,
+                    array_size=a,
+                    default_raw=_default_from_comment(c),
+                )
+                for t, n, c, a, _b in fields_raw
             ]
             self.command_structs[name] = StructDef(name=name, fields=fields)
             pid = _struct_name_to_payload_id(name)
@@ -183,8 +196,13 @@ class Schema:
                 continue
             fields_raw = self._converter.parse_struct_fields(structs[struct_name], struct_name)
             fields = [
-                FieldDef(cpp_type=t, name=n, array_size=a)
-                for t, n, _c, a, _b in fields_raw
+                FieldDef(
+                    cpp_type=t,
+                    name=n,
+                    array_size=a,
+                    default_raw=_default_from_comment(c),
+                )
+                for t, n, c, a, _b in fields_raw
             ]
             self.micro_ops[member] = MicroOpDef(
                 op_type_name=f"MicroOpType::{op_name}",

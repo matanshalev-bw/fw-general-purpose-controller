@@ -3,7 +3,7 @@
 from typing import Any, Dict, List, Optional
 
 from gpc_recorder.codegen.emitter import emit_config_hpp
-from gpc_recorder.dsl.pack import pack_trigger_data
+from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session
 from gpc_recorder.paths import DEFAULT_EXPORT_PATH
 from gpc_recorder.schema.loader import get_schema
@@ -37,6 +37,8 @@ class RecorderContext:
             raise ValueError(f"No command struct mapped for {payload_type}")
 
         field_values = _extract_struct_fields(command_struct, struct_name, kwargs)
+        struct_def = self.schema.command_structs[struct_name]
+        field_values = fill_struct_fields(self.schema, struct_def, field_values)
         data, _ = pack_trigger_data(self.schema, struct_name, field_values)
         self.session.current_binding = BindingState(
             payload_type=payload_type,
