@@ -1,0 +1,342 @@
+"""DSL builtins exposed to the REPL namespace."""
+
+from typing import Any, Dict, List, Optional
+
+from gpc_recorder.codegen.emitter import emit_config_hpp
+from gpc_recorder.dsl.pack import pack_trigger_data
+from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session
+from gpc_recorder.paths import DEFAULT_EXPORT_PATH
+from gpc_recorder.schema.loader import get_schema
+from gpc_recorder.validate import (
+    validate_binding_count,
+    validate_binding_step_count,
+    validate_var_index,
+)
+
+
+class RecorderContext:
+    def __init__(self) -> None:
+        self.session = Session()
+        self.schema = get_schema()
+        self._last_export_path: Optional[str] = None
+
+    def config(self, name: str = "G474_GPC_CONFIG", component: str = "") -> None:
+        self.session.config_name = name
+        if component:
+            self.session.component_id = component.split("::")[-1]
+
+    def begin_binding(self, trigger: str, command_struct: Any = None, **kwargs: Any) -> None:
+        if self.session.current_binding is not None:
+            raise RuntimeError("Call end_binding() before starting a new binding")
+        payload_type = trigger.split("::")[-1] if isinstance(trigger, str) else str(trigger)
+        if payload_type not in self.schema.payload_type_ids:
+            raise ValueError(f"Unknown PayloadTypeIds::{payload_type}")
+
+        struct_name = self.schema.payload_id_to_struct.get(payload_type)
+        if struct_name is None:
+            raise ValueError(f"No command struct mapped for {payload_type}")
+
+        field_values = _extract_struct_fields(command_struct, struct_name, kwargs)
+        data, _ = pack_trigger_data(self.schema, struct_name, field_values)
+        self.session.current_binding = BindingState(
+            payload_type=payload_type,
+            struct_name=struct_name,
+            field_values=field_values,
+            data=data,
+        )
+        print(f"Binding started: {payload_type} ({struct_name}), {len(data)} bytes packed")
+
+    def end_binding(self) -> None:
+        if self.session.current_binding is None:
+            raise RuntimeError("No binding in progress")
+        b = self.session.current_binding
+        validate_binding_step_count(len(b.steps))
+        validate_binding_count(len(self.session.bindings) + 1)
+        self.session.bindings.append(b)
+        self.session.current_binding = None
+        print(f"Binding saved ({len(b.steps)} steps). Total bindings: {len(self.session.bindings)}")
+
+    def clear_binding(self) -> None:
+        self.session.current_binding = None
+        print("Current binding cleared.")
+
+    def undo(self) -> None:
+        target = self.session.current_binding
+        if target is not None and target.steps:
+            target.steps.pop()
+            print("Removed last step from current binding.")
+            return
+        if self.session.bindings:
+            b = self.session.bindings[-1]
+            if b.steps:
+                b.steps.pop()
+                print("Removed last step from last saved binding.")
+            else:
+                self.session.bindings.pop()
+                print("Removed empty binding.")
+            return
+        print("Nothing to undo.")
+
+    def _add_step(self, union_member: str, values: Dict[str, Any]) -> None:
+        if self.session.current_binding is None:
+            raise RuntimeError("Call begin_binding() first")
+        if union_member not in self.schema.micro_ops:
+            raise ValueError(f"Unknown micro-op {union_member!r}")
+        op = self.schema.micro_ops[union_member]
+        if "var_index" in values:
+            validate_var_index(int(values["var_index"]))
+        if len(self.session.current_binding.steps) >= 15:
+            raise ValueError("Maximum 15 steps per binding")
+        self.session.current_binding.steps.append(
+            MicroOpStepState(op_type=op.op_type_name, union_member=union_member, values=values)
+        )
+
+    def gpio_write(self, port: int, pin: int, value: int) -> None:
+        self._add_step("digital_gpio_write", {"port": port, "pin": pin, "value": value})
+
+    def gpio_read(self, port: int, pin: int, var_index: int) -> None:
+        self._add_step("digital_gpio_read", {"port": port, "pin": pin, "var_index": var_index})
+
+    def adc_read(
+        self,
+        adc_instance: int,
+        channel: int,
+        var_index: int,
+        store_raw: int = 1,
+    ) -> None:
+        self._add_step(
+            "adc_read",
+            {
+                "adc_instance": adc_instance,
+                "channel": channel,
+                "var_index": var_index,
+                "store_raw": store_raw,
+            },
+        )
+
+    def dac_write(
+        self,
+        dac_instance: int,
+        use_var: int = 0,
+        var_index: int = 0,
+        literal_value: int = 0,
+    ) -> None:
+        self._add_step(
+            "dac_write",
+            {
+                "dac_instance": dac_instance,
+                "use_var": use_var,
+                "var_index": var_index,
+                "literal_value": literal_value,
+            },
+        )
+
+    def delay_ms(self, delay_ms: int) -> None:
+        self._add_step("delay_ms", {"delay_ms": delay_ms})
+
+    def can_transmit(
+        self,
+        can_bus: int,
+        id: int,
+        dlc: int,
+        data: List[int],
+    ) -> None:
+        self._add_step(
+            "can_transmit",
+            {"can_bus": can_bus, "id": id, "dlc": dlc, "data": list(data)},
+        )
+
+    def pwm_set(
+        self,
+        timer_instance: int,
+        channel: int,
+        use_var: int = 0,
+        var_index: int = 0,
+        literal_duty: int = 0,
+    ) -> None:
+        self._add_step(
+            "pwm_set",
+            {
+                "timer_instance": timer_instance,
+                "channel": channel,
+                "use_var": use_var,
+                "var_index": var_index,
+                "literal_duty": literal_duty,
+            },
+        )
+
+    def uart_transmit(self, uart_instance: int, length: int, data: List[int]) -> None:
+        self._add_step(
+            "uart_transmit",
+            {"uart_instance": uart_instance, "length": length, "data": list(data)},
+        )
+
+    def spi_transfer(self, spi_instance: int, tx_len: int, tx_data: List[int]) -> None:
+        self._add_step(
+            "spi_transfer",
+            {"spi_instance": spi_instance, "tx_len": tx_len, "tx_data": list(tx_data)},
+        )
+
+    def i2c_write(
+        self,
+        i2c_instance: int,
+        device_addr: int,
+        length: int,
+        data: List[int],
+    ) -> None:
+        self._add_step(
+            "i2c_write",
+            {
+                "i2c_instance": i2c_instance,
+                "device_addr": device_addr,
+                "length": length,
+                "data": list(data),
+            },
+        )
+
+    def bindings_summary(self) -> list:
+        """List of {index, payload_type, step_count, in_progress} for UI."""
+        out = []
+        for i, b in enumerate(self.session.bindings):
+            out.append(
+                {"index": i, "payload_type": b.payload_type, "step_count": len(b.steps), "in_progress": False}
+            )
+        if self.session.current_binding:
+            cb = self.session.current_binding
+            out.append(
+                {
+                    "index": len(out),
+                    "payload_type": cb.payload_type,
+                    "step_count": len(cb.steps),
+                    "in_progress": True,
+                }
+            )
+        return out
+
+    def show(self) -> str:
+        summary = self.bindings_summary()
+        if not summary:
+            return "No bindings yet."
+        d = self.session.to_dict()
+        lines = [f"config={d['config_name']}, component={d['component_id']}"]
+        for b in summary:
+            tag = " (recording)" if b["in_progress"] else ""
+            lines.append(f"  [{b['index']}] {b['payload_type']}: {b['step_count']} steps{tag}")
+        return "\n".join(lines)
+
+    def preview(self) -> str:
+        if not self.session.bindings and not self.session.current_binding:
+            return "// No bindings to preview"
+        return emit_config_hpp(self.session.to_dict(), self.schema, write=False)
+
+    def export(self, path: str = "") -> str:
+        out = DEFAULT_EXPORT_PATH if not path else __import__("pathlib").Path(path)
+        if not path and not self.session.bindings:
+            raise RuntimeError("No bindings to export")
+        if self.session.current_binding is not None:
+            raise RuntimeError("Call end_binding() before export")
+        text = emit_config_hpp(self.session.to_dict(), self.schema, out, write=True)
+        self._last_export_path = str(out)
+        print(f"Exported to {out}")
+        return text
+
+    def help(self, name: str = "") -> str:
+        if not name:
+            return (
+                "Commands: config(), begin_binding(), gpio_write(), adc_read(), dac_write(), "
+                "delay_ms(), can_transmit(), pwm_set(), uart_transmit(), spi_transfer(), "
+                "i2c_write(), end_binding(), show(), preview(), export(), help(), undo(), clear_binding()"
+            )
+        name = name.split("::")[-1]
+        if name in self.schema.micro_ops:
+            op = self.schema.micro_ops[name]
+            lines = [f"{name}({', '.join(f.name for f in op.fields)})"]
+            for f in op.fields:
+                lines.append(f"  {f.cpp_type} {f.name}")
+            return "\n".join(lines)
+        if name in self.schema.payload_id_to_struct:
+            sn = self.schema.payload_id_to_struct[name]
+            st = self.schema.command_structs[sn]
+            lines = [f"{sn} for PayloadTypeIds::{name}"]
+            for f in st.fields:
+                lines.append(f"  {f.cpp_type} {f.name}")
+            return "\n".join(lines)
+        if name in self.schema.command_structs:
+            st = self.schema.command_structs[name]
+            lines = [f"struct {name}"]
+            for f in st.fields:
+                lines.append(f"  {f.cpp_type} {f.name}")
+            return "\n".join(lines)
+        return f"Unknown: {name}"
+
+
+def _extract_struct_fields(
+    command_struct: Any,
+    struct_name: str,
+    kwargs: Dict[str, Any],
+) -> Dict[str, Any]:
+    if command_struct is not None and hasattr(command_struct, "_fields"):
+        return dict(command_struct._fields)
+    if command_struct is not None and isinstance(command_struct, dict):
+        return command_struct
+    if kwargs:
+        return kwargs
+    if command_struct is not None and hasattr(command_struct, "__dict__"):
+        return {k: v for k, v in command_struct.__dict__.items() if not k.startswith("_")}
+    raise ValueError(f"Provide {struct_name}(field=...) as kwargs or a struct instance")
+
+
+class StructInstance:
+    """Simple struct placeholder for begin_binding(DRIVE_COMMAND, DriveCommand(...))."""
+
+    def __init__(self, struct_name: str, **fields: Any):
+        self._struct_name = struct_name
+        self._fields = fields
+
+    def __repr__(self) -> str:
+        inner = ", ".join(f"{k}={v!r}" for k, v in self._fields.items())
+        return f"{self._struct_name}({inner})"
+
+
+def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
+    schema = ctx.schema
+    ns: Dict[str, Any] = {
+        "config": ctx.config,
+        "begin_binding": ctx.begin_binding,
+        "end_binding": ctx.end_binding,
+        "clear_binding": ctx.clear_binding,
+        "undo": ctx.undo,
+        "gpio_write": ctx.gpio_write,
+        "gpio_read": ctx.gpio_read,
+        "adc_read": ctx.adc_read,
+        "dac_write": ctx.dac_write,
+        "delay_ms": ctx.delay_ms,
+        "can_transmit": ctx.can_transmit,
+        "pwm_set": ctx.pwm_set,
+        "uart_transmit": ctx.uart_transmit,
+        "spi_transfer": ctx.spi_transfer,
+        "i2c_write": ctx.i2c_write,
+        "show": ctx.show,
+        "preview": ctx.preview,
+        "export": ctx.export,
+        "help": ctx.help,
+        "True": True,
+        "False": False,
+    }
+    for pid in schema.payload_type_ids:
+        ns[pid] = pid
+    for ename, edef in schema.enums.items():
+        for vname, vval in edef.values.items():
+            ns[vname] = vname
+    for cid in schema.component_ids:
+        ns[cid] = cid
+    for sname in schema.command_structs:
+
+        def _make_factory(name: str):
+            def _factory(**kw: Any) -> StructInstance:
+                return StructInstance(name, **kw)
+
+            return _factory
+
+        ns[sname] = _make_factory(sname)
+    return ns

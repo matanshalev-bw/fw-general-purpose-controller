@@ -1,0 +1,42 @@
+#ifndef G474_GPC_CONFIG_MEMORY_HPP_
+#define G474_GPC_CONFIG_MEMORY_HPP_
+
+#include "config_memory.hpp"
+#include "distributed_can_id.hpp"
+#include "PayloadTypes.hpp"
+
+volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMORY = {
+    .config_type = {
+        .name = "{{ config_name }}",
+        .type = ConfigTypeEnum::GPC_CONFIG,
+    },
+    .bluelink_identity_config = {
+        .component_id = bluelink::ComponentId::{{ component_id }},
+    },
+    .sequences_config = {
+        .binding_count = {{ binding_count }},
+        .bindings = {
+{% for b in bindings %}
+            {
+                .trigger = {
+                    .payload_type = bluelink::PayloadTypeIds::{{ b.payload_type }},
+                    .data = { {{- b.data_init -}} },
+                },
+                .sequence = {
+                    .step_count = {{ b.step_count }},
+                    .steps = {
+{% for s in b.steps %}
+                        {
+                            .op_type = bluelink::MicroOpsPayload::{{ s.op_type }},
+                            .{{ s.union_member }} = {{ s.init }},
+                        },
+{% endfor %}
+                    },
+                },
+            },
+{% endfor %}
+        },
+    },
+};
+
+#endif  // G474_GPC_CONFIG_MEMORY_HPP_
