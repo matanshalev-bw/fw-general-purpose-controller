@@ -8,6 +8,7 @@ from typing import List, Tuple
 
 from gpc_recorder.dsl.builtins import RecorderContext, build_namespace
 from gpc_recorder.dsl.completion import complete_line, longest_common_prefix
+from gpc_recorder.dsl.normalize import normalize_line
 
 
 class ReplEngine:
@@ -24,6 +25,8 @@ class ReplEngine:
 
         if line in ("exit", "quit"):
             return "Goodbye.", False
+
+        line = normalize_line(line)
 
         try:
             tree = ast.parse(line, mode="exec")

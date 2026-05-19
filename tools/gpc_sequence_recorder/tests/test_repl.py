@@ -26,3 +26,15 @@ def test_repl_builds_example_binding():
     assert "DRIVE_COMMAND" in hpp
     assert "digital_gpio_write" in hpp
     assert ".delay_ms = {500}" in hpp
+
+
+def test_begin_binding_trigger_then_struct_syntax():
+    engine = ReplEngine()
+    line = (
+        "begin_binding(trigger=BRAKES_CONTINUOUS_COMMAND,"
+        "BrakesContinuousCommand(brake_mode=BRAKE_MODE_ARMED, desired_brakes_position_in_percentage=20))"
+    )
+    out, cont = engine.execute(line)
+    assert cont, out
+    assert engine.ctx.session.current_binding is not None
+    assert engine.ctx.session.current_binding.payload_type == "BRAKES_CONTINUOUS_COMMAND"

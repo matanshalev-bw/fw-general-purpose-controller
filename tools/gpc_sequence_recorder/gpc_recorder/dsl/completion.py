@@ -8,7 +8,7 @@ from gpc_recorder.schema.cpp_parser import Schema
 # Builtin call -> keyword argument names (with trailing '=')
 FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "config": ["name=", "component="],
-    "begin_binding": ["trigger="],
+    "begin_binding": ["trigger=", "command_struct="],
     "gpio_write": ["port=", "pin=", "value="],
     "gpio_read": ["port=", "pin=", "var_index="],
     "adc_read": ["adc_instance=", "channel=", "var_index=", "store_raw="],
@@ -85,7 +85,7 @@ def _begin_binding_struct_candidates(
 ) -> List[str]:
     """Second argument to begin_binding: Command struct matching trigger."""
     m = re.search(
-        r"begin_binding\s*\(\s*(?:trigger\s*=\s*)?(\w+)\s*,\s*([A-Za-z_][A-Za-z0-9_]*)?$",
+        r"begin_binding\s*\(\s*(?:trigger\s*=\s*)?(\w+)\s*,\s*(?:command_struct\s*=\s*)?([A-Za-z_][A-Za-z0-9_]*)?$",
         line,
     )
     if not m:
