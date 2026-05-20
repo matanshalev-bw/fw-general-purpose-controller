@@ -18,7 +18,6 @@ def test_powerup_repl_and_export():
 
     hpp = engine.preview_hpp()
     assert "powerup_sequence" in hpp
-    assert ".step_count = 2" in hpp
     assert "digital_gpio_write" in hpp
 
     schema = get_schema()

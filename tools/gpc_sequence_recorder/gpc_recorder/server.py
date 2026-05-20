@@ -5,7 +5,12 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from gpc_recorder.dsl.repl import ReplEngine
-from gpc_recorder.paths import DEFAULT_EXPORT_PATH, FLASH_CONFIG_BYTES_SIZE, TOOL_DIR
+from gpc_recorder.paths import (
+    DEFAULT_EXPORT_HEX_PATH,
+    DEFAULT_EXPORT_PATH,
+    FLASH_CONFIG_BYTES_SIZE,
+    TOOL_DIR,
+)
 
 WEB_DIR = TOOL_DIR / "web"
 
@@ -36,10 +41,11 @@ async def export_config() -> dict:
         return {
             "ok": True,
             "path": str(DEFAULT_EXPORT_PATH),
+            "hex_path": str(DEFAULT_EXPORT_HEX_PATH),
             "hpp": text,
             "flash_note": (
-                f"Ensure static_assert(sizeof(ConfigMemory) <= {FLASH_CONFIG_BYTES_SIZE}) "
-                f"({FLASH_CONFIG_BYTES_SIZE // 1024} KB flash config region)."
+                f"Also wrote {DEFAULT_EXPORT_HEX_PATH.name} (packed config image). "
+                f"Flash region: {FLASH_CONFIG_BYTES_SIZE // 1024} KB at 0x08070000."
             ),
         }
     except Exception as e:

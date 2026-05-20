@@ -123,14 +123,19 @@
 
   document.getElementById("btn-export").addEventListener("click", async () => {
     const path = "configs/ConfigsTypes/g474_gpc_config_memory.hpp";
-    if (!confirm(`Export to ${path}? This will overwrite the existing file.`)) {
+    const hexPath = "config_projects/config_g474/Debug/config_g474.hex";
+    if (
+      !confirm(
+        `Export to ${path} and ${hexPath}? This will overwrite both files.`
+      )
+    ) {
       return;
     }
     statusEl.textContent = "Exporting…";
     const res = await fetch("/api/export", { method: "POST" });
     const data = await res.json();
     if (data.ok) {
-      statusEl.textContent = `Exported to ${data.path}. ${data.flash_note || ""}`;
+      statusEl.textContent = `Exported to ${data.path} and ${data.hex_path}. ${data.flash_note || ""}`;
       previewEl.textContent = data.hpp;
     } else {
       statusEl.textContent = `Export failed: ${data.error}`;

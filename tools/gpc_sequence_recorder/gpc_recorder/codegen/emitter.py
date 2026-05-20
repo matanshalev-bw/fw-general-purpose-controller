@@ -1,11 +1,13 @@
 """Emit g474_gpc_config_memory.hpp from session model."""
 
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from gpc_recorder.paths import TOOL_DIR
+from gpc_recorder.codegen.config_build import ConfigBuildError, build_config_hex
+from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS, TOOL_DIR
 
 
 def _format_data_array(data: List[int], struct_name: str, field_values: Dict[str, Any], schema) -> str:
@@ -100,6 +102,8 @@ def emit_config_hpp(
         lstrip_blocks=True,
     )
     def _steps_out(step_list: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+        if len(step_list) > MICRO_SEQUENCE_MAX_STEPS:
+            raise ValueError(f"At most {MICRO_SEQUENCE_MAX_STEPS} steps per sequence")
         out = []
         for step in step_list:
             out.append(
@@ -143,3 +147,21 @@ def emit_config_hpp(
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(text, encoding="utf-8")
     return text
+
+
+def emit_config_hex(
+    session: Dict[str, Any],
+    schema,
+    output_path: Path | None = None,
+    *,
+    write: bool = True,
+    hpp_path: Path | None = None,
+) -> str:
+    """Write config_g474.hex via STM32CubeIDE (matches compiled g474_gpc_config_memory.hpp)."""
+    del hpp_path
+    dest = Path(output_path) if output_path is not None else None
+    try:
+        result = build_config_hex(session, schema, dest if write else None)
+    except Exception as e:
+        raise ConfigBuildError(f"Failed to build config hex: {e}") from e
+    return result.read_text(encoding="utf-8")

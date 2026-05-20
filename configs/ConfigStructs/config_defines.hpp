@@ -6,8 +6,8 @@
 
 #define FLASH_CONFIG_SECTION __attribute__((used)) __attribute__((section(".config")))
 
-#define CONFIGS_START_SIGN "BW_GPC_CONF_S"
-#define CONFIGS_END_SIGN "BW_GPC_CONF_E"
+#define CONFIGS_START_SIGN "BW_CONF_S"
+#define CONFIGS_END_SIGN "BW_CONF_E"
 
 enum ConfigTypeEnum : uint8_t {
   UNDEFINED_CONFIG = 0,

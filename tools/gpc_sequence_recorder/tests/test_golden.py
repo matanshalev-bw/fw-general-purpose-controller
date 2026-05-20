@@ -22,7 +22,18 @@ def _build_example_session() -> dict:
     return {
         "config_name": "G474_GPC_CONFIG",
         "component_id": "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER",
-        "powerup_steps": [],
+        "powerup_steps": [
+            {
+                "op_type": "MicroOpType::DIGITAL_GPIO_WRITE",
+                "union_member": "digital_gpio_write",
+                "values": {"port": 1, "pin": 1, "value": 1},
+            },
+            {
+                "op_type": "MicroOpType::DIGITAL_GPIO_WRITE",
+                "union_member": "digital_gpio_write",
+                "values": {"port": 2, "pin": 1, "value": 0},
+            },
+        ],
         "bindings": [
             {
                 "payload_type": "DRIVE_COMMAND",

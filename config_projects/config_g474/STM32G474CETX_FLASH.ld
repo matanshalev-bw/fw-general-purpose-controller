@@ -59,7 +59,7 @@ SECTIONS
   } > CONFIG
 
   /* The startup code into "FLASH" Rom type memory */
-  .isr_vector :
+  .isr_vector (NOLOAD):
   {
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
@@ -67,7 +67,7 @@ SECTIONS
   } >FLASH
 
   /* The program code and other data into "FLASH" Rom type memory */
-  .text :
+  .text (NOLOAD):
   {
     . = ALIGN(4);
     *(.text)           /* .text sections (code) */
@@ -84,7 +84,7 @@ SECTIONS
   } >FLASH
 
   /* Constant data into "FLASH" Rom type memory */
-  .rodata :
+  .rodata (NOLOAD):
   {
     . = ALIGN(4);
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
@@ -92,7 +92,7 @@ SECTIONS
     . = ALIGN(4);
   } >FLASH
 
-  .ARM.extab : /* The "READONLY" keyword is only supported in GCC11 and later, remove it if using GCC10 or earlier. */
+  .ARM.extab (NOLOAD) : /* The "READONLY" keyword is only supported in GCC11 and later, remove it if using GCC10 or earlier. */
   {
     . = ALIGN(4);
     *(.ARM.extab* .gnu.linkonce.armextab.*)

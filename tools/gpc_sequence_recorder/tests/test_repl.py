@@ -25,6 +25,7 @@ def test_repl_builds_example_binding():
     hpp = engine.preview_hpp()
     assert "DRIVE_COMMAND" in hpp
     assert "digital_gpio_write" in hpp
+    assert "can_transmit" in hpp
     assert ".delay_ms = {500}" in hpp
 
 
