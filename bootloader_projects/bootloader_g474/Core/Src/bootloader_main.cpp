@@ -314,6 +314,8 @@ void BootloaderMain::transitionToState(BootloaderState new_state) {
 }
 
 void BootloaderMain::handleInitState() {
+    NonVolatileMemoryInterface::updateBootloaderVersionOnMetaData();
+
     if (isProgrammingCommandMetaDataPresent()) {
         transitionToState(BootloaderState::PROGRAMMING_READY);
     } else {

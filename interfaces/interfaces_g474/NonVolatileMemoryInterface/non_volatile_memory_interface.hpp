@@ -29,6 +29,7 @@ class NonVolatileMemoryInterface {
   static bool isConfigMemoryValid();
   static InterfaceStatus rewriteMetaData();
   static InterfaceStatus updateProgrammingStateOnMetaData(const ProgrammingState new_state);
+  static InterfaceStatus updateBootloaderVersionOnMetaData();
   
   // Flash operations for bootloader
   static uint32_t getPage(uint32_t addr);

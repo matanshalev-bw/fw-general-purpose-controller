@@ -221,3 +221,23 @@ InterfaceStatus NonVolatileMemoryInterface::updateProgrammingStateOnMetaData(con
 #pragma GCC diagnostic pop
 }
 
+InterfaceStatus NonVolatileMemoryInterface::updateBootloaderVersionOnMetaData() {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+	const BootloaderVersion current_version{};
+	const volatile MetaData& meta_data = NonVolatileMemoryInterface::META_DATA_;
+	if (meta_data.BOOTLOADER_VERSION.major == current_version.major and
+	    meta_data.BOOTLOADER_VERSION.minor == current_version.minor and
+	    meta_data.BOOTLOADER_VERSION.patch == current_version.patch) {
+		return InterfaceStatus::INTERFACE_OK;
+	}
+
+	MetaData updated_meta_data{};
+	memcpy(&updated_meta_data, const_cast<const MetaData*>(&meta_data), sizeof(MetaData));
+	updated_meta_data.BOOTLOADER_VERSION = current_version;
+
+	return writeDataToFlash(&updated_meta_data, sizeof(MetaData));
+#pragma GCC diagnostic pop
+}
+

@@ -18,6 +18,12 @@ struct ApplicationVersion {
   uint8_t patch = APPLICATION_VERSION_PATCH;
 };
 
+struct BootloaderVersion {
+  uint8_t major = BOOTLOADER_VERSION_MAJOR;
+  uint8_t minor = BOOTLOADER_VERSION_MINOR;
+  uint8_t patch = BOOTLOADER_VERSION_PATCH;
+};
+
 enum ProgrammingState : uint8_t {
 	PROGRAMMING_STATE_WAIT_FOR_PROGRAM = 0,
 	PROGRAMMING_STATE_PROGRAMMING_COMMAND,
@@ -31,6 +37,7 @@ struct MetaData {
   const ConfigMemoryVersion CONFIGURATION_VERSION{};
   ConfigType config_type = {"INVALID CONFIG", ConfigTypeEnum::UNDEFINED_CONFIG};
   ProgrammingState programming_state = ProgrammingState::PROGRAMMING_STATE_FLASHED;
+  BootloaderVersion BOOTLOADER_VERSION{};
 };
 
 #endif /* SRC_META_DATA_HPP_ */
