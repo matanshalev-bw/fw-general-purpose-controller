@@ -3,8 +3,9 @@
 #include <cstring>
 
 #include "main.h"
+#include "meta_data.hpp"
 #include "non_volatile_memory_interface.hpp"
-#include "PayloadTypes.hpp"
+#include "system_interface.hpp"
 
 uint16_t BluewhiteCanComm::can_receive_size_ = 0;
 bool BluewhiteCanComm::can_transmit_flag_ = true;
@@ -65,9 +66,10 @@ InterfaceStatus BluewhiteCanComm::configureCanFilter() {
   const uint8_t high_priority_payloads[] = {
       static_cast<uint8_t>(bluelink::PayloadTypeIds::RESET_COMMAND),
       static_cast<uint8_t>(bluelink::PayloadTypeIds::PROGRAMMING_COMMAND),
+      static_cast<uint8_t>(bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY),
+      static_cast<uint8_t>(bluelink::PayloadTypeIds::BLUELINK_VERSION_TELEMETRY),
       static_cast<uint8_t>(bluelink::PayloadTypeIds::DRIVE_COMMAND),
       static_cast<uint8_t>(bluelink::PayloadTypeIds::DRIVER_STATE_COMMAND),
-      static_cast<uint8_t>(bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY),
   };
 
   InterfaceStatus status = comm_can_->configHighPriorityFilters(component_id, high_priority_payloads,
@@ -89,6 +91,7 @@ InterfaceStatus BluewhiteCanComm::configureCanFilter() {
 
 void BluewhiteCanComm::tick() {
   processRxQueuedMessage();
+  processTxQueue();
   if (sequence_executor_ != nullptr) {
     sequence_executor_->tick();
   }
@@ -116,9 +119,126 @@ void BluewhiteCanComm::processRxQueuedMessage() {
   uint8_t messages_processed = 0;
   while (messages_processed < CanMessenger::MAX_RX_PROCESS_PER_TICK_ &&
          can_messenger_->getNextRxMessage(current_rx_item_)) {
-    tryStartSequenceForMessage(current_rx_item_.payload_type_id, current_rx_item_.data, current_rx_item_.length);
+    const bluelink::PayloadTypeIds payload_type =
+        static_cast<bluelink::PayloadTypeIds>(current_rx_item_.payload_type_id);
+
+    switch (payload_type) {
+      case bluelink::PayloadTypeIds::PROGRAMMING_COMMAND:
+        processProgrammingCommand();
+        break;
+
+      case bluelink::PayloadTypeIds::RESET_COMMAND:
+        processResetCommand();
+        break;
+
+      case bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY:
+        processMetaDataRequest();
+        break;
+
+      case bluelink::PayloadTypeIds::BLUELINK_VERSION_TELEMETRY:
+        processBluelinkVersionRequest();
+        break;
+
+      default:
+        tryStartSequenceForMessage(current_rx_item_.payload_type_id, current_rx_item_.data, current_rx_item_.length);
+        break;
+    }
+
     messages_processed++;
   }
+}
+
+void BluewhiteCanComm::processProgrammingCommand() {
+  const bluelink::CommandsPayload::ProgrammingCommand* received_cmd =
+      reinterpret_cast<const bluelink::CommandsPayload::ProgrammingCommand*>(current_rx_item_.data);
+  const bluelink::CommandsPayload::ProgrammingCommand::ProgrammingState prog_start =
+      bluelink::CommandsPayload::ProgrammingCommand::ProgrammingState::PROGRAMMING_STATE_START;
+
+  if (memcmp(&prog_start, &received_cmd->programming_command_union.programming_command_type,
+             sizeof(bluelink::CommandsPayload::ProgrammingCommand::ProgrammingState)) == 0) {
+    NonVolatileMemoryInterface::updateProgrammingStateOnMetaData(
+        ProgrammingState::PROGRAMMING_STATE_PROGRAMMING_COMMAND);
+    SystemInterface::delay(100);
+    SystemInterface::moveToBootloader(comm_can_.get());
+  }
+}
+
+void BluewhiteCanComm::processResetCommand() {
+  const bluelink::CommandsPayload::ResetCommand* received_cmd =
+      reinterpret_cast<const bluelink::CommandsPayload::ResetCommand*>(current_rx_item_.data);
+  const bluelink::CommandsPayload::ResetCommand reset_cmd_ref{};
+
+  if (memcmp(&reset_cmd_ref, received_cmd, sizeof(bluelink::CommandsPayload::ResetCommand)) == 0) {
+    SystemInterface::resetController();
+  }
+}
+
+void BluewhiteCanComm::processMetaDataRequest() {
+  requestMetaDataSend(current_rx_item_.source_id);
+}
+
+void BluewhiteCanComm::processBluelinkVersionRequest() {
+  bluelink_version_send_requested_ = true;
+  bluelink_version_destination_id_ = current_rx_item_.source_id;
+}
+
+void BluewhiteCanComm::processTxQueue() {
+  can_messenger_->processQueueFromTick();
+  handlePendingMetadataRequest();
+  handlePendingBluelinkVersionRequest();
+}
+
+void BluewhiteCanComm::handlePendingMetadataRequest() {
+  if (!metadata_send_requested_) {
+    return;
+  }
+
+  const volatile MetaData& meta = NonVolatileMemoryInterface::META_DATA_;
+  const bluelink::TelemetryPayload::ControllerMetaData meta_data = {
+      .component_id = meta.MY_COMPONENT_ID,
+      .bootloader_version = {meta.BOOTLOADER_VERSION.major, meta.BOOTLOADER_VERSION.minor},
+      .app_version = {meta.APPLICATION_VERSION.major, meta.APPLICATION_VERSION.minor},
+      .config_version = {meta.CONFIGURATION_VERSION.major, meta.CONFIGURATION_VERSION.minor},
+      .config_type = meta.config_type.type,
+  };
+
+  if (sendCanMessage(metadata_destination_id_, bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY, &meta_data,
+                     sizeof(meta_data))) {
+    metadata_send_requested_ = false;
+  }
+}
+
+void BluewhiteCanComm::handlePendingBluelinkVersionRequest() {
+  if (!bluelink_version_send_requested_) {
+    return;
+  }
+
+  const bluelink::TelemetryPayload::BluelinkVersionTelemetry bluelink_version = {
+      .major = BLUELINK_VERSION_MAJOR,
+      .minor = BLUELINK_VERSION_MINOR,
+      .patch = BLUELINK_VERSION_PATCH,
+  };
+
+  if (sendCanMessage(bluelink_version_destination_id_, bluelink::PayloadTypeIds::BLUELINK_VERSION_TELEMETRY,
+                     &bluelink_version, sizeof(bluelink_version))) {
+    bluelink_version_send_requested_ = false;
+  }
+}
+
+bool BluewhiteCanComm::sendCanMessage(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data,
+                                      size_t data_size) {
+  FDCAN_TxHeaderTypeDef tx_header;
+  const uint8_t component_id = NonVolatileMemoryInterface::CONFIG_MEMORY_.bluelink_identity_config.component_id;
+  const bluelink::J1939CanIdStruct can_id(static_cast<bluelink::ComponentId>(component_id), destination_id,
+                                            payload_type);
+  comm_can_->setupTxHeader(tx_header, can_id, data_size);
+
+  return can_messenger_->enqueueTxMessage(tx_header, reinterpret_cast<const uint8_t*>(data), data_size);
+}
+
+void BluewhiteCanComm::requestMetaDataSend(uint8_t destination_id) {
+  metadata_send_requested_ = true;
+  metadata_destination_id_ = destination_id;
 }
 
 bool BluewhiteCanComm::tryStartSequenceForMessage(uint8_t payload_type_id, const uint8_t* payload, uint8_t length) {

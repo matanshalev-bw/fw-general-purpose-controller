@@ -26,6 +26,8 @@ extern "C" void applicationInit(void) {
     Error_Handler();
   }
 
+  NonVolatileMemoryInterface::rewriteMetaData();
+
   g_sequence_executor = std::make_unique<MicroSequenceExecutor>();
   g_raw_can = std::make_unique<RawCanInterface>(&hfdcan3);
   g_sequence_executor->setRawCanInterface(g_raw_can.get());

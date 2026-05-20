@@ -221,8 +221,9 @@ void BootloaderMain::handlePendingMetadataRequest() {
     static const auto& meta = NonVolatileMemoryInterface::META_DATA_;
     bluelink::TelemetryPayload::ControllerMetaData data = {
         .component_id = meta.MY_COMPONENT_ID,
-        .app_version = {meta.APPLICATION_VERSION.major, meta.APPLICATION_VERSION.minor, meta.APPLICATION_VERSION.patch},
-        .config_version = {meta.CONFIGURATION_VERSION.major, meta.CONFIGURATION_VERSION.minor, meta.CONFIGURATION_VERSION.patch},
+        .bootloader_version = {meta.BOOTLOADER_VERSION.major, meta.BOOTLOADER_VERSION.minor},
+        .app_version = {meta.APPLICATION_VERSION.major, meta.APPLICATION_VERSION.minor},
+        .config_version = {meta.CONFIGURATION_VERSION.major, meta.CONFIGURATION_VERSION.minor},
         .config_type = meta.config_type.type
     };
 
