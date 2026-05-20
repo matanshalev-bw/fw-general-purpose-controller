@@ -101,8 +101,9 @@ void MicroSequenceExecutor::tick() {
     step_index_++;
   }
 
-  state_ = State::COMPLETED;
+  state_ = State::IDLE;
   active_sequence_ = nullptr;
+  step_index_ = 0;
 }
 
 bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOpStep& step) {

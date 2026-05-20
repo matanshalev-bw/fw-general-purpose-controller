@@ -29,6 +29,7 @@ struct CommandSequenceBinding {
 } __attribute__((packed));
 
 struct SequencesConfig {
+  MicroSequence powerup_sequence = {};
   uint8_t binding_count = 0;
   CommandSequenceBinding bindings[MICRO_SEQUENCE_MAX_BINDINGS] = {};
 } __attribute__((packed));

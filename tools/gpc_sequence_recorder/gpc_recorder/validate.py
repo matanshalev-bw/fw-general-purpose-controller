@@ -11,11 +11,19 @@ def validate_var_index(var_index: int) -> None:
         raise ValueError(f"var_index must be < {MICRO_VAR_SLOT_COUNT}")
 
 
-def validate_binding_step_count(count: int) -> None:
+def validate_step_count(count: int, *, label: str = "Sequence") -> None:
     if count < 1:
-        raise ValueError("Binding must have at least one step")
+        raise ValueError(f"{label} must have at least one step")
     if count > MICRO_SEQUENCE_MAX_STEPS:
-        raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_STEPS} steps per binding")
+        raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_STEPS} steps per {label.lower()}")
+
+
+def validate_binding_step_count(count: int) -> None:
+    validate_step_count(count, label="Binding")
+
+
+def validate_powerup_step_count(count: int) -> None:
+    validate_step_count(count, label="Powerup sequence")
 
 
 def validate_binding_count(count: int) -> None:

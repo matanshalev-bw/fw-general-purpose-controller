@@ -69,6 +69,7 @@ async def repl_ws(websocket: WebSocket) -> None:
                     "output": output,
                     "continue": cont,
                     "preview": preview,
+                    "powerup": _repl.ctx.powerup_summary(),
                     "bindings": _repl.ctx.bindings_summary(),
                 }
             )

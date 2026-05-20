@@ -22,6 +22,7 @@ def _build_example_session() -> dict:
     return {
         "config_name": "G474_GPC_CONFIG",
         "component_id": "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER",
+        "powerup_steps": [],
         "bindings": [
             {
                 "payload_type": "DRIVE_COMMAND",

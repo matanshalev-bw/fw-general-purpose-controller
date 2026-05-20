@@ -99,17 +99,23 @@ def emit_config_hpp(
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    bindings_out = []
-    for b in session["bindings"]:
-        steps_out = []
-        for step in b["steps"]:
-            steps_out.append(
+    def _steps_out(step_list: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+        out = []
+        for step in step_list:
+            out.append(
                 {
                     "op_type": step["op_type"],
                     "union_member": step["union_member"],
                     "init": _format_union_init(step["union_member"], step["values"], schema),
                 }
             )
+        return out
+
+    powerup_steps_out = _steps_out(session.get("powerup_steps", []))
+
+    bindings_out = []
+    for b in session["bindings"]:
+        steps_out = _steps_out(b["steps"])
         bindings_out.append(
             {
                 "payload_type": b["payload_type"],
@@ -126,6 +132,8 @@ def emit_config_hpp(
         "component_id": session["component_id"],
         "binding_count": len(bindings_out),
         "bindings": bindings_out,
+        "powerup_step_count": len(powerup_steps_out),
+        "powerup_steps": powerup_steps_out,
     }
     env.filters["format_union"] = lambda m, v: _format_union_init(m, v, schema)
 

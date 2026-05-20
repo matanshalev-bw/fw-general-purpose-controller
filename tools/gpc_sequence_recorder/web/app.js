@@ -14,18 +14,21 @@
   const statusEl = document.getElementById("status");
   const bindingsEl = document.getElementById("bindings-list");
 
-  function updateBindings(bindings) {
-    if (!bindings || bindings.length === 0) {
-      bindingsEl.textContent = "Bindings: none";
-      return;
+  function updateBindings(powerup, bindings) {
+    const parts = [];
+    if (powerup) {
+      const cls = powerup.in_progress ? ' class="recording"' : "";
+      const tag = powerup.in_progress ? " *" : "";
+      parts.push(`<span${cls}>Powerup: ${powerup.step_count} steps${tag}</span>`);
     }
-    bindingsEl.innerHTML = "Bindings: " + bindings
-      .map((b) => {
+    if (bindings && bindings.length > 0) {
+      bindings.forEach((b) => {
         const cls = b.in_progress ? ' class="recording"' : "";
         const tag = b.in_progress ? " *" : "";
-        return `<span${cls}>${b.index}: ${b.payload_type} (${b.step_count})${tag}</span>`;
-      })
-      .join("");
+        parts.push(`<span${cls}>${b.index}: ${b.payload_type} (${b.step_count})${tag}</span>`);
+      });
+    }
+    bindingsEl.innerHTML = parts.length ? parts.join(" ") : "No powerup or bindings";
   }
   let ws;
   let lineBuffer = "";
@@ -76,7 +79,9 @@
           msg.output.split("\n").forEach((l) => term.writeln(l));
         }
         if (msg.preview) previewEl.textContent = msg.preview;
-        if (msg.bindings) updateBindings(msg.bindings);
+        if (msg.powerup !== undefined || msg.bindings) {
+          updateBindings(msg.powerup, msg.bindings);
+        }
         if (msg.continue) writePrompt();
       }
     };

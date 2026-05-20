@@ -1,0 +1,6 @@
+{% for s in steps %}
+                        {
+                            .op_type = bluelink::MicroOpsPayload::{{ s.op_type }},
+                            .{{ s.union_member }} = {{ s.init }},
+                        },
+{% endfor %}

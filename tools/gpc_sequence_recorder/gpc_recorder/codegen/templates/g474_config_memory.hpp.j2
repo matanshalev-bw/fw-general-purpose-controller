@@ -14,6 +14,14 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
         .component_id = bluelink::ComponentId::{{ component_id }},
     },
     .sequences_config = {
+        .powerup_sequence = {
+            .step_count = {{ powerup_step_count }},
+            .steps = {
+{% with steps=powerup_steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
         .binding_count = {{ binding_count }},
         .bindings = {
 {% for b in bindings %}
@@ -25,12 +33,9 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                 .sequence = {
                     .step_count = {{ b.step_count }},
                     .steps = {
-{% for s in b.steps %}
-                        {
-                            .op_type = bluelink::MicroOpsPayload::{{ s.op_type }},
-                            .{{ s.union_member }} = {{ s.init }},
-                        },
-{% endfor %}
+{% with steps=b.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
                     },
                 },
             },

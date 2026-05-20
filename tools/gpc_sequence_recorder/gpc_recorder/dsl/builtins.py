@@ -7,9 +7,11 @@ from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session
 from gpc_recorder.paths import DEFAULT_EXPORT_PATH
 from gpc_recorder.schema.loader import get_schema
+from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS
 from gpc_recorder.validate import (
     validate_binding_count,
     validate_binding_step_count,
+    validate_powerup_step_count,
     validate_var_index,
 )
 
@@ -26,6 +28,8 @@ class RecorderContext:
             self.session.component_id = component.split("::")[-1]
 
     def begin_binding(self, trigger: str, command_struct: Any = None, **kwargs: Any) -> None:
+        if self.session.recording_powerup:
+            raise RuntimeError("Call end_powerup() before starting a binding")
         if self.session.current_binding is not None:
             raise RuntimeError("Call end_binding() before starting a new binding")
         payload_type = trigger.split("::")[-1] if isinstance(trigger, str) else str(trigger)
@@ -58,11 +62,34 @@ class RecorderContext:
         self.session.current_binding = None
         print(f"Binding saved ({len(b.steps)} steps). Total bindings: {len(self.session.bindings)}")
 
+    def begin_powerup(self) -> None:
+        if self.session.current_binding is not None:
+            raise RuntimeError("Call end_binding() before begin_powerup()")
+        self.session.powerup_steps = []
+        self.session.recording_powerup = True
+        print("Powerup recording started.")
+
+    def end_powerup(self) -> None:
+        if not self.session.recording_powerup:
+            raise RuntimeError("Call begin_powerup() first")
+        validate_powerup_step_count(len(self.session.powerup_steps))
+        self.session.recording_powerup = False
+        print(f"Powerup saved ({len(self.session.powerup_steps)} steps).")
+
+    def clear_powerup(self) -> None:
+        self.session.powerup_steps = []
+        self.session.recording_powerup = False
+        print("Powerup sequence cleared.")
+
     def clear_binding(self) -> None:
         self.session.current_binding = None
         print("Current binding cleared.")
 
     def undo(self) -> None:
+        if self.session.recording_powerup and self.session.powerup_steps:
+            self.session.powerup_steps.pop()
+            print("Removed last step from powerup.")
+            return
         target = self.session.current_binding
         if target is not None and target.steps:
             target.steps.pop()
@@ -80,16 +107,22 @@ class RecorderContext:
         print("Nothing to undo.")
 
     def _add_step(self, union_member: str, values: Dict[str, Any]) -> None:
-        if self.session.current_binding is None:
-            raise RuntimeError("Call begin_binding() first")
+        if self.session.recording_powerup:
+            target = self.session.powerup_steps
+            label = "powerup"
+        elif self.session.current_binding is not None:
+            target = self.session.current_binding.steps
+            label = "binding"
+        else:
+            raise RuntimeError("Call begin_powerup() or begin_binding() first")
         if union_member not in self.schema.micro_ops:
             raise ValueError(f"Unknown micro-op {union_member!r}")
         op = self.schema.micro_ops[union_member]
         if "var_index" in values:
             validate_var_index(int(values["var_index"]))
-        if len(self.session.current_binding.steps) >= 15:
-            raise ValueError("Maximum 15 steps per binding")
-        self.session.current_binding.steps.append(
+        if len(target) >= MICRO_SEQUENCE_MAX_STEPS:
+            raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_STEPS} steps per {label}")
+        target.append(
             MicroOpStepState(op_type=op.op_type_name, union_member=union_member, values=values)
         )
 
@@ -196,6 +229,12 @@ class RecorderContext:
             },
         )
 
+    def powerup_summary(self) -> dict:
+        return {
+            "step_count": len(self.session.powerup_steps),
+            "in_progress": self.session.recording_powerup,
+        }
+
     def bindings_summary(self) -> list:
         """List of {index, payload_type, step_count, in_progress} for UI."""
         out = []
@@ -216,27 +255,39 @@ class RecorderContext:
         return out
 
     def show(self) -> str:
-        summary = self.bindings_summary()
-        if not summary:
-            return "No bindings yet."
         d = self.session.to_dict()
         lines = [f"config={d['config_name']}, component={d['component_id']}"]
+        pu = len(self.session.powerup_steps)
+        tag = " (recording)" if self.session.recording_powerup else ""
+        lines.append(f"  powerup: {pu} steps{tag}")
+        summary = self.bindings_summary()
         for b in summary:
             tag = " (recording)" if b["in_progress"] else ""
             lines.append(f"  [{b['index']}] {b['payload_type']}: {b['step_count']} steps{tag}")
+        if pu == 0 and not summary:
+            return "No powerup or bindings yet."
         return "\n".join(lines)
 
     def preview(self) -> str:
-        if not self.session.bindings and not self.session.current_binding:
-            return "// No bindings to preview"
+        if (
+            not self.session.bindings
+            and not self.session.current_binding
+            and not self.session.powerup_steps
+        ):
+            return "// No powerup or bindings to preview"
         return emit_config_hpp(self.session.to_dict(), self.schema, write=False)
 
     def export(self, path: str = "") -> str:
         out = DEFAULT_EXPORT_PATH if not path else __import__("pathlib").Path(path)
-        if not path and not self.session.bindings:
-            raise RuntimeError("No bindings to export")
+        if (
+            not self.session.bindings
+            and not self.session.powerup_steps
+        ):
+            raise RuntimeError("No powerup or bindings to export")
         if self.session.current_binding is not None:
             raise RuntimeError("Call end_binding() before export")
+        if self.session.recording_powerup:
+            raise RuntimeError("Call end_powerup() before export")
         text = emit_config_hpp(self.session.to_dict(), self.schema, out, write=True)
         self._last_export_path = str(out)
         print(f"Exported to {out}")
@@ -245,9 +296,10 @@ class RecorderContext:
     def help(self, name: str = "") -> str:
         if not name:
             return (
-                "Commands: config(), begin_binding(), gpio_write(), adc_read(), dac_write(), "
-                "delay_ms(), can_transmit(), pwm_set(), uart_transmit(), spi_transfer(), "
-                "i2c_write(), end_binding(), show(), preview(), export(), help(), undo(), clear_binding()"
+                "Commands: config(), begin_powerup(), end_powerup(), clear_powerup(), "
+                "begin_binding(), gpio_write(), adc_read(), dac_write(), delay_ms(), can_transmit(), "
+                "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), end_binding(), "
+                "show(), preview(), export(), help(), undo(), clear_binding()"
             )
         name = name.split("::")[-1]
         if name in self.schema.micro_ops:
@@ -304,6 +356,9 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
     schema = ctx.schema
     ns: Dict[str, Any] = {
         "config": ctx.config,
+        "begin_powerup": ctx.begin_powerup,
+        "end_powerup": ctx.end_powerup,
+        "clear_powerup": ctx.clear_powerup,
         "begin_binding": ctx.begin_binding,
         "end_binding": ctx.end_binding,
         "clear_binding": ctx.clear_binding,

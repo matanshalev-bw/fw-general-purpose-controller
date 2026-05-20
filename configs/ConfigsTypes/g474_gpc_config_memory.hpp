@@ -14,6 +14,11 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
         .component_id = bluelink::ComponentId::COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER,
     },
     .sequences_config = {
+        .powerup_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
         .binding_count = 1,
         .bindings = {
             {

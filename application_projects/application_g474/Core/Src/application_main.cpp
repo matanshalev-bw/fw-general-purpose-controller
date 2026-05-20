@@ -32,6 +32,12 @@ extern "C" void applicationInit(void) {
   g_raw_can = std::make_unique<RawCanInterface>(&hfdcan3);
   g_sequence_executor->setRawCanInterface(g_raw_can.get());
 
+  const volatile MicroSequence& powerup =
+      NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config.powerup_sequence;
+  if (powerup.step_count > 0) {
+    g_sequence_executor->start(powerup);
+  }
+
 #ifdef HAL_ADC_MODULE_ENABLED
   extern ADC_HandleTypeDef hadc1;
   extern ADC_HandleTypeDef hadc2;
