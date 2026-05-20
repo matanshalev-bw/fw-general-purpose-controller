@@ -198,7 +198,10 @@ InterfaceStatus NonVolatileMemoryInterface::rewriteMetaData() {
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #pragma GCC diagnostic ignored "-Waddress-of-packed-member"
 	const volatile MetaData& meta_data = NonVolatileMemoryInterface::META_DATA_;
-	const BootloaderVersion preserved_bootloader_version = meta_data.BOOTLOADER_VERSION;
+	BootloaderVersion preserved_bootloader_version{};
+	preserved_bootloader_version.major = meta_data.BOOTLOADER_VERSION.major;
+	preserved_bootloader_version.minor = meta_data.BOOTLOADER_VERSION.minor;
+	preserved_bootloader_version.patch = meta_data.BOOTLOADER_VERSION.patch;
 
 	MetaData updated_meta_data{};
 	if (isConfigMemoryValid()) {
