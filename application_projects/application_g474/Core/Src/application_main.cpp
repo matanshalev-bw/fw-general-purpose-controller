@@ -7,6 +7,7 @@
 #include "micro_sequence_executor.hpp"
 #include "non_volatile_memory_interface.hpp"
 #include "raw_can_interface.hpp"
+#include "usb_comm.hpp"
 
 #ifdef HAL_ADC_MODULE_ENABLED
 #include "adc_manager.hpp"
@@ -50,6 +51,8 @@ extern "C" void applicationInit(void) {
 #endif
 
   g_bluewhite_can = std::make_unique<BluewhiteCanComm>(&hfdcan2, g_sequence_executor.get());
+
+  UsbComm::instance().initialize();
 }
 
 extern "C" void applicationTick(void) {

@@ -913,6 +913,9 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef* hpcd)
 
     /* Peripheral clock enable */
     __HAL_RCC_USB_CLK_ENABLE();
+
+    HAL_NVIC_SetPriority(USB_LP_IRQn, 6, 0);
+    HAL_NVIC_EnableIRQ(USB_LP_IRQn);
     /* USER CODE BEGIN USB_MspInit 1 */
 
     /* USER CODE END USB_MspInit 1 */
@@ -936,6 +939,8 @@ void HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)
     /* USER CODE END USB_MspDeInit 0 */
     /* Peripheral clock disable */
     __HAL_RCC_USB_CLK_DISABLE();
+
+    HAL_NVIC_DisableIRQ(USB_LP_IRQn);
     /* USER CODE BEGIN USB_MspDeInit 1 */
 
     /* USER CODE END USB_MspDeInit 1 */

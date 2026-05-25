@@ -7,6 +7,35 @@
 
 #include "comm_interface.hpp"
 
+#include "usbd_cdc.h"
+#include "usbd_cdc_if.h"
+
+///////////////////////////////// USB  /////////////////////////////////
+
+InterfaceStatus CommUsb::write(const uint8_t* data, const uint16_t size) {
+  return static_cast<InterfaceStatus>(CDC_Transmit_FS(const_cast<uint8_t*>(data), size));
+}
+
+InterfaceStatus CommUsb::startReceiveInterrupt(uint8_t* data, const uint16_t size) {
+  *receive_size_ = 0;
+  USBD_CDC_SetRxBuffer(handler_, data);
+  return static_cast<InterfaceStatus>(USBD_CDC_ReceivePacket(handler_));
+}
+
+InterfaceStatus CommUsb::startTransmitInterrupt(const uint8_t* data, const uint16_t size) {
+  USBD_CDC_HandleTypeDef* hcdc = static_cast<USBD_CDC_HandleTypeDef*>(handler_->pClassData);
+
+  if (hcdc->TxState != 0U) {
+    return InterfaceStatus::INTERFACE_BUSY;
+  }
+
+  *transmit_flag_ = false;
+  USBD_CDC_SetTxBuffer(handler_, const_cast<uint8_t*>(data), size);
+  return static_cast<InterfaceStatus>(USBD_CDC_TransmitPacket(handler_));
+}
+
+InterfaceStatus CommUsb::deInit() { return static_cast<InterfaceStatus>(USBD_Stop(handler_)); }
+
 ///////////////////////////////// SPI  /////////////////////////////////
 
 CommSpi* CommSpi::spi_instance_ = nullptr;

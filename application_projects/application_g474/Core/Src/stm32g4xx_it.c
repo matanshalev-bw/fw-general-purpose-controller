@@ -22,6 +22,7 @@
 #include "stm32g4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+extern PCD_HandleTypeDef hpcd_USB_FS;
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -245,6 +246,14 @@ void ADC1_2_IRQHandler(void)
   HAL_ADC_IRQHandler(&hadc2);
 }
 #endif
+
+/**
+  * @brief This function handles USB low priority interrupt.
+  */
+void USB_LP_IRQHandler(void)
+{
+  HAL_PCD_IRQHandler(&hpcd_USB_FS);
+}
 
 /* USER CODE BEGIN 1 */
 

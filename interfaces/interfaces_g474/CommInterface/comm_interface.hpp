@@ -12,6 +12,7 @@
 
 #include "interface_status.hpp"
 #include "stm32g4xx_hal.h"
+#include "usbd_def.h"
 #include "stm32g4xx_hal_fdcan.h"
 #include "stm32g4xx_hal_spi.h"
 #include "distributed_can_id.hpp"
@@ -45,8 +46,24 @@ class CommInterface {
   inline uint16_t getDataReceivedSize() const { return *receive_size_; }
 
   virtual InterfaceStatus write(const uint8_t* data, const uint16_t size) { return InterfaceStatus::INTERFACE_ERROR; }
+  virtual InterfaceStatus startReceiveInterrupt(uint8_t* data, const uint16_t size) { return InterfaceStatus::INTERFACE_ERROR; }
   virtual InterfaceStatus startTransmitInterrupt(const uint8_t* data, const uint16_t size) { return InterfaceStatus::INTERFACE_ERROR; }
   virtual InterfaceStatus deInit() { return InterfaceStatus::INTERFACE_ERROR; }
+};
+
+///////////////////////////////// USB  /////////////////////////////////
+
+class CommUsb : public CommInterface {
+  USBD_HandleTypeDef* handler_;
+
+ public:
+  CommUsb(USBD_HandleTypeDef* handler, uint16_t* receive_size, bool* transmit_flag)
+      : CommInterface(receive_size, transmit_flag), handler_(handler) {}
+
+  InterfaceStatus write(const uint8_t* data, const uint16_t size) override;
+  InterfaceStatus startReceiveInterrupt(uint8_t* data, const uint16_t size) override;
+  InterfaceStatus startTransmitInterrupt(const uint8_t* data, const uint16_t size) override;
+  InterfaceStatus deInit() override;
 };
 
 ///////////////////////////////// SPI  /////////////////////////////////
