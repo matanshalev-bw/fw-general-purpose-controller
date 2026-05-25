@@ -24,6 +24,7 @@ class MicroSequenceExecutor {
   State getState() const;
 
   bool start(const volatile MicroSequence& sequence);
+  bool executeImmediateOp(const bluelink::MicroOpsPayload::MicroOpStep& step);
   void tick();
 
  private:

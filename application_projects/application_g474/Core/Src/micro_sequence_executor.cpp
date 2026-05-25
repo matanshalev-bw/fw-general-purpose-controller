@@ -4,6 +4,7 @@
 
 #include "gpio_interface.hpp"
 #include "raw_can_interface.hpp"
+#include "system_interface.hpp"
 
 #ifdef HAL_ADC_MODULE_ENABLED
 #include "adc_manager.hpp"
@@ -43,6 +44,20 @@ bool MicroSequenceExecutor::isRunning() const {
 }
 
 MicroSequenceExecutor::State MicroSequenceExecutor::getState() const { return state_; }
+
+bool MicroSequenceExecutor::executeImmediateOp(const bluelink::MicroOpsPayload::MicroOpStep& step) {
+  if (isRunning()) {
+    return false;
+  }
+
+  if (step.op_type == bluelink::MicroOpsPayload::MicroOpType::DELAY_MS) {
+    const auto* delay_op = reinterpret_cast<const bluelink::MicroOpsPayload::MicroDelayMs*>(step.params);
+    SystemInterface::delay(delay_op->delay_ms);
+    return true;
+  }
+
+  return executeStep(step);
+}
 
 bool MicroSequenceExecutor::start(const volatile MicroSequence& sequence) {
   if (isRunning()) {
