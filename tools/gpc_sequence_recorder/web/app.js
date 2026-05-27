@@ -204,10 +204,6 @@
   let usbControllerCmds = [...FALLBACK_CONTROLLER_COMMANDS];
   let usbOpened = false;
 
-  function payloadTypeBluelink(payloadTypeName) {
-    return `bluelink::PayloadTypeIds::${payloadTypeName}`;
-  }
-
   function setUsbUi() {
     if (btnUsbOpen) btnUsbOpen.disabled = usbOpened;
     if (btnUsbClose) btnUsbClose.disabled = !usbOpened;
@@ -373,7 +369,7 @@
     usbMicroOps.forEach((op) => {
       const opt = document.createElement("option");
       opt.value = op.union_member;
-      opt.textContent = payloadTypeBluelink(op.payload_type);
+      opt.textContent = op.payload_type;
       opt.title = `id ${op.payload_type_id}`;
       usbMicroOpEl.appendChild(opt);
     });
@@ -388,7 +384,7 @@
     cmds.forEach((cmd) => {
       const opt = document.createElement("option");
       opt.value = cmd.payload_type;
-      opt.textContent = payloadTypeBluelink(cmd.payload_type);
+      opt.textContent = cmd.payload_type;
       opt.title = `id ${cmd.payload_type_id}`;
       usbControllerCmdEl.appendChild(opt);
     });
@@ -488,7 +484,7 @@
     const data = await res.json();
     btnUsbSend.disabled = !usbOpened;
     if (data.ok) {
-      statusEl.textContent = `Sent ${payloadTypeBluelink(data.payload_type)} (${data.payload_hex})`;
+      statusEl.textContent = `Sent ${data.payload_type} (${data.payload_hex})`;
       if (data.output) {
         term.writeln(`[USB] ${data.output}`);
       }
@@ -515,7 +511,7 @@
     const data = await res.json();
     btnUsbSendController.disabled = !usbOpened;
     if (data.ok) {
-      statusEl.textContent = `Sent ${payloadTypeBluelink(data.payload_type)} (${data.payload_hex})`;
+      statusEl.textContent = `Sent ${data.payload_type} (${data.payload_hex})`;
       if (data.output) {
         term.writeln(`[USB] ${data.output}`);
       }
