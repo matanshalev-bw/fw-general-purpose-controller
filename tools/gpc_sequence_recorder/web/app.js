@@ -148,6 +148,152 @@
     }
   });
 
+  // --- BlueLink struct dictionary ---
+  const dictOverlay = document.getElementById("dict-overlay");
+  const dictBody = document.getElementById("dict-body");
+  const dictFilter = document.getElementById("dict-filter");
+  let dictData = null;
+
+  function formatFieldLine(field) {
+    let line = `<span class="type">${field.type}</span> ${field.name}`;
+    if (field.array_size) {
+      line += `[${field.array_size}]`;
+    }
+    if (field.default !== null && field.default !== undefined && field.default !== "") {
+      line += ` <span class="def">= ${field.default}</span>`;
+    }
+    let html = `<div class="field">${line}</div>`;
+    if (field.enum_values && field.enum_values.length) {
+      const typeName = field.type.split("::").pop();
+      html += `<div class="enum-values"><div class="enum-label">enum ${typeName}</div>`;
+      field.enum_values.forEach((ev) => {
+        html += `<div class="enum-val">${ev.name} = ${ev.value}</div>`;
+      });
+      html += "</div>";
+    }
+    return html;
+  }
+
+  function fieldSearchText(field) {
+    let text = `${field.type} ${field.name}`;
+    if (field.enum_values) {
+      field.enum_values.forEach((ev) => {
+        text += ` ${ev.name} ${ev.value}`;
+      });
+    }
+    return text;
+  }
+
+  function renderDictEntry(title, meta, fields) {
+    const fieldsHtml =
+      fields && fields.length
+        ? fields.map(formatFieldLine).join("")
+        : '<div class="field dict-empty">(no fields)</div>';
+    return `<div class="dict-entry" data-search="${meta.toLowerCase()} ${title.toLowerCase()}">
+      <div class="title">${title}</div>
+      <div class="meta">${meta}</div>
+      ${fieldsHtml}
+    </div>`;
+  }
+
+  function renderDictionary(data, filter) {
+    if (!dictBody) return;
+    const q = (filter || "").trim().toLowerCase();
+    const match = (text) => !q || text.includes(q);
+
+    let html = "";
+
+    const commands = data.commands || [];
+    const cmdEntries = commands
+      .map((c) => {
+        const title = c.payload_type || c.struct_name;
+        const idPart = c.payload_type_id != null ? ` · id ${c.payload_type_id}` : "";
+        const meta = `struct ${c.struct_name}${idPart}`;
+        const search = `${title} ${meta} ${(c.fields || []).map(fieldSearchText).join(" ")}`;
+        return { title, meta, fields: c.fields, search: search.toLowerCase() };
+      })
+      .filter((e) => match(e.search));
+
+    html += '<div class="dict-section"><h3>Commands (CommandsPayload)</h3>';
+    if (!cmdEntries.length) {
+      html += '<p class="dict-empty">No matching commands.</p>';
+    } else {
+      html += cmdEntries
+        .map((e) => renderDictEntry(e.title, e.meta, e.fields))
+        .join("");
+    }
+    html += "</div>";
+
+    const micro = data.micro_ops || [];
+    const microEntries = micro
+      .map((m) => {
+        const title = m.payload_type || m.union_member;
+        const idPart = m.payload_type_id != null ? ` · id ${m.payload_type_id}` : "";
+        const meta = `struct ${m.struct_name} · ${m.union_member}()${idPart}`;
+        const search = `${title} ${meta} ${(m.fields || []).map(fieldSearchText).join(" ")}`;
+        return { title, meta, fields: m.fields, search: search.toLowerCase() };
+      })
+      .filter((e) => match(e.search));
+
+    html += '<div class="dict-section"><h3>Micro operations (MicroOpsPayload)</h3>';
+    if (!microEntries.length) {
+      html += '<p class="dict-empty">No matching micro ops.</p>';
+    } else {
+      html += microEntries
+        .map((e) => renderDictEntry(e.title, e.meta, e.fields))
+        .join("");
+    }
+    html += "</div>";
+
+    dictBody.innerHTML = html;
+  }
+
+  async function loadDictionary() {
+    if (dictData) {
+      renderDictionary(dictData, dictFilter ? dictFilter.value : "");
+      return;
+    }
+    if (dictBody) dictBody.innerHTML = '<p class="dict-empty">Loading…</p>';
+    try {
+      const res = await fetch("/api/schema/commands-dictionary");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      dictData = await res.json();
+      renderDictionary(dictData, dictFilter ? dictFilter.value : "");
+    } catch (e) {
+      if (dictBody) {
+        dictBody.innerHTML = `<p class="dict-empty">Failed to load dictionary: ${e.message}</p>`;
+      }
+    }
+  }
+
+  function openDictionary() {
+    if (!dictOverlay) return;
+    dictOverlay.classList.add("open");
+    loadDictionary();
+    if (dictFilter) {
+      dictFilter.value = "";
+      dictFilter.focus();
+    }
+  }
+
+  function closeDictionary() {
+    if (dictOverlay) dictOverlay.classList.remove("open");
+  }
+
+  document.getElementById("btn-dictionary")?.addEventListener("click", openDictionary);
+  document.getElementById("btn-dict-close")?.addEventListener("click", closeDictionary);
+  dictOverlay?.addEventListener("click", (e) => {
+    if (e.target === dictOverlay) closeDictionary();
+  });
+  dictFilter?.addEventListener("input", () => {
+    if (dictData) renderDictionary(dictData, dictFilter.value);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && dictOverlay?.classList.contains("open")) {
+      closeDictionary();
+    }
+  });
+
   // --- USB immediate micro commands ---
   const usbPortEl = document.getElementById("usb-port");
   const usbStatusEl = document.getElementById("usb-status");
