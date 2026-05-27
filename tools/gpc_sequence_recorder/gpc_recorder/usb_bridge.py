@@ -37,6 +37,15 @@ def payload_type_id(payload_type_name: str) -> int:
         raise UsbBridgeError(f"Payload type {payload_type_name} not in schema")
     return schema.payload_type_ids[payload_type_name]
 
+CONTROLLER_COMMANDS: List[Dict[str, str]] = [
+    {"label": "steering", "payload_type": "STEERING_CONTINUOUS_COMMAND"},
+    {"label": "throttle", "payload_type": "THROTTLE_CONTINUOUS_COMMAND"},
+    {"label": "brakes", "payload_type": "BRAKES_CONTINUOUS_COMMAND"},
+    {"label": "reverser", "payload_type": "REVERSER_COMMAND"},
+    # POWER_COMMAND is serialized as ControlCommand in the SDK serializer.
+    {"label": "power", "payload_type": "POWER_COMMAND", "struct_name": "ControlCommand"},
+]
+
 
 class UsbBridgeError(Exception):
     pass
@@ -145,6 +154,71 @@ def pack_micro_op_hex(union_member: str, values: Dict[str, Any]) -> str:
     raw = pack_struct(schema, struct_def, merged)
     return "".join(f"{b:02x}" for b in raw)
 
+def controller_commands_catalog() -> List[Dict[str, Any]]:
+    schema = get_schema()
+    catalog: List[Dict[str, Any]] = []
+    for item in CONTROLLER_COMMANDS:
+        payload_type = item["payload_type"]
+        type_id = payload_type_id(payload_type)
+        struct_name = item.get("struct_name") or schema.payload_id_to_struct.get(payload_type)
+        if not struct_name:
+            # Skip entries we cannot pack using the parsed CommandsPayload structs
+            continue
+        if struct_name not in schema.command_structs:
+            continue
+        struct_def = schema.command_structs[struct_name]
+
+        fields = []
+        for field in struct_def.fields:
+            default: Any = 0
+            if field.default_raw:
+                if field.array_size:
+                    default = []
+                elif field.cpp_type in schema.enums:
+                    default = field.default_raw.split("::")[-1]
+                else:
+                    try:
+                        default = int(field.default_raw, 0) if field.default_raw.startswith("0x") else int(field.default_raw)
+                    except ValueError:
+                        default = field.default_raw
+            fields.append(
+                {
+                    "name": field.name,
+                    "type": field.cpp_type,
+                    "array_size": field.array_size,
+                    "default": default,
+                }
+            )
+
+        catalog.append(
+            {
+                "label": item.get("label", payload_type.lower()),
+                "payload_type": payload_type,
+                "payload_type_id": type_id,
+                "struct_name": struct_name,
+                "fields": fields,
+            }
+        )
+    return catalog
+
+
+def pack_controller_command_hex(payload_type: str, values: Dict[str, Any]) -> str:
+    schema = get_schema()
+    struct_name = None
+    for item in CONTROLLER_COMMANDS:
+        if item["payload_type"] == payload_type:
+            struct_name = item.get("struct_name")
+            break
+    if not struct_name:
+        struct_name = schema.payload_id_to_struct.get(payload_type)
+    if not struct_name or struct_name not in schema.command_structs:
+        raise UsbBridgeError(f"No command struct mapped for payload type {payload_type}")
+
+    struct_def = schema.command_structs[struct_name]
+    merged = fill_struct_fields(schema, StructDef(name=struct_def.name, fields=struct_def.fields), values)
+    raw = pack_struct(schema, struct_def, merged)
+    return "".join(f"{b:02x}" for b in raw)
+
 
 def send_micro_command(
     union_member: str,
@@ -211,6 +285,73 @@ def send_micro_command(
         "ok": True,
         "port": use_port,
         "payload_type": payload_type_name,
+        "payload_type_id": type_id,
+        "payload_hex": payload_hex,
+        "output": stdout,
+    }
+
+
+def send_controller_command(
+    payload_type: str,
+    values: Dict[str, Any],
+    *,
+    port: Optional[str] = None,
+    qos: str = "none",
+    retries: int = 5,
+    timeout_ms: int = 2000,
+) -> Dict[str, Any]:
+    session = get_usb_session()
+    use_port = port or session.port
+    if not use_port:
+        raise UsbBridgeError("USB port not open — select a port and click Open")
+    if port is None and not session.opened:
+        raise UsbBridgeError("USB port not open — click Open first")
+
+    type_id = payload_type_id(payload_type)
+    payload_hex = pack_controller_command_hex(payload_type, values)
+    binary = usb_bluelink_binary()
+
+    cmd = [
+        str(binary),
+        "-p",
+        use_port,
+        "-d",
+        str(GPC_COMPONENT_ID),
+        "-s",
+        str(DEFAULT_SOURCE_ID),
+        "-t",
+        str(type_id),
+        "-P",
+        payload_hex,
+        "-q",
+        qos,
+    ]
+    if qos == "ack":
+        cmd.extend(["-r", str(retries), "--timeout-ms", str(timeout_ms)])
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=max(5, timeout_ms / 1000 + 3),
+            cwd=str(REPO_ROOT),
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise UsbBridgeError("USB send timed out") from exc
+    except OSError as exc:
+        raise UsbBridgeError(f"Failed to run USB bridge: {exc}") from exc
+
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    if result.returncode != 0:
+        detail = stderr or stdout or f"exit code {result.returncode}"
+        raise UsbBridgeError(detail)
+
+    return {
+        "ok": True,
+        "port": use_port,
+        "payload_type": payload_type,
         "payload_type_id": type_id,
         "payload_hex": payload_hex,
         "output": stdout,

@@ -86,15 +86,21 @@
     #bindings-list .recording { color: #dcdcaa; }
     .usb-bar {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem 0.75rem;
+      flex-direction: column;
+      gap: 0.5rem;
       padding: 0.5rem 1rem;
       background: #2a2d2e;
       border-bottom: 1px solid #333;
       font-size: 0.85rem;
     }
-    .usb-bar label { color: #aaa; margin-right: 0.25rem; }
+    .usb-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.75rem;
+      width: 100%;
+    }
+    .usb-bar label { color: #aaa; margin-right: 0.25rem; white-space: nowrap; }
     .usb-bar select, .usb-bar input {
       background: #3c3c3c;
       color: #e0e0e0;
@@ -102,6 +108,7 @@
       border-radius: 3px;
       padding: 0.25rem 0.4rem;
       font-size: 0.85rem;
+      flex-shrink: 0;
     }
     .usb-bar button {
       padding: 0.3rem 0.6rem;
@@ -119,6 +126,12 @@
     .usb-bar button.send:hover { background: #46a042; }
     #usb-status { color: #888; min-width: 5rem; }
     #usb-status.open { color: #4ec9b0; }
+    #usb-port { min-width: 14rem; max-width: 22rem; }
+    #usb-micro-op, #usb-controller-cmd {
+      min-width: 18rem;
+      max-width: 28rem;
+      width: 18rem;
+    }
     #usb-micro-fields {
       display: flex;
       flex-wrap: wrap;
@@ -133,6 +146,21 @@
     #usb-micro-fields .field label { font-size: 0.8rem; color: #bbb; }
     #usb-micro-fields input { width: 5rem; }
     #usb-micro-fields input.wide { width: 10rem; }
+
+    #usb-controller-fields {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+      align-items: center;
+    }
+    #usb-controller-fields .field {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    #usb-controller-fields .field label { font-size: 0.8rem; color: #bbb; }
+    #usb-controller-fields input { width: 5rem; }
+    #usb-controller-fields input.wide { width: 10rem; }
   </style>
 </head>
 <body>
@@ -144,16 +172,32 @@
     </div>
   </header>
   <div class="usb-bar" id="usb-bar">
-    <label for="usb-port">USB port</label>
-    <select id="usb-port" title="Serial device"></select>
-    <button type="button" id="btn-usb-refresh" class="secondary">Refresh</button>
-    <button type="button" id="btn-usb-open">Open</button>
-    <button type="button" id="btn-usb-close" class="secondary" disabled>Close</button>
-    <span id="usb-status">Closed</span>
-    <label for="usb-micro-op">Micro command</label>
-    <select id="usb-micro-op" title="Immediate micro op"></select>
-    <div id="usb-micro-fields"></div>
-    <button type="button" id="btn-usb-send" class="send" disabled>Send now</button>
+    <div class="usb-row">
+      <label for="usb-port">USB port</label>
+      <select id="usb-port" title="Serial device"></select>
+      <button type="button" id="btn-usb-refresh" class="secondary">Refresh</button>
+      <button type="button" id="btn-usb-open">Open</button>
+      <button type="button" id="btn-usb-close" class="secondary" disabled>Close</button>
+      <span id="usb-status">Closed</span>
+    </div>
+    <div class="usb-row">
+      <label for="usb-micro-op">Micro command</label>
+      <select id="usb-micro-op" title="Immediate micro op"></select>
+      <div id="usb-micro-fields"></div>
+      <button type="button" id="btn-usb-send" class="send" disabled>Send now</button>
+    </div>
+    <div class="usb-row">
+      <label for="usb-controller-cmd">Controller command</label>
+      <select id="usb-controller-cmd" title="Controller command">
+        <option value="STEERING_CONTINUOUS_COMMAND">steering (4)</option>
+        <option value="THROTTLE_CONTINUOUS_COMMAND">throttle (5)</option>
+        <option value="BRAKES_CONTINUOUS_COMMAND">brakes (42)</option>
+        <option value="REVERSER_COMMAND">reverser (41)</option>
+        <option value="POWER_COMMAND">power (98)</option>
+      </select>
+      <div id="usb-controller-fields"></div>
+      <button type="button" id="btn-usb-send-controller" class="send" disabled>Send cmd</button>
+    </div>
   </div>
   <main>
     <section class="panel">

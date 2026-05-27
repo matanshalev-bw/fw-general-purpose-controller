@@ -9,7 +9,9 @@ from gpc_recorder.usb_bridge import (
     UsbBridgeError,
     get_usb_session,
     list_serial_ports,
+    controller_commands_catalog,
     micro_ops_catalog,
+    send_controller_command,
     send_micro_command,
 )
 from gpc_recorder.paths import (
@@ -20,6 +22,9 @@ from gpc_recorder.paths import (
 )
 
 WEB_DIR = TOOL_DIR / "web"
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+_APP_JS = WEB_DIR / "app.js"
+_ASSET_VERSION = str(int(_APP_JS.stat().st_mtime)) if _APP_JS.is_file() else "0"
 
 app = FastAPI(title="GPC Sequence Recorder")
 _repl = ReplEngine()
@@ -28,12 +33,13 @@ _repl = ReplEngine()
 @app.get("/")
 async def index() -> HTMLResponse:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(html)
+    html = html.replace('src="/app.js"', f'src="/app.js?v={_ASSET_VERSION}"')
+    return HTMLResponse(html, headers=_NO_CACHE)
 
 
 @app.get("/app.js")
 async def app_js() -> FileResponse:
-    return FileResponse(WEB_DIR / "app.js", media_type="application/javascript")
+    return FileResponse(_APP_JS, media_type="application/javascript", headers=_NO_CACHE)
 
 
 @app.get("/api/preview")
@@ -54,6 +60,10 @@ async def usb_status() -> dict:
 @app.get("/api/usb/micro-ops")
 async def usb_micro_ops() -> dict:
     return {"micro_ops": micro_ops_catalog()}
+
+@app.get("/api/usb/controller-commands")
+async def usb_controller_commands() -> dict:
+    return {"controller_commands": controller_commands_catalog()}
 
 
 @app.post("/api/usb/open")
@@ -84,6 +94,25 @@ async def usb_send_micro(body: dict) -> dict:
     try:
         result = send_micro_command(
             str(union_member),
+            values,
+            qos=str(qos),
+            retries=int(body.get("retries", 5)),
+            timeout_ms=int(body.get("timeout_ms", 2000)),
+        )
+        return result
+    except UsbBridgeError as e:
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/usb/send-controller")
+async def usb_send_controller(body: dict) -> dict:
+    payload_type = body.get("payload_type")
+    values = body.get("values") or {}
+    qos = body.get("qos", "none")
+    if not payload_type:
+        return {"ok": False, "error": "Missing payload_type"}
+    try:
+        result = send_controller_command(
+            str(payload_type),
             values,
             qos=str(qos),
             retries=int(body.get("retries", 5)),

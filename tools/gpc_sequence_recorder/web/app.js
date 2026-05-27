@@ -153,18 +153,63 @@
   const usbStatusEl = document.getElementById("usb-status");
   const usbMicroOpEl = document.getElementById("usb-micro-op");
   const usbMicroFieldsEl = document.getElementById("usb-micro-fields");
+  const usbControllerCmdEl = document.getElementById("usb-controller-cmd");
+  const usbControllerFieldsEl = document.getElementById("usb-controller-fields");
   const btnUsbOpen = document.getElementById("btn-usb-open");
   const btnUsbClose = document.getElementById("btn-usb-close");
   const btnUsbSend = document.getElementById("btn-usb-send");
+  const btnUsbSendController = document.getElementById("btn-usb-send-controller");
+
+  /** Built-in catalog so the controller dropdown works before/without API. */
+  const FALLBACK_CONTROLLER_COMMANDS = [
+    {
+      label: "steering",
+      payload_type: "STEERING_CONTINUOUS_COMMAND",
+      payload_type_id: 4,
+      fields: [{ name: "desired_wheel_angle_in_deg", type: "float", default: 0 }],
+    },
+    {
+      label: "throttle",
+      payload_type: "THROTTLE_CONTINUOUS_COMMAND",
+      payload_type_id: 5,
+      fields: [
+        { name: "desired_throttle_in_percentage", type: "uint8_t", default: 0 },
+        { name: "desired_rpm", type: "uint16_t", default: 0 },
+      ],
+    },
+    {
+      label: "brakes",
+      payload_type: "BRAKES_CONTINUOUS_COMMAND",
+      payload_type_id: 42,
+      fields: [
+        { name: "brake_mode", type: "BrakeMode", default: 0 },
+        { name: "desired_brakes_position_in_percentage", type: "uint8_t", default: 0 },
+      ],
+    },
+    {
+      label: "reverser",
+      payload_type: "REVERSER_COMMAND",
+      payload_type_id: 41,
+      fields: [{ name: "reverser_gear_mode", type: "ReverserGearMode", default: "REVERSER_GEAR_MODE_NEUTRAL" }],
+    },
+    {
+      label: "power",
+      payload_type: "POWER_COMMAND",
+      payload_type_id: 98,
+      fields: [{ name: "is_desired_control_on", type: "bool", default: true }],
+    },
+  ];
 
   let usbMicroOps = [];
+  let usbControllerCmds = [...FALLBACK_CONTROLLER_COMMANDS];
   let usbOpened = false;
 
   function setUsbUi() {
-    btnUsbOpen.disabled = usbOpened;
-    btnUsbClose.disabled = !usbOpened;
-    btnUsbSend.disabled = !usbOpened;
-    usbPortEl.disabled = usbOpened;
+    if (btnUsbOpen) btnUsbOpen.disabled = usbOpened;
+    if (btnUsbClose) btnUsbClose.disabled = !usbOpened;
+    if (btnUsbSend) btnUsbSend.disabled = !usbOpened;
+    if (btnUsbSendController) btnUsbSendController.disabled = !usbOpened;
+    if (usbPortEl) usbPortEl.disabled = usbOpened;
     if (usbOpened) {
       usbStatusEl.textContent = `Open: ${usbPortEl.value}`;
       usbStatusEl.classList.add("open");
@@ -249,19 +294,128 @@
     return values;
   }
 
+  function renderUsbControllerFields(cmd) {
+    if (!usbControllerFieldsEl) return;
+    usbControllerFieldsEl.innerHTML = "";
+    if (!cmd) return;
+    cmd.fields.forEach((f) => {
+      const wrap = document.createElement("div");
+      wrap.className = "field";
+      const label = document.createElement("label");
+      label.textContent = f.name;
+      label.htmlFor = `usb-ctrl-field-${f.name}`;
+      const input = document.createElement("input");
+      input.id = `usb-ctrl-field-${f.name}`;
+      input.dataset.field = f.name;
+      if (f.array_size) {
+        input.classList.add("wide");
+        input.placeholder = `comma-separated (${f.array_size})`;
+        if (Array.isArray(f.default)) {
+          input.value = f.default.join(",");
+        }
+      } else {
+        input.value =
+          f.default !== undefined && f.default !== null ? String(f.default) : "0";
+      }
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      usbControllerFieldsEl.appendChild(wrap);
+    });
+  }
+
+  function collectUsbControllerValues(cmd) {
+    const values = {};
+    cmd.fields.forEach((f) => {
+      const input = document.getElementById(`usb-ctrl-field-${f.name}`);
+      if (!input) return;
+      let raw = input.value.trim();
+      if (f.array_size) {
+        values[f.name] = raw ? raw.split(",").map((s) => s.trim()) : [];
+        return;
+      }
+      if (/^0x[0-9a-fA-F]+$/.test(raw)) {
+        values[f.name] = raw;
+      } else if (/^-?\d+$/.test(raw)) {
+        values[f.name] = parseInt(raw, 10);
+      } else {
+        values[f.name] = raw;
+      }
+    });
+    return values;
+  }
+
   async function loadUsbMicroOps() {
-    const res = await fetch("/api/usb/micro-ops");
-    const data = await res.json();
-    usbMicroOps = data.micro_ops || [];
     usbMicroOpEl.innerHTML = "";
+    const loading = document.createElement("option");
+    loading.value = "";
+    loading.textContent = "(loading micro commands…)";
+    usbMicroOpEl.appendChild(loading);
+    try {
+      const res = await fetch("/api/usb/micro-ops");
+      const data = await res.json();
+      usbMicroOps = data.micro_ops || [];
+    } catch (_e) {
+      usbMicroOps = [];
+    }
+    usbMicroOpEl.innerHTML = "";
+    if (!usbMicroOps.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "(no micro commands available)";
+      usbMicroOpEl.appendChild(opt);
+      usbMicroFieldsEl.innerHTML = "";
+      return;
+    }
     usbMicroOps.forEach((op) => {
       const opt = document.createElement("option");
       opt.value = op.union_member;
       opt.textContent = `${op.union_member} (${op.payload_type_id})`;
       usbMicroOpEl.appendChild(opt);
     });
-    if (usbMicroOps.length) {
-      renderUsbMicroFields(usbMicroOps[0]);
+    renderUsbMicroFields(usbMicroOps[0]);
+  }
+
+  function applyControllerCatalog(cmds) {
+    if (!usbControllerCmdEl || !cmds.length) return;
+    const prev = usbControllerCmdEl.value;
+    usbControllerCmds = cmds;
+    usbControllerCmdEl.innerHTML = "";
+    cmds.forEach((cmd) => {
+      const opt = document.createElement("option");
+      opt.value = cmd.payload_type;
+      opt.textContent = `${cmd.label} (${cmd.payload_type_id})`;
+      usbControllerCmdEl.appendChild(opt);
+    });
+    const stillValid = cmds.some((c) => c.payload_type === prev);
+    usbControllerCmdEl.value = stillValid ? prev : cmds[0].payload_type;
+    const selected = cmds.find((c) => c.payload_type === usbControllerCmdEl.value) || cmds[0];
+    renderUsbControllerFields(selected);
+  }
+
+  function initControllerCommandsFromDom() {
+    if (!usbControllerCmdEl) return;
+    const fromDom = [];
+    for (const opt of usbControllerCmdEl.options) {
+      if (!opt.value) continue;
+      const fb = FALLBACK_CONTROLLER_COMMANDS.find((c) => c.payload_type === opt.value);
+      if (fb) fromDom.push(fb);
+    }
+    if (fromDom.length) {
+      applyControllerCatalog(fromDom);
+    } else {
+      applyControllerCatalog(FALLBACK_CONTROLLER_COMMANDS);
+    }
+  }
+
+  async function loadUsbControllerCommands() {
+    try {
+      const res = await fetch("/api/usb/controller-commands");
+      if (!res.ok) return;
+      const data = await res.json();
+      const cmds = data.controller_commands || [];
+      if (cmds.length) applyControllerCatalog(cmds);
+    } catch (_e) {
+      /* keep built-in / HTML catalog */
     }
   }
 
@@ -269,6 +423,14 @@
     const op = usbMicroOps.find((o) => o.union_member === usbMicroOpEl.value);
     renderUsbMicroFields(op);
   });
+
+  if (usbControllerCmdEl) {
+    initControllerCommandsFromDom();
+    usbControllerCmdEl.addEventListener("change", () => {
+      const cmd = usbControllerCmds.find((c) => c.payload_type === usbControllerCmdEl.value);
+      renderUsbControllerFields(cmd);
+    });
+  }
 
   document.getElementById("btn-usb-refresh").addEventListener("click", refreshUsbPorts);
 
@@ -329,13 +491,49 @@
     }
   });
 
+  btnUsbSendController.addEventListener("click", async () => {
+    const cmd = usbControllerCmds.find((c) => c.payload_type === usbControllerCmdEl.value);
+    if (!cmd) return;
+    const values = collectUsbControllerValues(cmd);
+    statusEl.textContent = "Sending controller command…";
+    btnUsbSendController.disabled = true;
+    const res = await fetch("/api/usb/send-controller", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        payload_type: cmd.payload_type,
+        values,
+        qos: "none",
+      }),
+    });
+    const data = await res.json();
+    btnUsbSendController.disabled = !usbOpened;
+    if (data.ok) {
+      statusEl.textContent = `Sent type ${data.payload_type_id} (${data.payload_hex})`;
+      if (data.output) {
+        term.writeln(`[USB] ${data.output}`);
+      }
+    } else {
+      statusEl.textContent = `Send failed: ${data.error}`;
+    }
+  });
+
   (async function initUsb() {
-    await refreshUsbPorts();
-    await loadUsbMicroOps();
-    const st = await fetch("/api/usb/status");
-    const stData = await st.json();
-    usbOpened = !!stData.opened;
-    if (stData.port) usbPortEl.value = stData.port;
+    loadUsbControllerCommands();
+    loadUsbMicroOps();
+    try {
+      await refreshUsbPorts();
+    } catch (_e) {
+      /* port list optional */
+    }
+    try {
+      const st = await fetch("/api/usb/status");
+      const stData = await st.json();
+      usbOpened = !!stData.opened;
+      if (stData.port && usbPortEl) usbPortEl.value = stData.port;
+    } catch (_e) {
+      usbOpened = false;
+    }
     setUsbUi();
   })();
 
