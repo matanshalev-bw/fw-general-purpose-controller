@@ -257,7 +257,7 @@
     usbMicroOps.forEach((op) => {
       const opt = document.createElement("option");
       opt.value = op.union_member;
-      opt.textContent = `${op.union_member} (${op.payload_type})`;
+      opt.textContent = `${op.union_member} (${op.payload_type_id})`;
       usbMicroOpEl.appendChild(opt);
     });
     if (usbMicroOps.length) {
@@ -320,7 +320,7 @@
     const data = await res.json();
     btnUsbSend.disabled = !usbOpened;
     if (data.ok) {
-      statusEl.textContent = `Sent ${data.payload_type} (${data.payload_hex})`;
+      statusEl.textContent = `Sent type ${data.payload_type_id} (${data.payload_hex})`;
       if (data.output) {
         term.writeln(`[USB] ${data.output}`);
       }

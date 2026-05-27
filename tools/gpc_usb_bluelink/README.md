@@ -18,7 +18,7 @@ make CC=g++ all
 
 ```bash
 ./gpc_usb_bluelink_x86_64 -p /dev/ttyACM0 \
-  -t MICRO_DIGITAL_GPIO_WRITE_COMMAND \
+  -t 99 \
   -P 010501 \
   -q ack
 ```
@@ -30,7 +30,7 @@ make CC=g++ all
 | `-p, --port` | Serial device (default `/dev/ttyACM0`) |
 | `-d, --dst` | Destination component id (default `17` = GPC `0x11`) |
 | `-s, --src` | Source id (default `2` = HLC) |
-| `-t, --payload-type` | `PayloadTypeIds` numeric value or name (required) |
+| `-t, --payload-type` | `PayloadTypeIds` numeric value, decimal or `0x` hex (required) |
 | `-P, --payload` | Payload as hex bytes (optional; size from SDK if omitted) |
 | `-q, --qos` | `none` or `ack` |
 | `-r, --retries` | ACK retransmit count (default 5) |
@@ -44,7 +44,7 @@ import subprocess
 subprocess.run([
     "tools/gpc_usb_bluelink/gpc_usb_bluelink_x86_64",
     "--port", "/dev/ttyACM0",
-    "--payload-type", "MICRO_DIGITAL_GPIO_WRITE_COMMAND",
+    "--payload-type", "99",
     "--payload", "010501",
     "--qos", "ack",
 ], check=True)

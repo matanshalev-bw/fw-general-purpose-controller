@@ -51,14 +51,14 @@ void printUsage(const char* prog) {
       << "  -p, --port PATH           Serial port (default " << kDefaultPort << ")\n"
       << "  -d, --dst ID              Destination component id, decimal or 0x hex (default 17 / GPC)\n"
       << "  -s, --src ID              Source component id (default 2 / HLC)\n"
-      << "  -t, --payload-type ID     PayloadTypeIds value or name (required)\n"
+      << "  -t, --payload-type ID     PayloadTypeIds numeric value, decimal or 0x hex (required)\n"
       << "  -P, --payload HEX         Payload bytes as hex (optional)\n"
       << "  -q, --qos none|ack        QoS (default none)\n"
       << "  -r, --retries N           ACK retries when qos=ack (default 5)\n"
       << "  --timeout-ms MS           ACK wait timeout (default 2000)\n"
       << "  -h, --help                Show this help\n\n"
       << "Example:\n"
-      << "  " << prog << " -p /dev/ttyACM0 -t MICRO_DIGITAL_GPIO_WRITE_COMMAND -P 010501 -q ack\n"
+      << "  " << prog << " -p /dev/ttyACM0 -t 99 -P 010501 -q ack\n"
       << "  " << prog << " -t 7 -P 00000000 -d 17 -q none\n";
 }
 
@@ -78,36 +78,11 @@ bool parseUint(const std::string& text, uint32_t& out) {
 
 bool parsePayloadType(const std::string& text, bluelink::PayloadTypeIds& out) {
   uint32_t numeric = 0;
-  if (parseUint(text, numeric)) {
-    out = static_cast<bluelink::PayloadTypeIds>(numeric);
-    return true;
+  if (!parseUint(text, numeric)) {
+    return false;
   }
-
-#define MAP_PAYLOAD(NAME) \
-  if (text == #NAME) {    \
-    out = bluelink::PayloadTypeIds::NAME; \
-    return true;          \
-  }
-
-  MAP_PAYLOAD(KEEP_ALIVE)
-  MAP_PAYLOAD(RESET_COMMAND)
-  MAP_PAYLOAD(PROGRAMMING_COMMAND)
-  MAP_PAYLOAD(DRIVE_COMMAND)
-  MAP_PAYLOAD(CONTROLLER_META_DATA_TELEMETRY)
-  MAP_PAYLOAD(BLUELINK_VERSION_TELEMETRY)
-  MAP_PAYLOAD(MICRO_DIGITAL_GPIO_WRITE_COMMAND)
-  MAP_PAYLOAD(MICRO_DIGITAL_GPIO_READ_COMMAND)
-  MAP_PAYLOAD(MICRO_ADC_READ_COMMAND)
-  MAP_PAYLOAD(MICRO_DAC_WRITE_COMMAND)
-  MAP_PAYLOAD(MICRO_PWM_SET_COMMAND)
-  MAP_PAYLOAD(MICRO_DELAY_MS_COMMAND)
-  MAP_PAYLOAD(MICRO_CAN_TRANSMIT_COMMAND)
-  MAP_PAYLOAD(MICRO_UART_TRANSMIT_COMMAND)
-  MAP_PAYLOAD(MICRO_SPI_TRANSFER_COMMAND)
-  MAP_PAYLOAD(MICRO_I2C_WRITE_COMMAND)
-#undef MAP_PAYLOAD
-
-  return false;
+  out = static_cast<bluelink::PayloadTypeIds>(numeric);
+  return true;
 }
 
 bool parseHexPayload(const std::string& text, std::vector<uint8_t>& out) {

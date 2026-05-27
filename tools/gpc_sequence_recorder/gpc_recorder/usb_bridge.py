@@ -31,6 +31,13 @@ MICRO_OP_TO_PAYLOAD_TYPE: Dict[str, str] = {
 }
 
 
+def payload_type_id(payload_type_name: str) -> int:
+    schema = get_schema()
+    if payload_type_name not in schema.payload_type_ids:
+        raise UsbBridgeError(f"Payload type {payload_type_name} not in schema")
+    return schema.payload_type_ids[payload_type_name]
+
+
 class UsbBridgeError(Exception):
     pass
 
@@ -120,6 +127,7 @@ def micro_ops_catalog() -> List[Dict[str, Any]]:
             {
                 "union_member": member,
                 "payload_type": payload_type,
+                "payload_type_id": payload_type_id(payload_type),
                 "op_type": op.op_type_name,
                 "fields": fields,
             }
@@ -154,13 +162,11 @@ def send_micro_command(
     if port is None and not session.opened:
         raise UsbBridgeError("USB port not open — click Open first")
 
-    payload_type = MICRO_OP_TO_PAYLOAD_TYPE.get(union_member)
-    if payload_type is None:
+    payload_type_name = MICRO_OP_TO_PAYLOAD_TYPE.get(union_member)
+    if payload_type_name is None:
         raise UsbBridgeError(f"No BlueLink payload type for micro-op {union_member}")
 
-    if payload_type not in get_schema().payload_type_ids:
-        raise UsbBridgeError(f"Payload type {payload_type} not in schema")
-
+    type_id = payload_type_id(payload_type_name)
     payload_hex = pack_micro_op_hex(union_member, values)
     binary = usb_bluelink_binary()
 
@@ -173,7 +179,7 @@ def send_micro_command(
         "-s",
         str(DEFAULT_SOURCE_ID),
         "-t",
-        payload_type,
+        str(type_id),
         "-P",
         payload_hex,
         "-q",
@@ -204,7 +210,8 @@ def send_micro_command(
     return {
         "ok": True,
         "port": use_port,
-        "payload_type": payload_type,
+        "payload_type": payload_type_name,
+        "payload_type_id": type_id,
         "payload_hex": payload_hex,
         "output": stdout,
     }
