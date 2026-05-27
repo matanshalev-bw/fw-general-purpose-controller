@@ -5,6 +5,13 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from gpc_recorder.dsl.repl import ReplEngine
+from gpc_recorder.usb_bridge import (
+    UsbBridgeError,
+    get_usb_session,
+    list_serial_ports,
+    micro_ops_catalog,
+    send_micro_command,
+)
 from gpc_recorder.paths import (
     DEFAULT_EXPORT_HEX_PATH,
     DEFAULT_EXPORT_PATH,
@@ -32,6 +39,59 @@ async def app_js() -> FileResponse:
 @app.get("/api/preview")
 async def preview() -> dict:
     return {"hpp": _repl.preview_hpp()}
+
+
+@app.get("/api/usb/ports")
+async def usb_ports() -> dict:
+    return {"ports": list_serial_ports()}
+
+
+@app.get("/api/usb/status")
+async def usb_status() -> dict:
+    return get_usb_session().status()
+
+
+@app.get("/api/usb/micro-ops")
+async def usb_micro_ops() -> dict:
+    return {"micro_ops": micro_ops_catalog()}
+
+
+@app.post("/api/usb/open")
+async def usb_open(body: dict) -> dict:
+    port = body.get("port")
+    if not port:
+        return {"ok": False, "error": "Missing port"}
+    try:
+        get_usb_session().open(str(port))
+        return {"ok": True, **get_usb_session().status()}
+    except UsbBridgeError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/usb/close")
+async def usb_close() -> dict:
+    get_usb_session().close()
+    return {"ok": True, **get_usb_session().status()}
+
+
+@app.post("/api/usb/send-micro")
+async def usb_send_micro(body: dict) -> dict:
+    union_member = body.get("union_member")
+    values = body.get("values") or {}
+    qos = body.get("qos", "none")
+    if not union_member:
+        return {"ok": False, "error": "Missing union_member"}
+    try:
+        result = send_micro_command(
+            str(union_member),
+            values,
+            qos=str(qos),
+            retries=int(body.get("retries", 5)),
+            timeout_ms=int(body.get("timeout_ms", 2000)),
+        )
+        return result
+    except UsbBridgeError as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.post("/api/export")

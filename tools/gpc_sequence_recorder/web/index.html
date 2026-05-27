@@ -84,6 +84,55 @@
       margin-right: 0.75rem;
     }
     #bindings-list .recording { color: #dcdcaa; }
+    .usb-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.75rem;
+      padding: 0.5rem 1rem;
+      background: #2a2d2e;
+      border-bottom: 1px solid #333;
+      font-size: 0.85rem;
+    }
+    .usb-bar label { color: #aaa; margin-right: 0.25rem; }
+    .usb-bar select, .usb-bar input {
+      background: #3c3c3c;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 3px;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.85rem;
+    }
+    .usb-bar button {
+      padding: 0.3rem 0.6rem;
+      background: #0e639c;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .usb-bar button:hover { background: #1177bb; }
+    .usb-bar button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .usb-bar button.secondary { background: #555; }
+    .usb-bar button.secondary:hover { background: #666; }
+    .usb-bar button.send { background: #388a34; }
+    .usb-bar button.send:hover { background: #46a042; }
+    #usb-status { color: #888; min-width: 5rem; }
+    #usb-status.open { color: #4ec9b0; }
+    #usb-micro-fields {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+      align-items: center;
+    }
+    #usb-micro-fields .field {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    #usb-micro-fields .field label { font-size: 0.8rem; color: #bbb; }
+    #usb-micro-fields input { width: 5rem; }
+    #usb-micro-fields input.wide { width: 10rem; }
   </style>
 </head>
 <body>
@@ -94,6 +143,18 @@
       <button id="btn-help" type="button">Help</button>
     </div>
   </header>
+  <div class="usb-bar" id="usb-bar">
+    <label for="usb-port">USB port</label>
+    <select id="usb-port" title="Serial device"></select>
+    <button type="button" id="btn-usb-refresh" class="secondary">Refresh</button>
+    <button type="button" id="btn-usb-open">Open</button>
+    <button type="button" id="btn-usb-close" class="secondary" disabled>Close</button>
+    <span id="usb-status">Closed</span>
+    <label for="usb-micro-op">Micro command</label>
+    <select id="usb-micro-op" title="Immediate micro op"></select>
+    <div id="usb-micro-fields"></div>
+    <button type="button" id="btn-usb-send" class="send" disabled>Send now</button>
+  </div>
   <main>
     <section class="panel">
       <h2>Terminal</h2>
