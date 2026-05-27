@@ -128,9 +128,11 @@
     #usb-status.open { color: #4ec9b0; }
     #usb-port { min-width: 14rem; max-width: 22rem; }
     #usb-micro-op, #usb-controller-cmd {
-      min-width: 18rem;
-      max-width: 28rem;
-      width: 18rem;
+      min-width: 26rem;
+      max-width: 36rem;
+      width: 26rem;
+      font-family: "Consolas", "Monaco", monospace;
+      font-size: 0.8rem;
     }
     #usb-micro-fields {
       display: flex;
@@ -189,11 +191,11 @@
     <div class="usb-row">
       <label for="usb-controller-cmd">Controller command</label>
       <select id="usb-controller-cmd" title="Controller command">
-        <option value="STEERING_CONTINUOUS_COMMAND">steering (4)</option>
-        <option value="THROTTLE_CONTINUOUS_COMMAND">throttle (5)</option>
-        <option value="BRAKES_CONTINUOUS_COMMAND">brakes (42)</option>
-        <option value="REVERSER_COMMAND">reverser (41)</option>
-        <option value="POWER_COMMAND">power (98)</option>
+        <option value="STEERING_CONTINUOUS_COMMAND">bluelink::PayloadTypeIds::STEERING_CONTINUOUS_COMMAND</option>
+        <option value="THROTTLE_CONTINUOUS_COMMAND">bluelink::PayloadTypeIds::THROTTLE_CONTINUOUS_COMMAND</option>
+        <option value="BRAKES_CONTINUOUS_COMMAND">bluelink::PayloadTypeIds::BRAKES_CONTINUOUS_COMMAND</option>
+        <option value="REVERSER_COMMAND">bluelink::PayloadTypeIds::REVERSER_COMMAND</option>
+        <option value="POWER_COMMAND">bluelink::PayloadTypeIds::POWER_COMMAND</option>
       </select>
       <div id="usb-controller-fields"></div>
       <button type="button" id="btn-usb-send-controller" class="send" disabled>Send cmd</button>
