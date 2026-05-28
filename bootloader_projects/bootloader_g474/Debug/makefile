@@ -16,6 +16,7 @@ RM := rm -rf
 -include Core/Src/interfaces_g474/NonVolatileMemoryInterface/subdir.mk
 -include Core/Src/interfaces_g474/GpioInterface/subdir.mk
 -include Core/Src/interfaces_g474/CommInterface/subdir.mk
+-include Core/Src/interfaces_g474/CommHandler/subdir.mk
 -include Core/Src/interfaces_g474/CanMessenger/subdir.mk
 -include Core/Src/interfaces_g474/AdcManager/subdir.mk
 -include Core/Src/bluelink_messages_include/PayloadStructs/subdir.mk

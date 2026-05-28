@@ -49,17 +49,17 @@ extern "C" {
 
 /* USER CODE END EM */
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-
 /* Exported functions prototypes ---------------------------------------------*/
-void SystemClock_Config(void);
 void Error_Handler(void);
+void SystemClock_Config(void);
 
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LED_Pin GPIO_PIN_15
+#define LED_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

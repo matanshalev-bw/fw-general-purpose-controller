@@ -65,7 +65,64 @@ extern void SystemClock_Config(void);
 /*******************************************************************************
                        LL Driver Callbacks (PCD -> USB Device Library)
 *******************************************************************************/
-/* MSP Init/DeInit: implemented in Core/Src/stm32g4xx_hal_msp.c (CubeMX + USB device). */
+/* MSP Init */
+
+#if (USE_HAL_PCD_REGISTER_CALLBACKS == 1U)
+static void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
+#else
+void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
+#endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
+{
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+  if(pcdHandle->Instance==USB)
+  {
+  /* USER CODE BEGIN USB_MspInit 0 */
+
+  /* USER CODE END USB_MspInit 0 */
+
+  /** Initializes the peripherals clocks
+  */
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+    PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* Peripheral clock enable */
+    __HAL_RCC_USB_CLK_ENABLE();
+
+    /* Peripheral interrupt init */
+    HAL_NVIC_SetPriority(USB_LP_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(USB_LP_IRQn);
+  /* USER CODE BEGIN USB_MspInit 1 */
+
+  /* USER CODE END USB_MspInit 1 */
+  }
+}
+
+#if (USE_HAL_PCD_REGISTER_CALLBACKS == 1U)
+static void HAL_PCD_MspDeInit(PCD_HandleTypeDef* pcdHandle)
+#else
+void HAL_PCD_MspDeInit(PCD_HandleTypeDef* pcdHandle)
+#endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
+{
+  if(pcdHandle->Instance==USB)
+  {
+  /* USER CODE BEGIN USB_MspDeInit 0 */
+
+  /* USER CODE END USB_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_USB_CLK_DISABLE();
+
+    /* Peripheral interrupt Deinit*/
+    HAL_NVIC_DisableIRQ(USB_LP_IRQn);
+
+  /* USER CODE BEGIN USB_MspDeInit 1 */
+
+  /* USER CODE END USB_MspDeInit 1 */
+  }
+}
 
 /**
   * @brief  Setup stage callback
@@ -374,6 +431,7 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
   /* USER CODE BEGIN RegisterCallBackFirstPart */
 
   /* USER CODE END RegisterCallBackFirstPart */
+  HAL_PCD_RegisterLpmCallback(&hpcd_USB_FS, PCDEx_LPM_Callback);
   HAL_PCD_RegisterDataOutStageCallback(&hpcd_USB_FS, PCD_DataOutStageCallback);
   HAL_PCD_RegisterDataInStageCallback(&hpcd_USB_FS, PCD_DataInStageCallback);
   HAL_PCD_RegisterIsoOutIncpltCallback(&hpcd_USB_FS, PCD_ISOOUTIncompleteCallback);
@@ -624,6 +682,46 @@ USBD_StatusTypeDef USBD_LL_PrepareReceive(USBD_HandleTypeDef *pdev, uint8_t ep_a
 uint32_t USBD_LL_GetRxDataSize(USBD_HandleTypeDef *pdev, uint8_t ep_addr)
 {
   return HAL_PCD_EP_GetRxCount((PCD_HandleTypeDef*) pdev->pData, ep_addr);
+}
+
+/**
+  * @brief  Send LPM message to user layer
+  * @param  hpcd: PCD handle
+  * @param  msg: LPM message
+  * @retval None
+  */
+#if (USE_HAL_PCD_REGISTER_CALLBACKS == 1U)
+static void PCDEx_LPM_Callback(PCD_HandleTypeDef *hpcd, PCD_LPM_MsgTypeDef msg)
+#else
+void HAL_PCDEx_LPM_Callback(PCD_HandleTypeDef *hpcd, PCD_LPM_MsgTypeDef msg)
+#endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
+{
+  /* USER CODE BEGIN LPM_Callback */
+  switch (msg)
+  {
+  case PCD_LPM_L0_ACTIVE:
+    if (hpcd->Init.low_power_enable)
+    {
+      SystemClockConfig_Resume();
+
+      /* Reset SLEEPDEEP bit of Cortex System Control Register. */
+      SCB->SCR &= (uint32_t)~((uint32_t)(SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk));
+    }
+    USBD_LL_Resume(hpcd->pData);
+    break;
+
+  case PCD_LPM_L1_ACTIVE:
+    USBD_LL_Suspend(hpcd->pData);
+
+    /* Enter in STOP mode. */
+    if (hpcd->Init.low_power_enable)
+    {
+      /* Set SLEEPDEEP bit and SleepOnExit of Cortex System Control Register. */
+      SCB->SCR |= (uint32_t)((uint32_t)(SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk));
+    }
+    break;
+  }
+  /* USER CODE END LPM_Callback */
 }
 
 /**

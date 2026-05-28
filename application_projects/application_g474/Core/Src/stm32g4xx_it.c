@@ -56,6 +56,7 @@ extern PCD_HandleTypeDef hpcd_USB_FS;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern PCD_HandleTypeDef hpcd_USB_FS;
 extern TIM_HandleTypeDef htim5;
 /* USER CODE BEGIN EV */
 extern FDCAN_HandleTypeDef hfdcan2;
@@ -207,6 +208,20 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles USB low priority interrupt remap.
+  */
+void USB_LP_IRQHandler(void)
+{
+  /* USER CODE BEGIN USB_LP_IRQn 0 */
+
+  /* USER CODE END USB_LP_IRQn 0 */
+  HAL_PCD_IRQHandler(&hpcd_USB_FS);
+  /* USER CODE BEGIN USB_LP_IRQn 1 */
+
+  /* USER CODE END USB_LP_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM5 global interrupt.
   */
 void TIM5_IRQHandler(void)
@@ -218,41 +233,6 @@ void TIM5_IRQHandler(void)
   /* USER CODE BEGIN TIM5_IRQn 1 */
 
   /* USER CODE END TIM5_IRQn 1 */
-}
-
-#ifdef HAL_ADC_MODULE_ENABLED
-/**
-  * @brief This function handles DMA1 channel1 global interrupt.
-  */
-void DMA1_Channel1_IRQHandler(void)
-{
-  HAL_DMA_IRQHandler(&hdma_adc1);
-}
-
-/**
-  * @brief This function handles DMA1 channel2 global interrupt.
-  */
-void DMA1_Channel2_IRQHandler(void)
-{
-  HAL_DMA_IRQHandler(&hdma_adc2);
-}
-
-/**
-  * @brief This function handles ADC1 and ADC2 global interrupts.
-  */
-void ADC1_2_IRQHandler(void)
-{
-  HAL_ADC_IRQHandler(&hadc1);
-  HAL_ADC_IRQHandler(&hadc2);
-}
-#endif
-
-/**
-  * @brief This function handles USB low priority interrupt.
-  */
-void USB_LP_IRQHandler(void)
-{
-  HAL_PCD_IRQHandler(&hpcd_USB_FS);
 }
 
 /* USER CODE BEGIN 1 */

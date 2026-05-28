@@ -13,6 +13,10 @@
 #include "comm_interface.hpp"
 #include "usbd_cdc_if.h"
 
+extern bool usb_transmit_flag;
+extern uint16_t usb_receive_size;
+extern uint8_t host_connection;
+
 class UsbComm {
  public:
   static constexpr size_t BUFFER_SIZE = APP_RX_DATA_SIZE;

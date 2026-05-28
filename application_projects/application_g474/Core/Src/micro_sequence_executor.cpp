@@ -11,7 +11,7 @@
 #endif
 
 extern UART_HandleTypeDef huart2;
-extern SPI_HandleTypeDef hspi2;
+extern SPI_HandleTypeDef hspi1;
 extern I2C_HandleTypeDef hi2c1;
 
 namespace {
@@ -240,7 +240,7 @@ bool MicroSequenceExecutor::executeSpiTransfer(const bluelink::MicroOpsPayload::
   }
 
   uint8_t rx_data[8] = {};
-  return HAL_SPI_TransmitReceive(&hspi2, const_cast<uint8_t*>(op.tx_data), rx_data, op.tx_len, 100) == HAL_OK;
+  return HAL_SPI_TransmitReceive(&hspi1, const_cast<uint8_t*>(op.tx_data), rx_data, op.tx_len, 100) == HAL_OK;
 }
 
 bool MicroSequenceExecutor::executeI2cWrite(const bluelink::MicroOpsPayload::MicroI2cWrite& op) {

@@ -44,6 +44,7 @@ Core/Src/bluelink_messages_include/PayloadStructs \
 Core/Src \
 Core/Src/interfaces_g474/AdcManager \
 Core/Src/interfaces_g474/CanMessenger \
+Core/Src/interfaces_g474/CommHandler \
 Core/Src/interfaces_g474/CommInterface \
 Core/Src/interfaces_g474/GpioInterface \
 Core/Src/interfaces_g474/NonVolatileMemoryInterface \
