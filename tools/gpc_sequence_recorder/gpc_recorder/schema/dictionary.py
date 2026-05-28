@@ -1,4 +1,4 @@
-"""BlueLink command / micro-op struct reference for the web UI."""
+"""bluelink command / micro-op struct reference for the web UI."""
 
 from __future__ import annotations
 

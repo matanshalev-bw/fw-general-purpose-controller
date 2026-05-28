@@ -46,7 +46,7 @@ bool parseInbound(bluelink::PayloadTypeIds payload_type, const uint8_t* buffer) 
 void printUsage(const char* prog) {
   std::cerr
       << "Usage: " << prog << " [options]\n"
-      << "  Send a BlueLink packet over USB CDC serial to GPC (or any destination).\n\n"
+      << "  Send a bluelink packet over USB CDC serial to GPC (or any destination).\n\n"
       << "Options:\n"
       << "  -p, --port PATH           Serial port (default " << kDefaultPort << ")\n"
       << "  -d, --dst ID              Destination component id, decimal or 0x hex (default 17 / GPC)\n"

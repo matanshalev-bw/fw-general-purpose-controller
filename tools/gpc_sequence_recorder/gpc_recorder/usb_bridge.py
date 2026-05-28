@@ -1,4 +1,4 @@
-"""Host USB BlueLink bridge via gpc_usb_bluelink CLI."""
+"""Host USB bluelink bridge via gpc_usb_bluelink CLI."""
 
 from __future__ import annotations
 
@@ -238,7 +238,7 @@ def send_micro_command(
 
     payload_type_name = MICRO_OP_TO_PAYLOAD_TYPE.get(union_member)
     if payload_type_name is None:
-        raise UsbBridgeError(f"No BlueLink payload type for micro-op {union_member}")
+        raise UsbBridgeError(f"No bluelink payload type for micro-op {union_member}")
 
     type_id = payload_type_id(payload_type_name)
     payload_hex = pack_micro_op_hex(union_member, values)

@@ -148,7 +148,7 @@
     }
   });
 
-  // --- BlueLink struct dictionary ---
+  // --- bluelink struct dictionary ---
   const dictOverlay = document.getElementById("dict-overlay");
   const dictBody = document.getElementById("dict-body");
   const dictFilter = document.getElementById("dict-filter");

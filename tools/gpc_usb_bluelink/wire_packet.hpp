@@ -18,7 +18,7 @@ struct SendOptions {
   uint32_t packet_sequence_id = 0;
 };
 
-// Builds a full BlueLink wire frame (prefix + header + payload + suffix). Returns total byte count or 0 on error.
+// Builds a full bluelink wire frame (prefix + header + payload + suffix). Returns total byte count or 0 on error.
 size_t buildWirePacket(uint8_t* buffer, size_t buffer_capacity, const SendOptions& options, const uint8_t* payload,
                        size_t payload_size);
 

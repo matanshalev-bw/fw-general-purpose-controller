@@ -1,6 +1,6 @@
-# GPC USB BlueLink bridge
+# GPC USB bluelink bridge
 
-Host-side C++ CLI that sends arbitrary BlueLink packets over USB CDC serial to the GPC firmware (same wire format as LLC `scripts/boot`).
+Host-side C++ CLI that sends arbitrary bluelink packets over USB CDC serial to the GPC firmware (same wire format as LLC `scripts/boot`).
 
 Intended as a subprocess backend for the Python sequence-recorder GUI.
 

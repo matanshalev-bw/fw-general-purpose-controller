@@ -1,4 +1,4 @@
-# Host tool: send arbitrary BlueLink packets over USB CDC serial (GPC).
+# Host tool: send arbitrary bluelink packets over USB CDC serial (GPC).
 #   make CC=g++ all
 #   make CC=aarch64-linux-gnu-g++ all
 
