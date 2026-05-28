@@ -380,6 +380,175 @@
     }
   });
 
+  // --- Recorder command bar (insert into terminal) ---
+  const recorderCmdEl = document.getElementById("recorder-cmd");
+  const recorderFieldsEl = document.getElementById("recorder-fields");
+  const btnRecorderInsert = document.getElementById("btn-recorder-insert");
+  let recorderCmds = [];
+
+  function terminalInsert(text) {
+    if (!text) return;
+    const s = String(text);
+    term.write(s);
+    lineBuffer += s;
+  }
+
+  function setRecorderCmdSelect(cmds) {
+    if (!recorderCmdEl) return;
+    recorderCmdEl.innerHTML = "";
+    cmds.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.name;
+      opt.textContent = c.name;
+      opt.title = c.description || "";
+      recorderCmdEl.appendChild(opt);
+    });
+  }
+
+  function isListAnnotation(ann) {
+    if (!ann) return false;
+    return (
+      String(ann).includes("List[") ||
+      String(ann).includes("list[") ||
+      String(ann).includes("List[int]") ||
+      String(ann).includes("List[typing") ||
+      String(ann).includes("List[") ||
+      String(ann).includes("List[") ||
+      String(ann).includes("List[") ||
+      String(ann).includes("List[") ||
+      String(ann).includes("List[")
+    );
+  }
+
+  function renderRecorderFields(cmd) {
+    if (!recorderFieldsEl) return;
+    recorderFieldsEl.innerHTML = "";
+    if (!cmd || !cmd.params) return;
+
+    cmd.params.forEach((p) => {
+      if (p.kind === "VAR_KEYWORD" || p.kind === "VAR_POSITIONAL") return;
+      const wrap = document.createElement("div");
+      wrap.className = "field";
+      const label = document.createElement("label");
+      label.textContent = p.name;
+      label.htmlFor = `rec-field-${p.name}`;
+      const input = document.createElement("input");
+      input.id = `rec-field-${p.name}`;
+      input.dataset.param = p.name;
+      input.dataset.annotation = p.annotation || "";
+      input.dataset.hasDefault = p.has_default ? "1" : "0";
+
+      const isList = isListAnnotation(p.annotation);
+      if (isList) {
+        input.classList.add("wide");
+        input.placeholder = "comma-separated";
+      } else if (!p.has_default) {
+        input.placeholder = "required";
+      }
+      if (p.has_default && p.default !== null && p.default !== undefined) {
+        input.value = String(p.default);
+      }
+
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      recorderFieldsEl.appendChild(wrap);
+    });
+  }
+
+  function pythonLiteral(raw) {
+    const s = String(raw ?? "").trim();
+    if (s === "") return "";
+    if (s === "True" || s === "False" || s === "true" || s === "false") {
+      return s[0] === "t" ? "True" : s[0] === "f" ? "False" : s;
+    }
+    if (/^0x[0-9a-fA-F]+$/.test(s) || /^-?\d+(\.\d+)?$/.test(s)) return s;
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) return s; // enum / constant token
+    // quote as python string
+    return JSON.stringify(s);
+  }
+
+  function pythonListLiteral(raw) {
+    const s = String(raw ?? "").trim();
+    if (!s) return "[]";
+    const parts = s
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .map(pythonLiteral);
+    return `[${parts.join(", ")}]`;
+  }
+
+  function buildRecorderCall(cmd) {
+    if (!cmd) return "";
+    const params = cmd.params || [];
+    const positional = [];
+    const kwargs = [];
+
+    params.forEach((p, idx) => {
+      if (p.kind === "VAR_KEYWORD" || p.kind === "VAR_POSITIONAL") return;
+      const input = document.getElementById(`rec-field-${p.name}`);
+      const raw = input ? input.value.trim() : "";
+      const isEmpty = raw === "";
+      if (isEmpty && p.has_default) return;
+      if (isEmpty && !p.has_default) return; // required but missing
+
+      const isList = isListAnnotation(p.annotation);
+      const lit = isList ? pythonListLiteral(raw) : pythonLiteral(raw);
+
+      // first required param as positional for nicer UX (e.g. begin_binding(DRIVE_COMMAND, ...))
+      const canBePositional = idx === 0 && p.kind === "POSITIONAL_OR_KEYWORD" && !p.has_default;
+      if (canBePositional) positional.push(lit);
+      else kwargs.push(`${p.name}=${lit}`);
+    });
+
+    const all = [...positional, ...kwargs].filter(Boolean);
+    return `${cmd.name}(${all.join(", ")})`;
+  }
+
+  async function loadRecorderCommandsForBar() {
+    if (!recorderCmdEl) return;
+    recorderCmdEl.innerHTML = "";
+    const loading = document.createElement("option");
+    loading.value = "";
+    loading.textContent = "(loading recorder commands…)";
+    recorderCmdEl.appendChild(loading);
+    try {
+      const res = await fetch("/api/schema/recorder-dictionary");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      recorderCmds = data.recorder_commands || [];
+    } catch (_e) {
+      recorderCmds = [];
+    }
+    recorderCmdEl.innerHTML = "";
+    if (!recorderCmds.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "(no recorder commands available)";
+      recorderCmdEl.appendChild(opt);
+      if (btnRecorderInsert) btnRecorderInsert.disabled = true;
+      return;
+    }
+    setRecorderCmdSelect(recorderCmds);
+    renderRecorderFields(recorderCmds[0]);
+    if (btnRecorderInsert) btnRecorderInsert.disabled = false;
+  }
+
+  recorderCmdEl?.addEventListener("change", () => {
+    const cmd = recorderCmds.find((c) => c.name === recorderCmdEl.value);
+    renderRecorderFields(cmd);
+  });
+
+  btnRecorderInsert?.addEventListener("click", () => {
+    if (!recorderCmdEl) return;
+    const name = recorderCmdEl.value;
+    const cmd = recorderCmds.find((c) => c.name === name);
+    if (!cmd) return;
+    const call = buildRecorderCall(cmd);
+    if (!call) return;
+    terminalInsert(call);
+  });
+
   // --- USB immediate micro commands ---
   const usbPortEl = document.getElementById("usb-port");
   const usbStatusEl = document.getElementById("usb-status");
@@ -753,6 +922,7 @@
   });
 
   (async function initUsb() {
+    loadRecorderCommandsForBar();
     loadUsbControllerCommands();
     loadUsbMicroOps();
     try {

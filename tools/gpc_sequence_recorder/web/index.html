@@ -129,7 +129,7 @@
     #usb-status { color: #888; min-width: 5rem; }
     #usb-status.open { color: #4ec9b0; }
     #usb-port { min-width: 14rem; max-width: 22rem; }
-    #usb-micro-op, #usb-controller-cmd {
+    #usb-micro-op, #usb-controller-cmd, #recorder-cmd {
       min-width: 20rem;
       max-width: 30rem;
       width: 20rem;
@@ -165,6 +165,21 @@
     #usb-controller-fields .field label { font-size: 0.8rem; color: #bbb; }
     #usb-controller-fields input { width: 5rem; }
     #usb-controller-fields input.wide { width: 10rem; }
+
+    #recorder-fields {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+      align-items: center;
+    }
+    #recorder-fields .field {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    #recorder-fields .field label { font-size: 0.8rem; color: #bbb; }
+    #recorder-fields input { width: 10rem; }
+    #recorder-fields input.wide { width: 16rem; }
 
     .dict-overlay {
       display: none;
@@ -299,6 +314,12 @@
       </select>
       <div id="usb-controller-fields"></div>
       <button type="button" id="btn-usb-send-controller" class="send" disabled>Send cmd</button>
+    </div>
+    <div class="usb-row">
+      <label for="recorder-cmd">Recorder command</label>
+      <select id="recorder-cmd" title="Insert a Recorder DSL command"></select>
+      <div id="recorder-fields"></div>
+      <button type="button" id="btn-recorder-insert" class="secondary">Insert</button>
     </div>
   </div>
   <main>

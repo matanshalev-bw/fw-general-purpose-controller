@@ -92,6 +92,25 @@ _RECORDER_PUBLIC_COMMANDS = [
     "help",
 ]
 
+def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
+    has_default = p.default is not inspect._empty
+    default = None if not has_default else p.default
+    ann = None if p.annotation is inspect._empty else p.annotation
+    ann_str = None
+    if ann is not None:
+        try:
+            ann_str = ann.__name__  # type: ignore[attr-defined]
+        except Exception:
+            ann_str = str(ann).replace("typing.", "")
+    kind = str(p.kind).split(".")[-1]
+    return {
+        "name": p.name,
+        "kind": kind,
+        "annotation": ann_str,
+        "has_default": has_default,
+        "default": default,
+    }
+
 
 def recorder_commands_dictionary() -> Dict[str, List[Dict[str, Any]]]:
     """
@@ -107,10 +126,18 @@ def recorder_commands_dictionary() -> Dict[str, List[Dict[str, Any]]]:
         if not _is_public_method(name, value):
             continue
         try:
-            sig = str(inspect.signature(value))
+            sig_obj = inspect.signature(value)
+            sig = str(sig_obj)
         except (TypeError, ValueError):
+            sig_obj = None
             sig = "()"
         doc = (inspect.getdoc(value) or "").strip()
+        params: List[Dict[str, Any]] = []
+        if sig_obj is not None:
+            for p in sig_obj.parameters.values():
+                if p.name == "self":
+                    continue
+                params.append(_param_to_dict(p))
         out.append(
             {
                 "name": name,
@@ -118,6 +145,7 @@ def recorder_commands_dictionary() -> Dict[str, List[Dict[str, Any]]]:
                 "description": _DESCRIPTIONS.get(name, ""),
                 "doc": doc,
                 "example": _EXAMPLES.get(name, f"{name}()"),  # best-effort
+                "params": params,
             }
         )
 
