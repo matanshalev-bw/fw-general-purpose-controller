@@ -27,14 +27,10 @@ private:
     static constexpr uint32_t FAST_BLINK_TICKS = 10;
 
     GpioPin comm_led_gpio_;
-    GpioPin error_led_gpio_;
     bool comm_led_state_ = false;
-    bool error_led_state_ = false;
     uint32_t comm_tick_counter_ = 0;
-    uint32_t error_tick_counter_ = 0;
 
     inline LedPattern getCommunicationPatternForState(BootloaderState state) const;
-    inline LedPattern getErrorPatternForState(BootloaderState state) const;
     bool calculatePatternState(LedPattern pattern, uint32_t& tick_counter) const;
 };
 

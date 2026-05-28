@@ -32,11 +32,6 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>Core/Inc/version.hpp</name>
-			<type>1</type>
-			<locationURI>PARENT-1-PROJECT_LOC/version.hpp</locationURI>
-		</link>
-		<link>
 			<name>Core/Src/ConfigStructs</name>
 			<type>2</type>
 			<locationURI>PARENT-2-PROJECT_LOC/configs/ConfigStructs</locationURI>

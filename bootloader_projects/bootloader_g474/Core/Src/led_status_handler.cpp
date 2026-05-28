@@ -5,28 +5,18 @@
 #include "led_status_handler.hpp"
 
 LedStatusHandler::LedStatusHandler()
-    : comm_led_gpio_(GpioInterface::createDigitalGpio(GREEN_LED_1_GPIO_Port, GREEN_LED_1_Pin)),
-      error_led_gpio_(GpioInterface::createDigitalGpio(GREEN_LED_2_GPIO_Port, GREEN_LED_2_Pin)) {
-    
+    : comm_led_gpio_(GpioInterface::createDigitalGpio(GREEN_LED_1_GPIO_Port, GREEN_LED_1_Pin)) {
     GpioInterface::digitalWrite(comm_led_gpio_, GpioPinState::PIN_RESET);
-    GpioInterface::digitalWrite(error_led_gpio_, GpioPinState::PIN_RESET);
 }
 
 void LedStatusHandler::updateForBootloaderState(BootloaderState state) {
     LedPattern comm_pattern = getCommunicationPatternForState(state);
-    LedPattern error_pattern = getErrorPatternForState(state);
-    
+
     bool new_comm_state = calculatePatternState(comm_pattern, comm_tick_counter_);
-    bool new_error_state = calculatePatternState(error_pattern, error_tick_counter_);
-    
+
     if (new_comm_state != comm_led_state_) {
         comm_led_state_ = new_comm_state;
         GpioInterface::digitalWrite(comm_led_gpio_, comm_led_state_ ? GpioPinState::PIN_SET : GpioPinState::PIN_RESET);
-    }
-    
-    if (new_error_state != error_led_state_) {
-        error_led_state_ = new_error_state;
-        GpioInterface::digitalWrite(error_led_gpio_, error_led_state_ ? GpioPinState::PIN_SET : GpioPinState::PIN_RESET);
     }
 }
 
@@ -49,13 +39,9 @@ inline LedStatusHandler::LedPattern LedStatusHandler::getCommunicationPatternFor
     }
 }
 
-inline LedStatusHandler::LedPattern LedStatusHandler::getErrorPatternForState(BootloaderState state) const {
-    return (state == BootloaderState::ERROR_STATE) ? LedPattern::SLOW_BLINK : LedPattern::OFF;
-}
-
 bool LedStatusHandler::calculatePatternState(LedPattern pattern, uint32_t& tick_counter) const {
     ++tick_counter;
-    
+
     switch (pattern) {
         case LedPattern::OFF: return false;
         case LedPattern::ON: return true;

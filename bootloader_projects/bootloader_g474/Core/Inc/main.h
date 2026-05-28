@@ -51,6 +51,7 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
+void SystemClock_Config(void);
 
 /* USER CODE BEGIN EFP */
 
@@ -59,8 +60,6 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define MAIN_EN_Pin GPIO_PIN_14
 #define MAIN_EN_GPIO_Port GPIOC
-#define GREEN_LED_2_Pin GPIO_PIN_13
-#define GREEN_LED_2_GPIO_Port GPIOB
 #define GREEN_LED_1_Pin GPIO_PIN_15
 #define GREEN_LED_1_GPIO_Port GPIOB
 
