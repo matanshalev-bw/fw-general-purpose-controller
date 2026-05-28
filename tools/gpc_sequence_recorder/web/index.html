@@ -86,7 +86,7 @@
       margin-right: 0.75rem;
     }
     #bindings-list .recording { color: #dcdcaa; }
-    .usb-bar {
+    .usb-bar, .recorder-bar {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
@@ -95,15 +95,30 @@
       border-bottom: 1px solid #333;
       font-size: 0.85rem;
     }
-    .usb-row {
+    .recorder-bar {
+      margin-top: 0.35rem;
+      padding-top: 0.65rem;
+      background: #262829;
+      border-top: 1px solid #3a3a3a;
+    }
+    .recorder-bar-heading {
+      margin: 0 0 0.15rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .usb-row, .recorder-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 0.5rem 0.75rem;
       width: 100%;
     }
-    .usb-bar label { color: #aaa; margin-right: 0.25rem; white-space: nowrap; }
-    .usb-bar select, .usb-bar input {
+    .usb-bar label, .recorder-bar label { color: #aaa; margin-right: 0.25rem; white-space: nowrap; }
+    .usb-bar select, .usb-bar input,
+    .recorder-bar select, .recorder-bar input {
       background: #3c3c3c;
       color: #e0e0e0;
       border: 1px solid #555;
@@ -112,7 +127,7 @@
       font-size: 0.85rem;
       flex-shrink: 0;
     }
-    .usb-bar button {
+    .usb-bar button, .recorder-bar button {
       padding: 0.3rem 0.6rem;
       background: #0e639c;
       color: #fff;
@@ -120,10 +135,10 @@
       border-radius: 4px;
       cursor: pointer;
     }
-    .usb-bar button:hover { background: #1177bb; }
-    .usb-bar button:disabled { opacity: 0.45; cursor: not-allowed; }
-    .usb-bar button.secondary { background: #555; }
-    .usb-bar button.secondary:hover { background: #666; }
+    .usb-bar button:hover, .recorder-bar button:hover { background: #1177bb; }
+    .usb-bar button:disabled, .recorder-bar button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .usb-bar button.secondary, .recorder-bar button.secondary { background: #555; }
+    .usb-bar button.secondary:hover, .recorder-bar button.secondary:hover { background: #666; }
     .usb-bar button.send { background: #388a34; }
     .usb-bar button.send:hover { background: #46a042; }
     #usb-status { color: #888; min-width: 5rem; }
@@ -133,6 +148,12 @@
       min-width: 20rem;
       max-width: 30rem;
       width: 20rem;
+      font-family: "Consolas", "Monaco", monospace;
+      font-size: 0.8rem;
+    }
+    #rec-bind-trigger {
+      min-width: 20rem;
+      max-width: 30rem;
       font-family: "Consolas", "Monaco", monospace;
       font-size: 0.8rem;
     }
@@ -315,7 +336,10 @@
       <div id="usb-controller-fields"></div>
       <button type="button" id="btn-usb-send-controller" class="send" disabled>Send cmd</button>
     </div>
-    <div class="usb-row">
+  </div>
+  <div class="recorder-bar" id="recorder-bar">
+    <p class="recorder-bar-heading">Recorder (terminal DSL)</p>
+    <div class="recorder-row">
       <label for="recorder-cmd">Recorder command</label>
       <select id="recorder-cmd" title="Insert a Recorder DSL command"></select>
       <div id="recorder-fields"></div>
