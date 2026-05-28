@@ -385,6 +385,7 @@
   const recorderFieldsEl = document.getElementById("recorder-fields");
   const btnRecorderInsert = document.getElementById("btn-recorder-insert");
   let recorderCmds = [];
+  let bindableCommands = []; // from /api/schema/commands-dictionary
 
   function terminalInsert(text) {
     if (!text) return;
@@ -424,6 +425,90 @@
     if (!recorderFieldsEl) return;
     recorderFieldsEl.innerHTML = "";
     if (!cmd || !cmd.params) return;
+
+    if (cmd.name === "begin_binding") {
+      const triggerWrap = document.createElement("div");
+      triggerWrap.className = "field";
+      const triggerLabel = document.createElement("label");
+      triggerLabel.textContent = "trigger";
+      triggerLabel.htmlFor = "rec-bind-trigger";
+      const triggerSelect = document.createElement("select");
+      triggerSelect.id = "rec-bind-trigger";
+      triggerSelect.dataset.param = "trigger";
+      triggerSelect.title = "PayloadTypeIds trigger (bindable)";
+
+      const bindables = (bindableCommands || []).filter((c) => !!c.payload_type);
+      if (!bindables.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "(no triggers available)";
+        triggerSelect.appendChild(opt);
+      } else {
+        bindables.forEach((c) => {
+          const opt = document.createElement("option");
+          opt.value = c.payload_type;
+          opt.textContent = c.payload_type;
+          triggerSelect.appendChild(opt);
+        });
+      }
+
+      triggerWrap.appendChild(triggerLabel);
+      triggerWrap.appendChild(triggerSelect);
+      recorderFieldsEl.appendChild(triggerWrap);
+
+      const structFieldsWrap = document.createElement("div");
+      structFieldsWrap.className = "field";
+      const structLabel = document.createElement("label");
+      structLabel.textContent = "struct";
+      structLabel.htmlFor = "rec-bind-struct";
+      const structName = document.createElement("input");
+      structName.id = "rec-bind-struct";
+      structName.disabled = true;
+      structName.classList.add("wide");
+      structFieldsWrap.appendChild(structLabel);
+      structFieldsWrap.appendChild(structName);
+      recorderFieldsEl.appendChild(structFieldsWrap);
+
+      const fieldsContainer = document.createElement("div");
+      fieldsContainer.id = "rec-bind-fields";
+      fieldsContainer.style.display = "flex";
+      fieldsContainer.style.flexWrap = "wrap";
+      fieldsContainer.style.gap = "0.35rem 0.75rem";
+      fieldsContainer.style.alignItems = "center";
+      recorderFieldsEl.appendChild(fieldsContainer);
+
+      const renderStructFields = () => {
+        fieldsContainer.innerHTML = "";
+        const selected = bindables.find((c) => c.payload_type === triggerSelect.value) || bindables[0];
+        if (!selected) return;
+        structName.value = selected.struct_name || "";
+        (selected.fields || []).forEach((f) => {
+          const wrap = document.createElement("div");
+          wrap.className = "field";
+          const label = document.createElement("label");
+          label.textContent = f.name;
+          label.htmlFor = `rec-bind-field-${f.name}`;
+          const input = document.createElement("input");
+          input.id = `rec-bind-field-${f.name}`;
+          input.dataset.field = f.name;
+          input.dataset.type = f.type || "";
+          if (f.array_size) {
+            input.classList.add("wide");
+            input.placeholder = `comma-separated (${f.array_size})`;
+            if (Array.isArray(f.default)) input.value = f.default.join(",");
+          } else if (f.default !== undefined && f.default !== null) {
+            input.value = String(f.default);
+          }
+          wrap.appendChild(label);
+          wrap.appendChild(input);
+          fieldsContainer.appendChild(wrap);
+        });
+      };
+
+      triggerSelect.addEventListener("change", renderStructFields);
+      renderStructFields();
+      return;
+    }
 
     cmd.params.forEach((p) => {
       if (p.kind === "VAR_KEYWORD" || p.kind === "VAR_POSITIONAL") return;
@@ -480,11 +565,29 @@
 
   function buildRecorderCall(cmd) {
     if (!cmd) return "";
+    if (cmd.name === "begin_binding") {
+      const trigger = document.getElementById("rec-bind-trigger")?.value || "";
+      if (!trigger) return "";
+      const kwargs = [`trigger=${pythonLiteral(trigger)}`];
+
+      const bindables = (bindableCommands || []).filter((c) => !!c.payload_type);
+      const selected = bindables.find((c) => c.payload_type === trigger);
+      if (selected) {
+        (selected.fields || []).forEach((f) => {
+          const input = document.getElementById(`rec-bind-field-${f.name}`);
+          const raw = input ? input.value.trim() : "";
+          const lit = f.array_size ? pythonListLiteral(raw) : pythonLiteral(raw);
+          if (lit !== "") {
+            kwargs.push(`${f.name}=${lit}`);
+          }
+        });
+      }
+      return `begin_binding(${kwargs.join(", ")})`;
+    }
     const params = cmd.params || [];
-    const positional = [];
     const kwargs = [];
 
-    params.forEach((p, idx) => {
+    params.forEach((p) => {
       if (p.kind === "VAR_KEYWORD" || p.kind === "VAR_POSITIONAL") return;
       const input = document.getElementById(`rec-field-${p.name}`);
       const raw = input ? input.value.trim() : "";
@@ -494,14 +597,10 @@
 
       const isList = isListAnnotation(p.annotation);
       const lit = isList ? pythonListLiteral(raw) : pythonLiteral(raw);
-
-      // first required param as positional for nicer UX (e.g. begin_binding(DRIVE_COMMAND, ...))
-      const canBePositional = idx === 0 && p.kind === "POSITIONAL_OR_KEYWORD" && !p.has_default;
-      if (canBePositional) positional.push(lit);
-      else kwargs.push(`${p.name}=${lit}`);
+      kwargs.push(`${p.name}=${lit}`);
     });
 
-    const all = [...positional, ...kwargs].filter(Boolean);
+    const all = [...kwargs].filter(Boolean);
     return `${cmd.name}(${all.join(", ")})`;
   }
 
@@ -534,6 +633,17 @@
     if (btnRecorderInsert) btnRecorderInsert.disabled = false;
   }
 
+  async function loadBindableCommandsForRecorder() {
+    try {
+      const res = await fetch("/api/schema/commands-dictionary");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      bindableCommands = data.commands || [];
+    } catch (_e) {
+      bindableCommands = [];
+    }
+  }
+
   recorderCmdEl?.addEventListener("change", () => {
     const cmd = recorderCmds.find((c) => c.name === recorderCmdEl.value);
     renderRecorderFields(cmd);
@@ -547,6 +657,12 @@
     const call = buildRecorderCall(cmd);
     if (!call) return;
     terminalInsert(call);
+    // Execute immediately (same as pressing Enter in the terminal).
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      term.write("\r\n");
+      ws.send(call.trim());
+      lineBuffer = "";
+    }
   });
 
   // --- USB immediate micro commands ---
@@ -922,6 +1038,7 @@
   });
 
   (async function initUsb() {
+    loadBindableCommandsForRecorder();
     loadRecorderCommandsForBar();
     loadUsbControllerCommands();
     loadUsbMicroOps();

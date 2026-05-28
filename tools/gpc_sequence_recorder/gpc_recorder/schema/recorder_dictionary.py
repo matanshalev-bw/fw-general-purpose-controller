@@ -68,13 +68,13 @@ _DESCRIPTIONS: Dict[str, str] = {
 
 
 _RECORDER_PUBLIC_COMMANDS = [
-    "config",
-    "begin_powerup",
-    "end_powerup",
-    "clear_powerup",
     "begin_binding",
     "end_binding",
     "clear_binding",
+    "begin_powerup",
+    "end_powerup",
+    "clear_powerup",
+    "config",
     "undo",
     "gpio_write",
     "gpio_read",
@@ -149,6 +149,5 @@ def recorder_commands_dictionary() -> Dict[str, List[Dict[str, Any]]]:
             }
         )
 
-    out.sort(key=lambda x: x["name"])
     return {"recorder_commands": out}
 
