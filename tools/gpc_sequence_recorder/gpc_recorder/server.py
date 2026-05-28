@@ -15,6 +15,7 @@ from gpc_recorder.usb_bridge import (
     send_micro_command,
 )
 from gpc_recorder.schema.dictionary import bluelink_commands_dictionary
+from gpc_recorder.schema.recorder_dictionary import recorder_commands_dictionary
 from gpc_recorder.paths import (
     DEFAULT_EXPORT_HEX_PATH,
     DEFAULT_EXPORT_PATH,
@@ -70,6 +71,10 @@ async def usb_controller_commands() -> dict:
 @app.get("/api/schema/commands-dictionary")
 async def schema_commands_dictionary() -> dict:
     return bluelink_commands_dictionary()
+
+@app.get("/api/schema/recorder-dictionary")
+async def schema_recorder_dictionary() -> dict:
+    return recorder_commands_dictionary()
 
 
 @app.post("/api/usb/open")

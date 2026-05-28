@@ -152,7 +152,11 @@
   const dictOverlay = document.getElementById("dict-overlay");
   const dictBody = document.getElementById("dict-body");
   const dictFilter = document.getElementById("dict-filter");
-  let dictData = null;
+  const btnDictTabBluelink = document.getElementById("btn-dict-tab-bluelink");
+  const btnDictTabRecorder = document.getElementById("btn-dict-tab-recorder");
+  let dictBluelinkData = null;
+  let dictRecorderData = null;
+  let dictMode = "bluelink"; // 'bluelink' | 'recorder'
 
   function formatFieldLine(field) {
     let line = `<span class="type">${field.type}</span> ${field.name}`;
@@ -248,17 +252,72 @@
     dictBody.innerHTML = html;
   }
 
-  async function loadDictionary() {
-    if (dictData) {
-      renderDictionary(dictData, dictFilter ? dictFilter.value : "");
+  function renderRecorderDictionary(data, filter) {
+    if (!dictBody) return;
+    const q = (filter || "").trim().toLowerCase();
+    const match = (text) => !q || text.includes(q);
+    const cmds = (data.recorder_commands || [])
+      .map((c) => {
+        const title = `${c.name}${c.signature || "()"}`;
+        const meta = "Recorder DSL builtin";
+        const desc = c.description || "";
+        const search = `${title} ${desc} ${c.doc || ""} ${c.example || ""}`.toLowerCase();
+        return { title, meta, desc, doc: c.doc || "", example: c.example || "", search };
+      })
+      .filter((e) => match(e.search));
+
+    let html = '<div class="dict-section"><h3>Recorder commands (REPL)</h3>';
+    if (!cmds.length) {
+      html += '<p class="dict-empty">No matching commands.</p>';
+    } else {
+      html += cmds
+        .map((c) => {
+          const descHtml = c.desc ? `<div class="field">${c.desc}</div>` : '<div class="field dict-empty">(no description)</div>';
+          const docHtml = c.doc ? `<div class="field">${c.doc}</div>` : "";
+          const exHtml = c.example
+            ? `<div class="field"><span class="type">example</span> <span class="def">${c.example}</span></div>`
+            : "";
+          return `<div class="dict-entry">
+            <div class="title">${c.title}</div>
+            <div class="meta">${c.meta}</div>
+            ${descHtml}
+            ${docHtml}
+            ${exHtml}
+          </div>`;
+        })
+        .join("");
+    }
+    html += "</div>";
+    dictBody.innerHTML = html;
+  }
+
+  function setDictMode(mode) {
+    dictMode = mode;
+    btnDictTabBluelink?.classList.toggle("active", mode === "bluelink");
+    btnDictTabRecorder?.classList.toggle("active", mode === "recorder");
+    const filter = dictFilter ? dictFilter.value : "";
+    if (mode === "recorder") {
+      if (dictRecorderData) renderRecorderDictionary(dictRecorderData, filter);
+      else loadRecorderDictionary();
+    } else {
+      if (dictBluelinkData) renderDictionary(dictBluelinkData, filter);
+      else loadBluelinkDictionary();
+    }
+  }
+
+  async function loadBluelinkDictionary() {
+    if (dictBluelinkData) {
+      renderDictionary(dictBluelinkData, dictFilter ? dictFilter.value : "");
       return;
     }
     if (dictBody) dictBody.innerHTML = '<p class="dict-empty">Loading…</p>';
     try {
       const res = await fetch("/api/schema/commands-dictionary");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      dictData = await res.json();
-      renderDictionary(dictData, dictFilter ? dictFilter.value : "");
+      dictBluelinkData = await res.json();
+      if (dictMode === "bluelink") {
+        renderDictionary(dictBluelinkData, dictFilter ? dictFilter.value : "");
+      }
     } catch (e) {
       if (dictBody) {
         dictBody.innerHTML = `<p class="dict-empty">Failed to load dictionary: ${e.message}</p>`;
@@ -266,10 +325,30 @@
     }
   }
 
+  async function loadRecorderDictionary() {
+    if (dictRecorderData) {
+      renderRecorderDictionary(dictRecorderData, dictFilter ? dictFilter.value : "");
+      return;
+    }
+    if (dictBody) dictBody.innerHTML = '<p class="dict-empty">Loading…</p>';
+    try {
+      const res = await fetch("/api/schema/recorder-dictionary");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      dictRecorderData = await res.json();
+      if (dictMode === "recorder") {
+        renderRecorderDictionary(dictRecorderData, dictFilter ? dictFilter.value : "");
+      }
+    } catch (e) {
+      if (dictBody) {
+        dictBody.innerHTML = `<p class="dict-empty">Failed to load recorder dictionary: ${e.message}</p>`;
+      }
+    }
+  }
+
   function openDictionary() {
     if (!dictOverlay) return;
     dictOverlay.classList.add("open");
-    loadDictionary();
+    setDictMode(dictMode);
     if (dictFilter) {
       dictFilter.value = "";
       dictFilter.focus();
@@ -282,11 +361,18 @@
 
   document.getElementById("btn-dictionary")?.addEventListener("click", openDictionary);
   document.getElementById("btn-dict-close")?.addEventListener("click", closeDictionary);
+  btnDictTabBluelink?.addEventListener("click", () => setDictMode("bluelink"));
+  btnDictTabRecorder?.addEventListener("click", () => setDictMode("recorder"));
   dictOverlay?.addEventListener("click", (e) => {
     if (e.target === dictOverlay) closeDictionary();
   });
   dictFilter?.addEventListener("input", () => {
-    if (dictData) renderDictionary(dictData, dictFilter.value);
+    const filter = dictFilter.value;
+    if (dictMode === "recorder") {
+      if (dictRecorderData) renderRecorderDictionary(dictRecorderData, filter);
+    } else {
+      if (dictBluelinkData) renderDictionary(dictBluelinkData, filter);
+    }
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && dictOverlay?.classList.contains("open")) {

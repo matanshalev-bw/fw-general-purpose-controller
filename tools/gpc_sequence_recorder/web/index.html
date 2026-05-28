@@ -220,6 +220,10 @@
       cursor: pointer;
     }
     .dict-header button:hover { background: #666; }
+    .dict-header button.secondary { background: #444; }
+    .dict-header button.secondary:hover { background: #555; }
+    .dict-header button.active { background: #0e639c; }
+    .dict-header button.active:hover { background: #1177bb; }
     .dict-body {
       overflow: auto;
       padding: 0.75rem 1rem;
@@ -264,7 +268,7 @@
   <header>
     <h1>GPC Sequence Recorder</h1>
     <div class="actions">
-      <button id="btn-dictionary" type="button" class="secondary">BlueLink Dictionary</button>
+      <button id="btn-dictionary" type="button" class="secondary">Dictionary</button>
       <button id="btn-export" type="button">Export</button>
       <button id="btn-help" type="button">Help</button>
     </div>
@@ -315,7 +319,9 @@
   <div id="dict-overlay" class="dict-overlay" role="dialog" aria-modal="true" aria-labelledby="dict-title">
     <div class="dict-panel">
       <div class="dict-header">
-        <h2 id="dict-title">BlueLink command structs</h2>
+        <h2 id="dict-title">Dictionary</h2>
+        <button type="button" id="btn-dict-tab-bluelink" class="secondary">BlueLink</button>
+        <button type="button" id="btn-dict-tab-recorder" class="secondary">Recorder</button>
         <input id="dict-filter" type="search" placeholder="Filter…" autocomplete="off" />
         <button type="button" id="btn-dict-close">Close</button>
       </div>
