@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "application_main.h"
+#include "system_interface.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -83,7 +84,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  SystemInterface::setVectorTable();
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/

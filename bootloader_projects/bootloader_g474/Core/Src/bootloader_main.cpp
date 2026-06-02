@@ -546,6 +546,7 @@ void BootloaderMain::jumpToApplication(bool force_jump) {
         }
 
         exitBootloader();
+        SystemInterface::setVectorTable();
         __set_MSP(*(uint32_t*)FLASH_APPLICATION_ADDRESS);
         jump_to_application();
     } else {

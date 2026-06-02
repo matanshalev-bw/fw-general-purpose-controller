@@ -23,21 +23,20 @@ std::unique_ptr<BluewhiteCanComm> g_bluewhite_can;
 std::unique_ptr<BluewhiteUsbComm> g_bluewhite_usb;
 }  // namespace
 
-extern "C" void applicationInit(void) {
-  if (not NonVolatileMemoryInterface::isConfigMemoryValid()) {
-    Error_Handler();
-  }
-
+void applicationInit(void) {
+  const bool config_valid = NonVolatileMemoryInterface::isConfigMemoryValid();
   NonVolatileMemoryInterface::rewriteMetaData();
 
   g_sequence_executor = std::make_unique<MicroSequenceExecutor>();
   g_raw_can = std::make_unique<RawCanInterface>(&hfdcan3);
   g_sequence_executor->setRawCanInterface(g_raw_can.get());
 
-  const volatile MicroSequence& powerup =
-      NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config.powerup_sequence;
-  if (powerup.step_count > 0) {
-    g_sequence_executor->start(powerup);
+  if (config_valid) {
+    const volatile MicroSequence& powerup =
+        NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config.powerup_sequence;
+    if (powerup.step_count > 0) {
+      g_sequence_executor->start(powerup);
+    }
   }
 
 #ifdef HAL_ADC_MODULE_ENABLED
@@ -56,7 +55,7 @@ extern "C" void applicationInit(void) {
   g_bluewhite_usb->initialize();
 }
 
-extern "C" void applicationTick(void) {
+void applicationTick(void) {
   if (g_bluewhite_can) {
     g_bluewhite_can->tick();
   }
