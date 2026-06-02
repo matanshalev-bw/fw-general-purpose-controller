@@ -1,6 +1,6 @@
 # GPC USB bluelink bridge
 
-Host-side C++ CLI that sends arbitrary bluelink packets over USB CDC serial to the GPC firmware (same wire format as LLC `scripts/boot`).
+Host-side C++ CLI that sends bluelink packets over USB CDC serial to the GPC firmware, using the same bluelink SDK stack as LLC `scripts/boot`.
 
 Intended as a subprocess backend for the Python sequence-recorder GUI.
 
@@ -31,7 +31,7 @@ make CC=g++ all
 | `-d, --dst` | Destination component id (default `17` = GPC `0x11`) |
 | `-s, --src` | Source id (default `2` = HLC) |
 | `-t, --payload-type` | `PayloadTypeIds` numeric value, decimal or `0x` hex (required) |
-| `-P, --payload` | Payload as hex bytes (optional; size from SDK if omitted) |
+| `-P, --payload` | Payload as hex bytes (optional; zero-filled to SDK payload size if omitted) |
 | `-q, --qos` | `none` or `ack` |
 | `-r, --retries` | ACK retransmit count (default 5) |
 | `--timeout-ms` | ACK wait timeout (default 2000) |

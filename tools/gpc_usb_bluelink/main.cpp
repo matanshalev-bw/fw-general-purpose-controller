@@ -1,18 +1,16 @@
 #include <unistd.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 
 #include "bluelink_communication_handler.hpp"
 #include "concrete_bluelink_callbacks.hpp"
 #include "serial.h"
-#include "bluelink_serializer.hpp"
-#include "wire_packet.hpp"
 
 namespace {
 
@@ -23,25 +21,9 @@ constexpr int kSerialTimeoutMs = 700;
 serial::Serial g_serial;
 uint8_t g_rx_buffer[kCommBufferSize]{};
 
-uint32_t g_expected_sequence_id = 0;
-bool g_ack_received = false;
-bool g_nack_received = false;
-
 void delayMs(unsigned ms) { usleep(ms * 1000); }
 
-bool parseInbound(bluelink::PayloadTypeIds payload_type, const uint8_t* buffer) {
-  bluelink::Header header{};
-  bluelink::Deserializer::decodeHeader(&header, buffer);
-
-  if (payload_type == bluelink::PayloadTypeIds::ACK_PACKET_RECEIVED &&
-      header.packet_sequence_id == g_expected_sequence_id) {
-    g_ack_received = true;
-  } else if (payload_type == bluelink::PayloadTypeIds::NACK_PACKET_RECEIVED &&
-             header.packet_sequence_id == g_expected_sequence_id) {
-    g_nack_received = true;
-  }
-  return true;
-}
+bool parseInbound(bluelink::PayloadTypeIds /*payload_type*/, const uint8_t* /*buffer*/) { return true; }
 
 void printUsage(const char* prog) {
   std::cerr
@@ -52,14 +34,14 @@ void printUsage(const char* prog) {
       << "  -d, --dst ID              Destination component id, decimal or 0x hex (default 17 / GPC)\n"
       << "  -s, --src ID              Source component id (default 2 / HLC)\n"
       << "  -t, --payload-type ID     PayloadTypeIds numeric value, decimal or 0x hex (required)\n"
-      << "  -P, --payload HEX         Payload bytes as hex (optional)\n"
+      << "  -P, --payload HEX         Payload bytes as hex (optional; zero-filled to SDK size if omitted)\n"
       << "  -q, --qos none|ack        QoS (default none)\n"
       << "  -r, --retries N           ACK retries when qos=ack (default 5)\n"
       << "  --timeout-ms MS           ACK wait timeout (default 2000)\n"
       << "  -h, --help                Show this help\n\n"
       << "Example:\n"
       << "  " << prog << " -p /dev/ttyACM0 -t 99 -P 010501 -q ack\n"
-      << "  " << prog << " -t 7 -P 00000000 -d 17 -q none\n";
+      << "  " << prog << " -t 7 -d 17 -q none\n";
 }
 
 bool parseUint(const std::string& text, uint32_t& out) {
@@ -219,32 +201,160 @@ bool parseArgs(int argc, char* argv[], CliOptions& opts) {
   return opts.payload_type_set;
 }
 
-bool waitForAck(bluelink::BluelinkCommunicationHandler& bluelink, ConcreteBluelinkCallbacks& callbacks,
-                const uint8_t* wire_buffer, size_t wire_size, uint8_t retries, unsigned timeout_ms) {
-  const unsigned step_ms = 50;
-  unsigned elapsed = 0;
-  uint8_t resend_count = 0;
+size_t wireSizeForPayloadType(bluelink::PayloadTypeIds payload_type) {
+  bluelink::Header header{};
+  header.payload_type = payload_type;
+  return sizeof(bluelink::Prefix) + sizeof(bluelink::Header) +
+         bluelink::Serializer::GetSizeOfPayload(header) + sizeof(bluelink::Suffix);
+}
 
-  while (elapsed < timeout_ms && not g_ack_received && not g_nack_received) {
-    bluelink.processReceivedData(g_rx_buffer);
-    if (g_ack_received) {
-      return true;
-    }
-    if (g_nack_received) {
-      std::cerr << "NACK received\n";
-      return false;
-    }
-    delayMs(step_ms);
-    elapsed += step_ms;
-    if (resend_count < retries && (elapsed % 200) == 0 && elapsed > 0) {
-      callbacks.write(wire_buffer, wire_size);
-      ++resend_count;
-    }
+template <typename T>
+void fillPayload(bluelink::Packet<T>& packet, const std::vector<uint8_t>& payload) {
+  std::memset(&packet.payload_data, 0, sizeof(T));
+  if (!payload.empty()) {
+    const size_t copy_size = std::min(payload.size(), sizeof(T));
+    std::memcpy(&packet.payload_data, payload.data(), copy_size);
+  }
+}
+
+template <typename T>
+bool sendAndWait(bluelink::BluelinkCommunicationHandler& bluelink, bluelink::Packet<T>& packet,
+                 const CliOptions& opts) {
+  int tick = 0;
+  const int wire_size = (opts.qos == bluelink::QosTypes::REQUIRE_ACK)
+                            ? bluelink.writeMessageNow(packet, opts.retries)
+                            : bluelink.writeMessageNow(packet);
+  if (wire_size <= 0) {
+    std::cerr << "Failed to send packet\n";
+    return false;
   }
 
-  std::cerr << "ACK timeout after " << timeout_ms << " ms\n";
-  return false;
+  if (opts.qos == bluelink::QosTypes::REQUIRE_ACK) {
+    delayMs(100);
+    bluelink.processReceivedData(g_rx_buffer);
+
+    unsigned elapsed = 100;
+    while (bluelink.getLeftRetries(packet) > 0 && elapsed < opts.timeout_ms) {
+      bluelink.resendWaitingForAckMsgsLoop(static_cast<uint32_t>(tick++));
+      delayMs(100);
+      bluelink.processReceivedData(g_rx_buffer);
+      elapsed += 100;
+    }
+
+    if (bluelink.getLeftRetries(packet) != AckVector::MESSAGE_RECEIVED) {
+      if (bluelink.getLeftRetries(packet) == AckVector::MESSAGE_NACK) {
+        std::cerr << "NACK received\n";
+      } else {
+        std::cerr << "ACK timeout after " << opts.timeout_ms << " ms\n";
+      }
+      return false;
+    }
+    std::cout << "ACK received\n";
+  }
+
+  std::cout << "Sent " << wireSizeForPayloadType(opts.payload_type) << " bytes to " << opts.port
+            << " (dst=" << static_cast<int>(opts.dst) << " type=" << static_cast<int>(opts.payload_type)
+            << " payload=" << bluelink::Serializer::GetSizeOfPayload(packet.header) << ")\n";
+  return true;
 }
+
+#define BL_SEND_CASE(payload_id, payload_type)                         \
+  case bluelink::PayloadTypeIds::payload_id: {                         \
+    bluelink::Packet<payload_type> packet(bluelink::PayloadTypeIds::payload_id, opts.dst, opts.qos); \
+    fillPayload(packet, opts.payload);                                 \
+    return sendAndWait(bluelink, packet, opts);                        \
+  }
+
+bool dispatchSend(bluelink::BluelinkCommunicationHandler& bluelink, const CliOptions& opts) {
+  switch (opts.payload_type) {
+    BL_SEND_CASE(KEEP_ALIVE, bluelink::ConnectivityPayload::KeepAlive)
+    BL_SEND_CASE(ACK_PACKET_RECEIVED, bluelink::ConnectivityPayload::AckPacketReceived)
+    BL_SEND_CASE(STEERING_CONTINUOUS_COMMAND, bluelink::CommandsPayload::SteeringContinuousCommand)
+    BL_SEND_CASE(THROTTLE_CONTINUOUS_COMMAND, bluelink::CommandsPayload::ThrottleContinuousCommand)
+    BL_SEND_CASE(DRIVE_COMMAND, bluelink::CommandsPayload::DriveCommand)
+    BL_SEND_CASE(PTO_COMMAND, bluelink::CommandsPayload::PtoCommand)
+    BL_SEND_CASE(SPRAYERS_COMMAND, bluelink::CommandsPayload::SprayersCommand)
+    BL_SEND_CASE(CALIBRATE_COMMAND, bluelink::CommandsPayload::CalibrateCommand)
+    BL_SEND_CASE(ENGINE_START_COMMAND, bluelink::CommandsPayload::EngineStartCommand)
+    BL_SEND_CASE(THREE_POINT_HITCH_COMMAND, bluelink::CommandsPayload::ThreePointHitchCommand)
+    BL_SEND_CASE(SAFETY_LOCK_COMMAND, bluelink::CommandsPayload::SafetyLockCommand)
+    BL_SEND_CASE(HORN_CONTINUOUS_COMMAND, bluelink::CommandsPayload::HornContinuousCommand)
+    BL_SEND_CASE(STROBE_COMMAND, bluelink::CommandsPayload::StrobeCommand)
+    BL_SEND_CASE(REVERSER_COMMAND, bluelink::CommandsPayload::ReverserCommand)
+    BL_SEND_CASE(FOUR_WHEEL_DRIVE_COMMAND, bluelink::CommandsPayload::FourWheelDriveCommand)
+    BL_SEND_CASE(STEERING_TELEMETRY, bluelink::TelemetryPayload::SteeringTelemetry)
+    BL_SEND_CASE(STEERING_PHYSICAL_SETTINGS_TELEMETRY, bluelink::TelemetryPayload::SteeringPhysicalSettingsTelemetry)
+    BL_SEND_CASE(BRAKES_TELEMETRY, bluelink::TelemetryPayload::BrakesTelemetry)
+    BL_SEND_CASE(ENGINE_TELEMETRY, bluelink::TelemetryPayload::EngineTelemetry)
+    BL_SEND_CASE(DRIVE_CONTROL_TELEMETRY, bluelink::TelemetryPayload::DriveControlTelemetry)
+    BL_SEND_CASE(PTO_TELEMETRY, bluelink::TelemetryPayload::PtoTelemetry)
+    BL_SEND_CASE(THREE_POINT_HITCH_TELEMETRY, bluelink::TelemetryPayload::ThreePointHitchTelemetry)
+    BL_SEND_CASE(SPRAYERS_TELEMETRY, bluelink::TelemetryPayload::SprayersTelemetry)
+    BL_SEND_CASE(RAW_SENSORS_TELEMETRY, bluelink::TelemetryPayload::RawSensorTelemetries)
+    BL_SEND_CASE(LLC_SYSTEM_STATUS_TELEMETRY, bluelink::TelemetryPayload::LlcSystemStatusTelemetry)
+    BL_SEND_CASE(LLC_SYSTEM_CONFIG_TELEMETRY, bluelink::TelemetryPayload::LlcSystemConfigTelemetry)
+    BL_SEND_CASE(CALIBRATION_TELEMETRY, bluelink::TelemetryPayload::CalibrationTelemetryData)
+    BL_SEND_CASE(HORN_TELEMETRY, bluelink::TelemetryPayload::HornTelemetry)
+    BL_SEND_CASE(FOUR_WHEEL_DRIVE_TELEMETRY, bluelink::TelemetryPayload::FourWheelDriveTelemetry)
+    BL_SEND_CASE(RESET_COMMAND, bluelink::CommandsPayload::ResetCommand)
+    BL_SEND_CASE(CONTROL_METRICS, bluelink::TelemetryPayload::ControlMetricsTelemetryData)
+    BL_SEND_CASE(AUTOTUNE_TELEMETRY, bluelink::TelemetryPayload::AutotuneTelemetryData)
+    BL_SEND_CASE(SCHEDULE_COMMAND, bluelink::CommandsPayload::ScheduleCommand)
+    BL_SEND_CASE(BRAKES_CONTINUOUS_COMMAND, bluelink::CommandsPayload::BrakesContinuousCommand)
+    BL_SEND_CASE(REVERSER_TELEMETRY, bluelink::TelemetryPayload::ReverserTelemetry)
+    BL_SEND_CASE(STROBE_TELEMETRY, bluelink::TelemetryPayload::StrobeTelemetry)
+    BL_SEND_CASE(SEAT_TELEMETRY, bluelink::TelemetryPayload::SeatTelemetry)
+    BL_SEND_CASE(LEDBAR_COMMAND, bluelink::CommandsPayload::LedbarCommand)
+    BL_SEND_CASE(DRIVER_STATE_COMMAND, bluelink::CommandsPayload::DriverStateCommand)
+    BL_SEND_CASE(CONTROL_COMMAND, bluelink::CommandsPayload::ControlCommand)
+    BL_SEND_CASE(CENTER_OFFSET_COMMAND, bluelink::CommandsPayload::CenterOffsetCommand)
+    BL_SEND_CASE(AUX_KEEP_ALIVE_COMMAND, bluelink::CommandsPayload::AuxKeepAliveCommand)
+    BL_SEND_CASE(AUX_KEEP_ALIVE_TELEMETRY, bluelink::TelemetryPayload::AuxKeepAliveTelemetry)
+    BL_SEND_CASE(NACK_PACKET_RECEIVED, bluelink::ConnectivityPayload::AckPacketReceived)
+    BL_SEND_CASE(CONTROLLER_META_DATA_TELEMETRY, bluelink::TelemetryPayload::ControllerMetaData)
+    BL_SEND_CASE(POWER_PANEL_SET_PARAMS_COMMAND, bluelink::CommandsPayload::PowerPanelSetParamsCommand)
+    BL_SEND_CASE(POWER_PANEL_SET_MODE_COMMAND, bluelink::CommandsPayload::PowerPanelSetModeCommand)
+    BL_SEND_CASE(POWER_PANEL_COMPONENT_CONTROL_COMMAND, bluelink::CommandsPayload::PowerPanelComponentControlCommand)
+    BL_SEND_CASE(POWER_PANEL_ESTOP_COMMAND, bluelink::CommandsPayload::PowerPanelEstopCommand)
+    BL_SEND_CASE(LOG, bluelink::ConnectivityPayload::Log)
+    BL_SEND_CASE(POWER_PANEL_HIGH_FREQ_TELEMETRY, bluelink::TelemetryPayload::PowerPanelHighFreqTelemetry)
+    BL_SEND_CASE(POWER_PANEL_LOW_FREQ_TELEMETRY, bluelink::TelemetryPayload::PowerPanelLowFreqTelemetry)
+    BL_SEND_CASE(PPI_PP_TELEMETRY, bluelink::TelemetryPayload::PpiPpTelemetry)
+    BL_SEND_CASE(REVERSER_ANALOG_CHANNEL_TELEMETRY, bluelink::TelemetryPayload::ReverserAnalogChannelTelemetry)
+    BL_SEND_CASE(ENGINE_TORQ_MODE_TELEMETRY, bluelink::TelemetryPayload::EngTorqModeTelemetry)
+    BL_SEND_CASE(SEAT_COMMAND, bluelink::CommandsPayload::SeatCommand)
+    BL_SEND_CASE(ENGAGE_AUTONOMOUS_COMMAND, bluelink::CommandsPayload::EngageAutonomousCommand)
+    BL_SEND_CASE(LLC_STATE_TELEMETRY, bluelink::TelemetryPayload::LlcStateTelemetry)
+    BL_SEND_CASE(POWER_TELEMETRY, bluelink::TelemetryPayload::PowerTelemetry)
+    BL_SEND_CASE(LLC_CONTROLLER_TELEMETRIES, bluelink::TelemetryPayload::LlcControllerTelemetries)
+    BL_SEND_CASE(LLC_HIGH_FREQ_SYSTEM_TELEMETRIES, bluelink::TelemetryPayload::LlcHighFreqSystemTelemetries)
+    BL_SEND_CASE(LLC_LOW_FREQ_SYSTEM_TELEMETRIES, bluelink::TelemetryPayload::LlcLowFreqSystemTelemetries)
+    BL_SEND_CASE(TRANSM_OUT_SPD_TELEMETRY, bluelink::TelemetryPayload::TransmOutSpdTelemetry)
+    BL_SEND_CASE(BLUELINK_VERSION_TELEMETRY, bluelink::TelemetryPayload::BluelinkVersionTelemetry)
+    BL_SEND_CASE(TRACTOR_DIAGNOSTIC_TELEMETRY, bluelink::TelemetryPayload::TractorDiagnosticTelemetry)
+    BL_SEND_CASE(POWER_COMMAND, bluelink::CommandsPayload::ControlCommand)
+    BL_SEND_CASE(MICRO_DIGITAL_GPIO_WRITE_COMMAND, bluelink::MicroCommandsPayload::MicroDigitalGpioWriteCommand)
+    BL_SEND_CASE(MICRO_DIGITAL_GPIO_READ_COMMAND, bluelink::MicroCommandsPayload::MicroDigitalGpioReadCommand)
+    BL_SEND_CASE(MICRO_ADC_READ_COMMAND, bluelink::MicroCommandsPayload::MicroAdcReadCommand)
+    BL_SEND_CASE(MICRO_DAC_WRITE_COMMAND, bluelink::MicroCommandsPayload::MicroDacWriteCommand)
+    BL_SEND_CASE(MICRO_PWM_SET_COMMAND, bluelink::MicroCommandsPayload::MicroPwmSetCommand)
+    BL_SEND_CASE(MICRO_DELAY_MS_COMMAND, bluelink::MicroCommandsPayload::MicroDelayMsCommand)
+    BL_SEND_CASE(MICRO_CAN_TRANSMIT_COMMAND, bluelink::MicroCommandsPayload::MicroCanTransmitCommand)
+    BL_SEND_CASE(MICRO_UART_TRANSMIT_COMMAND, bluelink::MicroCommandsPayload::MicroUartTransmitCommand)
+    BL_SEND_CASE(MICRO_SPI_TRANSFER_COMMAND, bluelink::MicroCommandsPayload::MicroSpiTransferCommand)
+    BL_SEND_CASE(MICRO_I2C_WRITE_COMMAND, bluelink::MicroCommandsPayload::MicroI2cWriteCommand)
+    BL_SEND_CASE(PROGRAMMING_COMMAND, bluelink::Pattern)
+    BL_SEND_CASE(PROGRAMMING_REQUEST, bluelink::Pattern)
+    BL_SEND_CASE(STOP_PROGRAMMING_COMMAND, bluelink::Pattern)
+    default: {
+      bluelink::Packet<bluelink::Pattern> packet(opts.payload_type, opts.dst, opts.qos);
+      fillPayload(packet, opts.payload);
+      return sendAndWait(bluelink, packet, opts);
+    }
+  }
+}
+
+#undef BL_SEND_CASE
 
 }  // namespace
 
@@ -262,51 +372,20 @@ int main(int argc, char* argv[]) {
   bluelink::Header size_probe{};
   size_probe.payload_type = opts.payload_type;
   const size_t expected_payload_size = bluelink::Serializer::GetSizeOfPayload(size_probe);
-  if (opts.payload.empty() && expected_payload_size > 0) {
+  if (opts.payload.empty()) {
     opts.payload.assign(expected_payload_size, 0);
-  }
-
-  if (opts.payload.size() > gpc_usb_bluelink::kMaxWirePayloadBytes) {
-    std::cerr << "Payload too large (" << opts.payload.size() << " bytes)\n";
+  } else if (opts.payload.size() != expected_payload_size) {
+    std::cerr << "Payload size mismatch: got " << opts.payload.size() << " bytes, expected "
+              << expected_payload_size << " for payload type " << static_cast<int>(opts.payload_type) << '\n';
     return 1;
   }
 
   ConcreteBluelinkCallbacks callbacks(&g_serial, parseInbound);
   bluelink::BluelinkCommunicationHandler bluelink(opts.src, &callbacks);
 
-  static uint8_t wire_buffer[512]{};
-  gpc_usb_bluelink::SendOptions send_opts{};
-  send_opts.source_id = opts.src;
-  send_opts.destination_id = opts.dst;
-  send_opts.payload_type = opts.payload_type;
-  send_opts.qos = opts.qos;
-  if (opts.qos == bluelink::QosTypes::REQUIRE_ACK) {
-    send_opts.packet_sequence_id = 1;
-  }
-  g_expected_sequence_id = send_opts.packet_sequence_id;
-
-  const size_t wire_size = gpc_usb_bluelink::buildWirePacket(wire_buffer, sizeof(wire_buffer), send_opts,
-                                                             opts.payload.data(), opts.payload.size());
-  if (wire_size == 0) {
-    std::cerr << "Failed to build wire packet\n";
+  if (not dispatchSend(bluelink, opts)) {
+    g_serial.close();
     return 1;
-  }
-
-  if (callbacks.write(wire_buffer, wire_size) != wire_size) {
-    std::cerr << "Serial write failed\n";
-    return 1;
-  }
-
-  std::cout << "Sent " << wire_size << " bytes to " << opts.port << " (dst=" << static_cast<int>(opts.dst)
-            << " type=" << static_cast<int>(opts.payload_type) << " payload=" << opts.payload.size() << ")\n";
-
-  if (opts.qos == bluelink::QosTypes::REQUIRE_ACK) {
-    delayMs(100);
-    if (not waitForAck(bluelink, callbacks, wire_buffer, wire_size, opts.retries, opts.timeout_ms)) {
-      g_serial.close();
-      return 1;
-    }
-    std::cout << "ACK received\n";
   }
 
   g_serial.close();

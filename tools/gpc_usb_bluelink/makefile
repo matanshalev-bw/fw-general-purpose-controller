@@ -32,7 +32,6 @@ VPATH := .:$(LLC_COMMON):$(BLUELINK_SER)/Communicator/AckVector:$(BLUELINK_SER)/
 
 SRC_FILES := \
 	main.cpp \
-	wire_packet.cpp \
 	concrete_bluelink_callbacks.cpp \
 	serial.cpp \
 	unix.cpp \
