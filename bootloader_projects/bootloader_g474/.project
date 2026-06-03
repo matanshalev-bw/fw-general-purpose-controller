@@ -42,6 +42,11 @@
 			<locationURI>PARENT-2-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include</locationURI>
 		</link>
 		<link>
+			<name>Core/Src/bluelink_serializer</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_serializer</locationURI>
+		</link>
+		<link>
 			<name>Core/Src/bluelink_version</name>
 			<type>2</type>
 			<locationURI>PARENT-2-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_version</locationURI>

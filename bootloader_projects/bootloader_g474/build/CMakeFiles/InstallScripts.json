@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

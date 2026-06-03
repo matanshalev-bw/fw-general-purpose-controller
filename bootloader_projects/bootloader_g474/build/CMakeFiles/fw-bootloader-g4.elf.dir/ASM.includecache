@@ -1,0 +1,10 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/Core/Startup/startup_stm32g474cetx.s
+

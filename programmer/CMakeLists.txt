@@ -11,18 +11,45 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMMON_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG "-g3 -O0 -DDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 
+set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set(BLUELINK_MSG ${REPO_ROOT}/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include)
+set(BLUELINK_VER ${REPO_ROOT}/3rd_party/bluelink_sdk/bluelink_version)
+set(BLUELINK_SER ${REPO_ROOT}/3rd_party/bluelink_sdk/bluelink_serializer/bluelink_serializer_include)
+set(LLC_COMMON ${REPO_ROOT}/../fw-llc/scripts/common)
+
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/bluelink_sdk
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/bluelink_sdk/bluelink_version
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interfaces/interfaces_g474
+    ${REPO_ROOT}
+    ${BLUELINK_MSG}
+    ${BLUELINK_MSG}/PayloadStructs
+    ${BLUELINK_VER}
+    ${BLUELINK_SER}
+    ${BLUELINK_SER}/Communicator
+    ${BLUELINK_SER}/Communicator/BluelinkCommHandler
+    ${BLUELINK_SER}/PacketStruct
+    ${BLUELINK_SER}/Serialization/CRC32
+    ${LLC_COMMON}
+    ${REPO_ROOT}/interfaces/interfaces_g474
+    ${CMAKE_CURRENT_SOURCE_DIR}/g474
 )
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
-add_executable(prog-gpc-g4
+set(PROGRAMMER_SOURCES
     g474/programmer.cpp
+    g474/can_transport.cpp
+    g474/usb_transport.cpp
+    g474/concrete_bluelink_callbacks.cpp
+    ${BLUELINK_SER}/Communicator/AckVector/ack_vector.cpp
+    ${BLUELINK_SER}/Communicator/bluelink_callbacks.cpp
+    ${BLUELINK_SER}/Communicator/BluelinkCommHandler/bluelink_communication_handler.cpp
+    ${BLUELINK_SER}/Serialization/CRC32/checksum_32.cpp
+    ${BLUELINK_SER}/Serialization/Deserializer/deserializer.cpp
+    ${BLUELINK_SER}/Serialization/Serializer/serializer.cpp
+    ${LLC_COMMON}/serial.cpp
+    ${LLC_COMMON}/unix.cpp
 )
+
+add_executable(prog-gpc-g4 ${PROGRAMMER_SOURCES})
 
 set_target_properties(prog-gpc-g4 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

@@ -22,7 +22,7 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
-
+#include <stdbool.h>
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -94,7 +94,9 @@ uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
-
+bool usb_transmit_flag = true;
+uint16_t usb_receive_size = 0;
+uint8_t host_connection = 0;
 /* USER CODE END PRIVATE_VARIABLES */
 
 /**
@@ -227,9 +229,11 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 
     break;
 
-    case CDC_SET_CONTROL_LINE_STATE:
-
-    break;
+    case CDC_SET_CONTROL_LINE_STATE: {
+      const uint16_t ctrl_line_state = pbuf[2];
+      host_connection = (ctrl_line_state == 3U) ? 1U : 0U;
+      break;
+    }
 
     case CDC_SEND_BREAK:
 
@@ -261,8 +265,8 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
-  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+  (void)Buf;
+  usb_receive_size = (uint16_t)(*Len);
   return (USBD_OK);
   /* USER CODE END 6 */
 }
@@ -311,6 +315,7 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
   UNUSED(Buf);
   UNUSED(Len);
   UNUSED(epnum);
+  usb_transmit_flag = true;
   /* USER CODE END 13 */
   return result;
 }

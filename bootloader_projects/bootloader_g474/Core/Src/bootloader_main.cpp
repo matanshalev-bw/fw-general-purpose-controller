@@ -7,6 +7,10 @@
 
 #include "bootloader_main.hpp"
 
+#include <cstring>
+
+#include "usb_comm.hpp"
+
 uint16_t BootloaderMain::can_receive_size_ = 0;
 bool BootloaderMain::can_transmit_flag_ = true;
 BootloaderMain* BootloaderMain::interrupt_instance_ = nullptr;
@@ -32,6 +36,9 @@ BootloaderMain::BootloaderMain(FDCAN_HandleTypeDef* hfdcan, TIM_HandleTypeDef* h
     programming_timeout_scheduler_ = std::make_unique<SchedulerOnce>(PROGRAMMING_TIMEOUT_MS_);
     
     interrupt_instance_ = this;
+
+    bootloader_usb_comm_ = new BootloaderUsbComm(this);
+    bootloader_usb_comm_->initialize();
 
     InterfaceStatus status = initializeCanInterface();
     if (status != InterfaceStatus::INTERFACE_OK) {
@@ -129,6 +136,10 @@ int BootloaderMain::run() {
         handleTimeouts();
         processTxQueue();
         processRxQueuedMessage();
+        if (bootloader_usb_comm_ != nullptr) {
+            bootloader_usb_comm_->tick();
+        }
+        handlePendingUsbReplies();
         executeTask(led_status_scheduler_, led_status_);
     }
 
@@ -190,22 +201,63 @@ void BootloaderMain::processRxQueuedMessage() {
     while (messages_processed < MAX_RX_MESSAGES_PER_TICK and
            can_messenger_->getNextRxMessage(current_rx_item_)) {
 
-        const bluelink::PayloadTypeIds payload_type = static_cast<bluelink::PayloadTypeIds>(current_rx_item_.payload_type_id);
+        BootloaderInboundMessage message{};
+        message.source_id = current_rx_item_.source_id;
+        message.payload_type_id = current_rx_item_.payload_type_id;
+        message.length = current_rx_item_.length;
+        std::memcpy(message.data, current_rx_item_.data, message.length);
 
-        switch (payload_type) {
-        case bluelink::PayloadTypeIds::PROGRAMMING_COMMAND:
-            processProgrammingCommand();
-            break;
-
-        case bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY:
-            processMetaDataRequest();
-            break;
-
-        default:
-            break;
-        }
+        handleInboundMessage(message, BootloaderTransport::CAN);
 
         messages_processed++;
+    }
+}
+
+bool BootloaderMain::handleInboundMessage(const BootloaderInboundMessage& message, BootloaderTransport transport) {
+    const bluelink::PayloadTypeIds payload_type =
+        static_cast<bluelink::PayloadTypeIds>(message.payload_type_id);
+
+    switch (payload_type) {
+    case bluelink::PayloadTypeIds::PROGRAMMING_COMMAND:
+        last_programming_source_id_ = message.source_id;
+        last_programming_transport_ = transport;
+        processProgrammingCommand(message);
+        return true;
+
+    case bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY:
+        processMetaDataRequest(message.source_id, transport);
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+void BootloaderMain::handlePendingUsbReplies() {
+    if (bootloader_usb_comm_ == nullptr) {
+        return;
+    }
+
+    if (is_metadata_send_requested_ && metadata_response_transport_ == BootloaderTransport::USB_BLUELINK) {
+        static const auto& meta = NonVolatileMemoryInterface::META_DATA_;
+        bluelink::TelemetryPayload::ControllerMetaData data = {
+            .component_id = meta.MY_COMPONENT_ID,
+            .bootloader_version = {meta.BOOTLOADER_VERSION.major, meta.BOOTLOADER_VERSION.minor},
+            .app_version = {meta.APPLICATION_VERSION.major, meta.APPLICATION_VERSION.minor},
+            .config_version = {meta.CONFIGURATION_VERSION.major, meta.CONFIGURATION_VERSION.minor},
+            .config_type = meta.config_type.type
+        };
+
+        if (bootloader_usb_comm_->sendControllerMetaData(metadata_destination_id_, data)) {
+            is_metadata_send_requested_ = false;
+        }
+    }
+
+    if (is_programming_data_send_requested_ && programming_response_transport_ == BootloaderTransport::USB_BLUELINK) {
+        if (bootloader_usb_comm_->sendProgrammingCommand(programming_response_destination_id_,
+                                                        programming_data_to_send_)) {
+            is_programming_data_send_requested_ = false;
+        }
     }
 }
 
@@ -216,7 +268,7 @@ void BootloaderMain::processTxQueue() {
 }
 
 void BootloaderMain::handlePendingMetadataRequest() {
-    if (not is_metadata_send_requested_) return;
+    if (not is_metadata_send_requested_ || metadata_response_transport_ == BootloaderTransport::USB_BLUELINK) return;
 
     static const auto& meta = NonVolatileMemoryInterface::META_DATA_;
     bluelink::TelemetryPayload::ControllerMetaData data = {
@@ -227,17 +279,18 @@ void BootloaderMain::handlePendingMetadataRequest() {
         .config_type = meta.config_type.type
     };
 
-    if (sendCanMessage(metadata_destination_id_, bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY,
-                       &data, sizeof(data))) {
+    if (sendReply(metadata_destination_id_, bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY,
+                  &data, sizeof(data), metadata_response_transport_)) {
         is_metadata_send_requested_ = false;
     }
 }
 
 void BootloaderMain::handlePendingProgrammingData() {
-    if (not is_programming_data_send_requested_) return;
+    if (not is_programming_data_send_requested_ || programming_response_transport_ == BootloaderTransport::USB_BLUELINK) return;
 
-    if (sendCanMessage(bluelink::ComponentId::COMPONENT_ID_HLC, bluelink::PayloadTypeIds::PROGRAMMING_COMMAND,
-                       &programming_data_to_send_, sizeof(programming_data_to_send_))) {
+    if (sendReply(programming_response_destination_id_, bluelink::PayloadTypeIds::PROGRAMMING_COMMAND,
+                  &programming_data_to_send_, sizeof(programming_data_to_send_),
+                  programming_response_transport_)) {
         is_programming_data_send_requested_ = false;
     }
 }
@@ -255,6 +308,15 @@ bool BootloaderMain::sendCanMessage(uint8_t destination_id, bluelink::PayloadTyp
     return can_messenger_->enqueueTxMessage(tx_header,
                                            reinterpret_cast<const uint8_t*>(data),
                                            data_size);
+}
+
+bool BootloaderMain::sendReply(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data,
+                               size_t data_size, BootloaderTransport transport) {
+    if (transport == BootloaderTransport::USB_BLUELINK) {
+        return false;
+    }
+
+    return sendCanMessage(destination_id, payload_type, data, data_size);
 }
 
 void BootloaderMain::handleTimeouts() {
@@ -284,8 +346,8 @@ void BootloaderMain::handleTimeouts() {
     }
 }
 
-void BootloaderMain::processProgrammingCommand() {
-    memcpy(&received_programming_command_, current_rx_item_.data, sizeof(received_programming_command_));
+void BootloaderMain::processProgrammingCommand(const BootloaderInboundMessage& message) {
+    memcpy(&received_programming_command_, message.data, sizeof(received_programming_command_));
     
     auto cmd_type = received_programming_command_.programming_command_union.programming_command_type;
     
@@ -307,8 +369,10 @@ void BootloaderMain::processProgrammingCommand() {
     is_programming_command_received_ = true;
 }
 
-void BootloaderMain::processMetaDataRequest() {
-    requestMetaDataSend(current_rx_item_.source_id);
+void BootloaderMain::processMetaDataRequest(uint8_t source_id, BootloaderTransport transport) {
+    metadata_destination_id_ = source_id;
+    metadata_response_transport_ = transport;
+    is_metadata_send_requested_ = true;
 }
 void BootloaderMain::transitionToState(BootloaderState new_state) {
     bootloader_state_ = new_state;
@@ -410,6 +474,8 @@ void BootloaderMain::sendProgrammingStartRequests() {
         bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START;
 
     programming_data_to_send_ = prog_cmd;
+    programming_response_destination_id_ = last_programming_source_id_;
+    programming_response_transport_ = last_programming_transport_;
     is_programming_data_send_requested_ = true;
 }
 
@@ -507,6 +573,8 @@ void BootloaderMain::sendProgrammingResponse(uint32_t address, uint32_t data) {
     response_cmd.programming_command_union.programming_command_data.programming_address = address;
     response_cmd.programming_command_union.programming_command_data.programming_data = data;
     programming_data_to_send_ = response_cmd;
+    programming_response_destination_id_ = last_programming_source_id_;
+    programming_response_transport_ = last_programming_transport_;
     is_programming_data_send_requested_ = true;
 }
 
@@ -557,6 +625,9 @@ void BootloaderMain::jumpToApplication(bool force_jump) {
 
 void BootloaderMain::exitBootloader() {
     comm_can_->prepareForBootloader();
+    if (UsbComm::instance().interface() != nullptr) {
+        UsbComm::instance().interface()->deInit();
+    }
     SystemInterface::delay(BOOTLOADER_EXIT_DELAY_MS_);
 }
 
@@ -573,6 +644,7 @@ bool BootloaderMain::isProgrammingStateFlashed() const {
 
 void BootloaderMain::requestMetaDataSend(uint8_t destination_id) {
     metadata_destination_id_ = destination_id;
+    metadata_response_transport_ = BootloaderTransport::CAN;
     is_metadata_send_requested_ = true;
 }
 

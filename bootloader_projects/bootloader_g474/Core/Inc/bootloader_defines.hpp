@@ -19,4 +19,18 @@ enum class BootloaderState : uint8_t {
     JUMP_TO_APP
 };
 
+enum class BootloaderTransport : uint8_t {
+    CAN,
+    USB_BLUELINK
+};
+
+struct BootloaderInboundMessage {
+    static constexpr uint8_t MAX_PAYLOAD_BYTES = 8;
+
+    uint8_t source_id = 0;
+    uint8_t payload_type_id = 0;
+    uint8_t data[MAX_PAYLOAD_BYTES]{};
+    uint8_t length = 0;
+};
+
 #endif /* SRC_BOOTLOADER_DEFINES_HPP_ */

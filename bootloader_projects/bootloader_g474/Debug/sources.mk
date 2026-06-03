@@ -41,6 +41,12 @@ CPP_DEPS :=
 # Every subdirectory with source files must be described here
 SUBDIRS := \
 Core/Src/bluelink_messages_include/PayloadStructs \
+Core/Src/bluelink_serializer/bluelink_serializer_include/Communicator/AckVector \
+Core/Src/bluelink_serializer/bluelink_serializer_include/Communicator/BluelinkCommHandler \
+Core/Src/bluelink_serializer/bluelink_serializer_include/Communicator \
+Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/CRC32 \
+Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/Deserializer \
+Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/Serializer \
 Core/Src \
 Core/Src/interfaces_g474/AdcManager \
 Core/Src/interfaces_g474/CanMessenger \

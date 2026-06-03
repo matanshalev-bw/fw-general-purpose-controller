@@ -218,9 +218,11 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 
     break;
 
-    case CDC_SET_CONTROL_LINE_STATE:
-
-    break;
+    case CDC_SET_CONTROL_LINE_STATE: {
+      const uint16_t ctrl_line_state = pbuf[2];
+      host_connection = (ctrl_line_state == 3U) ? 1U : 0U;
+      break;
+    }
 
     case CDC_SEND_BREAK:
 
@@ -252,8 +254,8 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
-  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+  (void)Buf;
+  usb_receive_size = static_cast<uint16_t>(*Len);
   return (USBD_OK);
   /* USER CODE END 6 */
 }
@@ -302,6 +304,7 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
   UNUSED(Buf);
   UNUSED(Len);
   UNUSED(epnum);
+  usb_transmit_flag = true;
   /* USER CODE END 13 */
   return result;
 }

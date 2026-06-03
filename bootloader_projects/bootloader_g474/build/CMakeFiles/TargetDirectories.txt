@@ -1,0 +1,7 @@
+/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/build/CMakeFiles/fw-bootloader-g4.elf.dir
+/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/build/CMakeFiles/edit_cache.dir
+/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/build/CMakeFiles/rebuild_cache.dir
+/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/build/CMakeFiles/list_install_components.dir
+/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/build/CMakeFiles/install.dir
+/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/build/CMakeFiles/install/local.dir
+/home/matan/fw_workspace/fw-general-purpose-controller/bootloader_projects/bootloader_g474/build/CMakeFiles/install/strip.dir

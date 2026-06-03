@@ -41,28 +41,42 @@ set(CMAKE_EXE_LINKER_FLAGS
 )
 
 # Include directories in exact IDE order (CRITICAL for correct header resolution)
+set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+set(BLUELINK_SERIALIZER_DIR ${REPO_ROOT}/3rd_party/bluelink_sdk/bluelink_serializer/bluelink_serializer_include)
+set(INTERFACES_DIR ${REPO_ROOT}/interfaces/interfaces_g474)
+
 include_directories(
     Core/Inc
     Drivers/STM32G4xx_HAL_Driver/Inc
     Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
     Drivers/CMSIS/Device/ST/STM32G4xx/Include
     Drivers/CMSIS/Include
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include/PayloadStructs
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/bluelink_sdk/bluelink_version
-    ${CMAKE_CURRENT_SOURCE_DIR}/../configs/ConfigStructs
-    ${CMAKE_CURRENT_SOURCE_DIR}/../configs/ConfigStructs/SequencesConfigs
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/AdcManager
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/CanMessenger
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/CommInterface
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/GpioInterface
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/InterfaceDefines
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/MemoryMap
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/NonVolatileMemoryInterface
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/SchedulerInterface
-    ${CMAKE_CURRENT_SOURCE_DIR}/../interface/g474/SystemInterface
+    USB_Device/App
+    USB_Device/Target
+    Middlewares/ST/STM32_USB_Device_Library/Core/Inc
+    Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc
+    ${REPO_ROOT}
+    ${REPO_ROOT}/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include
+    ${REPO_ROOT}/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include/PayloadStructs
+    ${REPO_ROOT}/3rd_party/bluelink_sdk/bluelink_version
+    ${BLUELINK_SERIALIZER_DIR}
+    ${BLUELINK_SERIALIZER_DIR}/Communicator
+    ${BLUELINK_SERIALIZER_DIR}/Communicator/BluelinkCommHandler
+    ${BLUELINK_SERIALIZER_DIR}/PacketStruct
+    ${BLUELINK_SERIALIZER_DIR}/Serialization/CRC32
+    ${REPO_ROOT}/configs/ConfigStructs
+    ${REPO_ROOT}/configs/ConfigStructs/SequencesConfigs
+    ${INTERFACES_DIR}
+    ${INTERFACES_DIR}/AdcManager
+    ${INTERFACES_DIR}/CanMessenger
+    ${INTERFACES_DIR}/CommInterface
+    ${INTERFACES_DIR}/CommHandler
+    ${INTERFACES_DIR}/GpioInterface
+    ${INTERFACES_DIR}/InterfaceDefines
+    ${INTERFACES_DIR}/MemoryMap
+    ${INTERFACES_DIR}/NonVolatileMemoryInterface
+    ${INTERFACES_DIR}/SchedulerInterface
+    ${INTERFACES_DIR}/SystemInterface
 )
 
 # HAL Driver sources matching IDE build exactly
@@ -77,6 +91,8 @@ set(HAL_SOURCES
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c"
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ramfunc.c"
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c"
+    "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pcd.c"
+    "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pcd_ex.c"
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c"
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c"
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c"
@@ -85,14 +101,15 @@ set(HAL_SOURCES
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_spi_ex.c"
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim.c"
     "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim_ex.c"
-    "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart.c"
-    "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart_ex.c"
+    "Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_ll_usb.c"
 )
 
 # Core application sources
 set(CORE_SOURCES
     Core/Src/main.cpp
     Core/Src/bootloader_main.cpp
+    Core/Src/bootloader_usb_comm.cpp
+    Core/Src/usb_comm.cpp
     Core/Src/led_status_handler.cpp
     Core/Src/stm32g4xx_hal_msp.c
     Core/Src/stm32g4xx_it.c
@@ -101,14 +118,36 @@ set(CORE_SOURCES
     Core/Src/system_stm32g4xx.c
 )
 
+set(USB_SOURCES
+    USB_Device/App/usb_device.c
+    USB_Device/App/usbd_cdc_if.c
+    USB_Device/App/usbd_desc.c
+    USB_Device/Target/usbd_conf.c
+    Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c
+    Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c
+    Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c
+    Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c
+)
+
 set(INTERFACE_SOURCES
-    ../interface/g474/SystemInterface/system_interface.cpp
-    ../interface/g474/SchedulerInterface/scheduler_interface.cpp
-    ../interface/g474/NonVolatileMemoryInterface/non_volatile_memory_interface.cpp
-    ../interface/g474/GpioInterface/gpio_interface.cpp
-    ../interface/g474/CommInterface/comm_interface.cpp
-    ../interface/g474/CanMessenger/can_messenger.cpp
-    ../interface/g474/AdcManager/adc_manager.cpp
+    ${INTERFACES_DIR}/SystemInterface/system_interface.cpp
+    ${INTERFACES_DIR}/SchedulerInterface/scheduler_interface.cpp
+    ${INTERFACES_DIR}/NonVolatileMemoryInterface/non_volatile_memory_interface.cpp
+    ${INTERFACES_DIR}/GpioInterface/gpio_interface.cpp
+    ${INTERFACES_DIR}/CommInterface/comm_interface.cpp
+    ${INTERFACES_DIR}/CanMessenger/can_messenger.cpp
+    ${INTERFACES_DIR}/CommHandler/comm_interrupts_handler.cpp
+    ${INTERFACES_DIR}/CommHandler/gpc_bluelink_usb_callbacks.cpp
+    ${INTERFACES_DIR}/AdcManager/adc_manager.cpp
+)
+
+set(BLUELINK_SERIALIZER_SOURCES
+    ${BLUELINK_SERIALIZER_DIR}/Communicator/AckVector/ack_vector.cpp
+    ${BLUELINK_SERIALIZER_DIR}/Communicator/bluelink_callbacks.cpp
+    ${BLUELINK_SERIALIZER_DIR}/Communicator/BluelinkCommHandler/bluelink_communication_handler.cpp
+    ${BLUELINK_SERIALIZER_DIR}/Serialization/CRC32/checksum_32.cpp
+    ${BLUELINK_SERIALIZER_DIR}/Serialization/Deserializer/deserializer.cpp
+    ${BLUELINK_SERIALIZER_DIR}/Serialization/Serializer/serializer.cpp
 )
 
 # Startup file
@@ -116,14 +155,16 @@ set(STARTUP_ASM Core/Startup/startup_stm32g474cetx.s)
 
 # Bluelink SDK sources (matching IDE build exactly)
 set(BLUELINK_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include/PayloadStructs/PayloadTypes.cpp"
+    "${REPO_ROOT}/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include/PayloadStructs/PayloadTypes.cpp"
 )
 
 # Create executable
 add_executable(${PROJECT_NAME}.elf
     ${HAL_SOURCES}
     ${CORE_SOURCES}
+    ${USB_SOURCES}
     ${BLUELINK_SOURCES}
+    ${BLUELINK_SERIALIZER_SOURCES}
     ${STARTUP_ASM}
     ${INTERFACE_SOURCES}
 )

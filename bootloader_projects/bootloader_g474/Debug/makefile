@@ -23,6 +23,12 @@ RM := rm -rf
 -include Core/Src/interfaces_g474/CommHandler/subdir.mk
 -include Core/Src/interfaces_g474/CanMessenger/subdir.mk
 -include Core/Src/interfaces_g474/AdcManager/subdir.mk
+-include Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/Serializer/subdir.mk
+-include Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/Deserializer/subdir.mk
+-include Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/CRC32/subdir.mk
+-include Core/Src/bluelink_serializer/bluelink_serializer_include/Communicator/BluelinkCommHandler/subdir.mk
+-include Core/Src/bluelink_serializer/bluelink_serializer_include/Communicator/AckVector/subdir.mk
+-include Core/Src/bluelink_serializer/bluelink_serializer_include/Communicator/subdir.mk
 -include Core/Src/bluelink_messages_include/PayloadStructs/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk

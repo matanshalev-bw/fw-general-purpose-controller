@@ -23,6 +23,7 @@
 #include "gpio_interface.hpp"
 #include "scheduler_interface.hpp"
 #include "bootloader_defines.hpp"
+#include "bootloader_usb_comm.hpp"
 #include "led_status_handler.hpp"
 
 #define IS_APP_EXIST(app_addr) (((*(uint32_t*) app_addr) & 0x2FFE0000) == 0x20000000)
@@ -70,8 +71,15 @@ public:
 
   bool is_metadata_send_requested_ = false;
   uint8_t metadata_destination_id_ = 0;
+  BootloaderTransport metadata_response_transport_ = BootloaderTransport::CAN;
   bool is_programming_data_send_requested_ = false;
   bluelink::CommandsPayload::ProgrammingCommand programming_data_to_send_;
+  uint8_t programming_response_destination_id_ = bluelink::ComponentId::COMPONENT_ID_HLC;
+  BootloaderTransport programming_response_transport_ = BootloaderTransport::CAN;
+  uint8_t last_programming_source_id_ = bluelink::ComponentId::COMPONENT_ID_HLC;
+  BootloaderTransport last_programming_transport_ = BootloaderTransport::CAN;
+
+  BootloaderUsbComm* bootloader_usb_comm_ = nullptr;
 
   // Double-word programming FSM
   enum class DoubleWordState : uint8_t {
@@ -97,6 +105,7 @@ public:
 
   int run();
   void directEnqueueRxFromInterrupt(const FDCAN_RxHeaderTypeDef& header, const uint8_t* data, uint8_t length);
+  bool handleInboundMessage(const BootloaderInboundMessage& message, BootloaderTransport transport);
 
  private:
   template<typename ModuleType>
@@ -109,11 +118,15 @@ public:
   void processTxQueue();
   void handlePendingMetadataRequest();
   void handlePendingProgrammingData();
-  bool sendCanMessage(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data, size_t data_size);
+  void handlePendingUsbReplies();
+  bool sendCanMessage(uint8_t destination_id, bluelink::PayloadTypeIds payload_type,
+                      const void* data, size_t data_size);
+  bool sendReply(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data,
+                 size_t data_size, BootloaderTransport transport);
   void handleTimeouts();
 
-  void processProgrammingCommand();
-  void processMetaDataRequest();
+  void processProgrammingCommand(const BootloaderInboundMessage& message);
+  void processMetaDataRequest(uint8_t source_id, BootloaderTransport transport);
 
   void transitionToState(BootloaderState new_state);
   void handleInitState();

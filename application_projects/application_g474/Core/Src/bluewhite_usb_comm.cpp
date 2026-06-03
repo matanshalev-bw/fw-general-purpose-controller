@@ -25,9 +25,9 @@ void BluewhiteUsbComm::initialize() {
 }
 
 void BluewhiteUsbComm::tick() {
-  if (bluelink_ == nullptr || not UsbComm::instance().isHostConnected()) {
-    return;
-  }
+//  if (bluelink_ == nullptr || not UsbComm::instance().isHostConnected()) {
+//    return;
+//  }
 
   bluelink_->processReceivedData(process_buffer_);
   bluelink_->writePendingDataIfNeeded();
