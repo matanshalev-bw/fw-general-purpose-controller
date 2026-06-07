@@ -121,12 +121,54 @@
 
   window.addEventListener("resize", () => fitAddon.fit());
 
-  document.getElementById("btn-export").addEventListener("click", async () => {
-    const path = "configs/ConfigsTypes/g474_gpc_config_memory.hpp";
-    const hexPath = "config_projects/config_g474/Debug/config_g474.hex";
+  document.getElementById("btn-flash").addEventListener("click", async () => {
+    const port = document.getElementById("usb-port")?.value || "";
+    const binPath = "config_projects/config_g474/Debug/config_g474.bin";
+    if (!port) {
+      statusEl.textContent = "Select a USB port first";
+      return;
+    }
     if (
       !confirm(
-        `Export to ${path} and ${hexPath}? This will overwrite both files.`
+        `Flash config to ${port} via USB?\n\nUses ${binPath} (built with Export).`
+      )
+    ) {
+      return;
+    }
+    const btnFlash = document.getElementById("btn-flash");
+    btnFlash.disabled = true;
+    statusEl.textContent = "Flashing config…";
+    try {
+      const res = await fetch("/api/flash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ port }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        statusEl.textContent = `Flashed ${data.bin_path} to ${data.port}`;
+        if (data.output) {
+          data.output.split("\n").forEach((line) => {
+            if (line.trim()) term.writeln(`[Flash] ${line}`);
+          });
+        }
+      } else {
+        statusEl.textContent = `Flash failed: ${data.error}`;
+        if (data.error) term.writeln(`[Flash] ${data.error}`);
+      }
+    } catch (e) {
+      statusEl.textContent = `Flash failed: ${e.message}`;
+    } finally {
+      btnFlash.disabled = false;
+    }
+  });
+
+  document.getElementById("btn-export").addEventListener("click", async () => {
+    const path = "configs/ConfigsTypes/g474_gpc_config_memory.hpp";
+    const binPath = "config_projects/config_g474/Debug/config_g474.bin";
+    if (
+      !confirm(
+        `Export to ${path} and ${binPath}? This will overwrite both files.`
       )
     ) {
       return;
@@ -135,7 +177,7 @@
     const res = await fetch("/api/export", { method: "POST" });
     const data = await res.json();
     if (data.ok) {
-      statusEl.textContent = `Exported to ${data.path} and ${data.hex_path}. ${data.flash_note || ""}`;
+      statusEl.textContent = `Exported to ${data.path} and ${data.bin_path}. ${data.flash_note || ""}`;
       previewEl.textContent = data.hpp;
     } else {
       statusEl.textContent = `Export failed: ${data.error}`;

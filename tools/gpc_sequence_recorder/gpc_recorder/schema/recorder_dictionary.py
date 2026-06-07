@@ -62,7 +62,7 @@ _DESCRIPTIONS: Dict[str, str] = {
     "i2c_write": "Add an I2C write micro-op step.",
     "show": "Print current session summary (power-up + bindings).",
     "preview": "Generate the current HPP preview (no files written).",
-    "export": "Write the config HPP + packed HEX output files.",
+    "export": "Write the config HPP + packed BIN output files.",
     "help": "Show DSL help or details for a payload/struct name.",
 }
 

@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from gpc_recorder.dsl.repl import ReplEngine
+from gpc_recorder.programmer_flash import ProgrammerFlashError, flash_config_via_usb
 from gpc_recorder.usb_bridge import (
     UsbBridgeError,
     get_usb_session,
@@ -17,7 +18,7 @@ from gpc_recorder.usb_bridge import (
 from gpc_recorder.schema.dictionary import bluelink_commands_dictionary
 from gpc_recorder.schema.recorder_dictionary import recorder_commands_dictionary
 from gpc_recorder.paths import (
-    DEFAULT_EXPORT_HEX_PATH,
+    DEFAULT_EXPORT_BIN_PATH,
     DEFAULT_EXPORT_PATH,
     FLASH_CONFIG_BYTES_SIZE,
     TOOL_DIR,
@@ -134,6 +135,17 @@ async def usb_send_controller(body: dict) -> dict:
         return {"ok": False, "error": str(e)}
 
 
+@app.post("/api/flash")
+async def flash_config(body: dict) -> dict:
+    port = body.get("port")
+    if not port:
+        return {"ok": False, "error": "Missing port"}
+    try:
+        return flash_config_via_usb(str(port))
+    except ProgrammerFlashError as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/export")
 async def export_config() -> dict:
     try:
@@ -141,10 +153,10 @@ async def export_config() -> dict:
         return {
             "ok": True,
             "path": str(DEFAULT_EXPORT_PATH),
-            "hex_path": str(DEFAULT_EXPORT_HEX_PATH),
+            "bin_path": str(DEFAULT_EXPORT_BIN_PATH),
             "hpp": text,
             "flash_note": (
-                f"Also wrote {DEFAULT_EXPORT_HEX_PATH.name} (packed config image). "
+                f"Also wrote {DEFAULT_EXPORT_BIN_PATH.name} (packed config image). "
                 f"Flash region: {FLASH_CONFIG_BYTES_SIZE // 1024} KB at 0x08070000."
             ),
         }

@@ -37,6 +37,9 @@
     .actions button:hover { background: #1177bb; }
     .actions button.secondary { background: #555; }
     .actions button.secondary:hover { background: #666; }
+    .actions button.flash { background: #388a34; }
+    .actions button.flash:hover { background: #46a042; }
+    .actions button.flash:disabled { opacity: 0.45; cursor: not-allowed; }
     main {
       flex: 1;
       display: grid;
@@ -306,6 +309,7 @@
     <div class="actions">
       <button id="btn-dictionary" type="button" class="secondary">Dictionary</button>
       <button id="btn-export" type="button">Export</button>
+      <button id="btn-flash" type="button" class="flash">Flash</button>
       <button id="btn-help" type="button">Help</button>
     </div>
   </header>

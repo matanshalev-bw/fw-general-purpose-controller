@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from gpc_recorder.codegen.config_build import ConfigBuildError, build_config_hex
+from gpc_recorder.codegen.config_build import ConfigBuildError, build_config_bin
 from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS, TOOL_DIR
 
 
@@ -149,7 +149,7 @@ def emit_config_hpp(
     return text
 
 
-def emit_config_hex(
+def emit_config_bin(
     session: Dict[str, Any],
     schema,
     output_path: Path | None = None,
@@ -157,11 +157,11 @@ def emit_config_hex(
     write: bool = True,
     hpp_path: Path | None = None,
 ) -> str:
-    """Write config_g474.hex via STM32CubeIDE (matches compiled g474_gpc_config_memory.hpp)."""
+    """Write config_g474.bin via STM32CubeIDE (matches compiled g474_gpc_config_memory.hpp)."""
     del hpp_path
     dest = Path(output_path) if output_path is not None else None
     try:
-        result = build_config_hex(session, schema, dest if write else None)
+        result = build_config_bin(session, schema, dest if write else None)
     except Exception as e:
-        raise ConfigBuildError(f"Failed to build config hex: {e}") from e
-    return result.read_text(encoding="utf-8")
+        raise ConfigBuildError(f"Failed to build config bin: {e}") from e
+    return str(result)

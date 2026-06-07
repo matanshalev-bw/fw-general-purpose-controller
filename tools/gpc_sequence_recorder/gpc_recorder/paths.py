@@ -7,9 +7,12 @@ BLUELINK_MSG = REPO_ROOT / "3rd_party/bluelink_sdk/bluelink_messages/bluelink_me
 PAYLOAD_STRUCTS = BLUELINK_MSG / "PayloadStructs"
 
 DEFAULT_EXPORT_PATH = REPO_ROOT / "configs/ConfigsTypes/g474_gpc_config_memory.hpp"
-DEFAULT_EXPORT_HEX_PATH = (
-    REPO_ROOT / "config_projects/config_g474/Debug/config_g474.hex"
+DEFAULT_EXPORT_BIN_PATH = (
+    REPO_ROOT / "config_projects/config_g474/Debug/config_g474.bin"
 )
+
+PROGRAMMER_DIR = REPO_ROOT / "programmer/g474"
+PROGRAMMER_CMAKE_BUILD_DIR = REPO_ROOT / "programmer/build"
 
 STM32CUBEIDE_WORKSPACE = REPO_ROOT / "out/stm32cubeide-ws"
 STM32CUBEIDE_ECLIPSE_CONFIG = REPO_ROOT / "out/stm32cubeide-eclipse-config"

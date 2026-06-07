@@ -2,10 +2,10 @@
 
 from typing import Any, Dict, List, Optional
 
-from gpc_recorder.codegen.emitter import emit_config_hex, emit_config_hpp
+from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session
-from gpc_recorder.paths import DEFAULT_EXPORT_HEX_PATH, DEFAULT_EXPORT_PATH
+from gpc_recorder.paths import DEFAULT_EXPORT_BIN_PATH, DEFAULT_EXPORT_PATH
 from gpc_recorder.schema.loader import get_schema
 from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS
 from gpc_recorder.validate import (
@@ -290,11 +290,11 @@ class RecorderContext:
             raise RuntimeError("Call end_powerup() before export")
         session = self.session.to_dict()
         text = emit_config_hpp(session, self.schema, out, write=True)
-        hex_path = DEFAULT_EXPORT_HEX_PATH
-        emit_config_hex(session, self.schema, hex_path, write=True)
+        bin_path = DEFAULT_EXPORT_BIN_PATH
+        emit_config_bin(session, self.schema, bin_path, write=True)
         self._last_export_path = str(out)
         print(f"Exported to {out}")
-        print(f"Exported to {hex_path}")
+        print(f"Exported to {bin_path}")
         return text
 
     def help(self, name: str = "") -> str:
@@ -303,7 +303,7 @@ class RecorderContext:
                 "Commands: config(), begin_powerup(), end_powerup(), clear_powerup(), "
                 "begin_binding(), gpio_write(), adc_read(), dac_write(), delay_ms(), can_transmit(), "
                 "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), end_binding(), "
-                "show(), preview(), export()  # writes .hpp + .hex, help(), undo(), clear_binding()"
+                "show(), preview(), export()  # writes .hpp + .bin, help(), undo(), clear_binding()"
             )
         name = name.split("::")[-1]
         if name in self.schema.micro_ops:

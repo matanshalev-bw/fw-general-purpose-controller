@@ -1,6 +1,6 @@
 # GPC Sequence Recorder
 
-Local web GUI with a Python-like terminal REPL for authoring GPC micro-op sequences. Generates `configs/ConfigsTypes/g474_gpc_config_memory.hpp` (designated initializers) and `config_g474.hex` (packed flash image) for programmer-ready config flash.
+Local web GUI with a Python-like terminal REPL for authoring GPC micro-op sequences. Generates `configs/ConfigsTypes/g474_gpc_config_memory.hpp` (designated initializers) and `config_g474.bin` (packed flash image) for programmer-ready config flash.
 
 ## Quick start
 
@@ -52,12 +52,12 @@ delay_ms(500)
 can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])
 end_binding()
 
-export()  # writes .hpp + .hex (hex from STM32CubeIDE headless build of config_g474)
+export()  # writes .hpp + .bin (bin from STM32CubeIDE headless build of config_g474)
 ```
 
-## Config hex build (STM32CubeIDE)
+## Config bin build (STM32CubeIDE)
 
-`export()` writes `g474_gpc_config_memory.hpp`, then runs STM32CubeIDE headless build on `config_projects/config_g474` and copies `Debug/config_g474.hex`.
+`export()` writes `g474_gpc_config_memory.hpp`, then runs STM32CubeIDE headless build on `config_projects/config_g474` and copies `Debug/config_g474.bin`.
 
 Set `STM32CUBEIDE` to your install directory if it is not under `/opt/st/stm32cubeide_*` (e.g. `/opt/st/stm32cubeide_1.19.0`). First export imports the project into `out/stm32cubeide-ws` (gitignored); later exports reuse that workspace.
 
@@ -70,7 +70,7 @@ export PYTHONPATH=.
 pytest -v
 ```
 
-Hex tests call STM32CubeIDE and are skipped when it is not installed.
+Bin export tests call STM32CubeIDE and are skipped when it is not installed.
 
 ## Layout
 

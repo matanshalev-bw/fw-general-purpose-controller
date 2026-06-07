@@ -1,4 +1,4 @@
-"""Build config_g474.hex via STM32CubeIDE headless CLI.
+"""Build config_g474.bin via STM32CubeIDE headless CLI.
 
 Requires STM32CubeIDE on the host (see STM32CUBEIDE or /opt/st/stm32cubeide_*).
 The exported g474_gpc_config_memory.hpp must already be on disk before building.
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 from gpc_recorder.paths import (
-    DEFAULT_EXPORT_HEX_PATH,
+    DEFAULT_EXPORT_BIN_PATH,
     REPO_ROOT,
     STM32CUBEIDE_BUILD_CONFIG,
     STM32CUBEIDE_ECLIPSE_CONFIG,
@@ -112,21 +112,21 @@ def _run_debug_build(headless: Path) -> None:
     _run_headless(headless, ["-build", STM32CUBEIDE_BUILD_CONFIG], label="build")
 
 
-def _hex_search_paths() -> list[Path]:
+def _bin_search_paths() -> list[Path]:
     ws = STM32CUBEIDE_WORKSPACE
     proj = STM32CUBEIDE_PROJECT_DIR.name
     return [
-        DEFAULT_EXPORT_HEX_PATH,
-        STM32CUBEIDE_PROJECT_DIR / "Debug/config_g474.hex",
-        ws / f"{proj}/Debug/config_g474.hex",
-        ws / "fw-config-g4/Debug/config_g474.hex",
-        ws / "config_g474/Debug/config_g474.hex",
+        DEFAULT_EXPORT_BIN_PATH,
+        STM32CUBEIDE_PROJECT_DIR / "Debug/config_g474.bin",
+        ws / f"{proj}/Debug/config_g474.bin",
+        ws / "fw-config-g4/Debug/config_g474.bin",
+        ws / "config_g474/Debug/config_g474.bin",
     ]
 
 
-def _locate_built_hex() -> Optional[Path]:
+def _locate_built_bin() -> Optional[Path]:
     seen: set[Path] = set()
-    for path in _hex_search_paths():
+    for path in _bin_search_paths():
         resolved = path.resolve()
         if resolved in seen:
             continue
@@ -136,27 +136,27 @@ def _locate_built_hex() -> Optional[Path]:
     return None
 
 
-def build_config_hex(
+def build_config_bin(
     session: Dict[str, Any],
     schema: Schema,
     dest: Path | None = None,
     *,
     try_cmake: bool = False,
 ) -> Path:
-    """Compile config_g474 via STM32CubeIDE and copy the generated Intel HEX."""
+    """Compile config_g474 via STM32CubeIDE and copy the generated binary."""
     del session, schema, try_cmake
 
     headless = find_stm32cubeide_headless()
     _run_debug_build(headless)
 
-    built = _locate_built_hex()
+    built = _locate_built_bin()
     if built is None:
         raise ConfigBuildError(
-            "STM32CubeIDE build finished but config_g474.hex was not found. "
-            f"Expected under {DEFAULT_EXPORT_HEX_PATH} or the CubeIDE workspace."
+            "STM32CubeIDE build finished but config_g474.bin was not found. "
+            f"Expected under {DEFAULT_EXPORT_BIN_PATH} or the CubeIDE workspace."
         )
 
-    out = Path(dest) if dest is not None else DEFAULT_EXPORT_HEX_PATH
+    out = Path(dest) if dest is not None else DEFAULT_EXPORT_BIN_PATH
     if built.resolve() != out.resolve():
         out.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(built, out)
