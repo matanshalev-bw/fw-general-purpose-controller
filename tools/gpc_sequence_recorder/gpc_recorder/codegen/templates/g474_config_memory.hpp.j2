@@ -22,6 +22,86 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
 {% endwith %}
             },
         },
+        .main_tick_sequence = {
+            .step_count = {{ main_tick_step_count }},
+            .steps = {
+{% with steps=main_tick_steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .init_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.init_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.init_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .manual_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.manual_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.manual_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .disengagement_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.disengagement_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.disengagement_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .engaged_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.engaged_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.engaged_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .power_up_bit_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.power_up_bit_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.power_up_bit_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .operational_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.operational_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.operational_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .error_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.error_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.error_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .emergency_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.emergency_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.emergency_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .technician_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.technician_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.technician_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
         .binding_count = {{ binding_count }},
         .bindings = {
 {% for b in bindings %}

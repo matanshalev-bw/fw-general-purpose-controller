@@ -19,6 +19,56 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             .steps = {
             },
         },
+        .main_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .init_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .manual_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .disengagement_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .engaged_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .power_up_bit_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .operational_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .error_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .emergency_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
+        .technician_state_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
         .binding_count = 1,
         .bindings = {
             {
@@ -39,7 +89,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DAC_WRITE,
-                            .dac_write = {1, 1, 0, 0},
+                            .dac_write = {1, 0, 0, 0},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,

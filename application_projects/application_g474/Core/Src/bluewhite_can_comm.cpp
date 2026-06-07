@@ -9,10 +9,11 @@ uint16_t BluewhiteCanComm::can_receive_size_ = 0;
 bool BluewhiteCanComm::can_transmit_flag_ = true;
 BluewhiteCanComm* BluewhiteCanComm::interrupt_instance_ = nullptr;
 
-BluewhiteCanComm::BluewhiteCanComm(FDCAN_HandleTypeDef* bluelink_fdcan, MicroSequenceExecutor* sequence_executor)
+BluewhiteCanComm::BluewhiteCanComm(FDCAN_HandleTypeDef* bluelink_fdcan, MicroSequenceExecutor* sequence_executor,
+                                   GpcController* gpc_controller)
     : sequence_executor_(sequence_executor),
       comm_can_(std::make_unique<CommCan>(bluelink_fdcan, &can_receive_size_, &can_transmit_flag_)),
-      message_handler_(sequence_executor, comm_can_.get()) {
+      message_handler_(sequence_executor, comm_can_.get(), gpc_controller) {
   const uint8_t component_id = NonVolatileMemoryInterface::CONFIG_MEMORY_.bluelink_identity_config.component_id;
   can_messenger_ = std::make_unique<CanMessenger>(comm_can_.get(), static_cast<bluelink::ComponentId>(component_id));
   interrupt_instance_ = this;
@@ -69,6 +70,7 @@ InterfaceStatus BluewhiteCanComm::configureCanFilter() {
       static_cast<uint8_t>(bluelink::PayloadTypeIds::BLUELINK_VERSION_TELEMETRY),
       static_cast<uint8_t>(bluelink::PayloadTypeIds::DRIVE_COMMAND),
       static_cast<uint8_t>(bluelink::PayloadTypeIds::DRIVER_STATE_COMMAND),
+      static_cast<uint8_t>(bluelink::PayloadTypeIds::CONTROLLER_STATE_COMMAND),
   };
 
   InterfaceStatus status = comm_can_->configHighPriorityFilters(component_id, high_priority_payloads,

@@ -427,6 +427,7 @@
   const recorderFieldsEl = document.getElementById("recorder-fields");
   const btnRecorderInsert = document.getElementById("btn-recorder-insert");
   let recorderCmds = [];
+  let controllerStates = [];
   let bindableCommands = []; // from /api/schema/commands-dictionary
 
   function terminalInsert(text) {
@@ -552,6 +553,30 @@
       return;
     }
 
+    if (cmd.name === "bindStateTick" || cmd.name === "clearStateTick") {
+      const stateWrap = document.createElement("div");
+      stateWrap.className = "field";
+      const stateLabel = document.createElement("label");
+      stateLabel.textContent = "state";
+      stateLabel.htmlFor = "rec-state-select";
+      const stateSelect = document.createElement("select");
+      stateSelect.id = "rec-state-select";
+      stateSelect.dataset.param = "state";
+      const states = controllerStates.length
+        ? controllerStates
+        : ["CONTROLLER_STATE_OPERATIONAL"];
+      states.forEach((s) => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s;
+        stateSelect.appendChild(opt);
+      });
+      stateWrap.appendChild(stateLabel);
+      stateWrap.appendChild(stateSelect);
+      recorderFieldsEl.appendChild(stateWrap);
+      return;
+    }
+
     cmd.params.forEach((p) => {
       if (p.kind === "VAR_KEYWORD" || p.kind === "VAR_POSITIONAL") return;
       const wrap = document.createElement("div");
@@ -626,6 +651,11 @@
       }
       return `begin_binding(${kwargs.join(", ")})`;
     }
+    if (cmd.name === "bindStateTick" || cmd.name === "clearStateTick") {
+      const state = document.getElementById("rec-state-select")?.value || "";
+      if (!state) return "";
+      return `${cmd.name}(${pythonLiteral(state)})`;
+    }
     const params = cmd.params || [];
     const kwargs = [];
 
@@ -658,6 +688,7 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       recorderCmds = data.recorder_commands || [];
+      controllerStates = data.controller_states || [];
     } catch (_e) {
       recorderCmds = [];
     }

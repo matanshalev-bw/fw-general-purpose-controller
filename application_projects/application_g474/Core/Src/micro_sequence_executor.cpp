@@ -59,7 +59,7 @@ bool MicroSequenceExecutor::executeImmediateOp(const bluelink::MicroOpsPayload::
   return executeStep(step);
 }
 
-bool MicroSequenceExecutor::start(const volatile MicroSequence& sequence) {
+bool MicroSequenceExecutor::start(const volatile MicroSequence& sequence, bool loop_on_complete) {
   if (isRunning()) {
     return false;
   }
@@ -70,11 +70,21 @@ bool MicroSequenceExecutor::start(const volatile MicroSequence& sequence) {
 
   active_sequence_ = &sequence;
   step_index_ = 0;
+  loop_on_complete_ = loop_on_complete;
   state_ = State::RUNNING;
   memset(vars_, 0, sizeof(vars_));
   delay_start_ms_ = 0;
   delay_duration_ms_ = 0;
   return true;
+}
+
+void MicroSequenceExecutor::stop() {
+  active_sequence_ = nullptr;
+  step_index_ = 0;
+  loop_on_complete_ = false;
+  state_ = State::IDLE;
+  delay_start_ms_ = 0;
+  delay_duration_ms_ = 0;
 }
 
 void MicroSequenceExecutor::tick() {
@@ -114,6 +124,12 @@ void MicroSequenceExecutor::tick() {
     }
 
     step_index_++;
+  }
+
+  if (loop_on_complete_) {
+    step_index_ = 0;
+    state_ = State::RUNNING;
+    return;
   }
 
   state_ = State::IDLE;

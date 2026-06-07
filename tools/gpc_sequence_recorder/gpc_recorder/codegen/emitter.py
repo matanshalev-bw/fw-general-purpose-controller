@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from gpc_recorder.codegen.config_build import ConfigBuildError, build_config_bin
-from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS, TOOL_DIR
+from gpc_recorder.paths import CONTROLLER_STATE_TICK_FIELDS, MICRO_SEQUENCE_MAX_STEPS, TOOL_DIR
 
 
 def _format_data_array(data: List[int], struct_name: str, field_values: Dict[str, Any], schema) -> str:
@@ -116,6 +116,16 @@ def emit_config_hpp(
         return out
 
     powerup_steps_out = _steps_out(session.get("powerup_steps", []))
+    main_tick_steps_out = _steps_out(session.get("main_tick_steps", []))
+
+    state_tick_steps_map = session.get("state_tick_steps", {})
+    state_tick_fields_out = {}
+    for state_name, field_name in CONTROLLER_STATE_TICK_FIELDS.items():
+        steps_out = _steps_out(state_tick_steps_map.get(state_name, []))
+        state_tick_fields_out[field_name] = {
+            "step_count": len(steps_out),
+            "steps": steps_out,
+        }
 
     bindings_out = []
     for b in session["bindings"]:
@@ -138,6 +148,9 @@ def emit_config_hpp(
         "bindings": bindings_out,
         "powerup_step_count": len(powerup_steps_out),
         "powerup_steps": powerup_steps_out,
+        "main_tick_step_count": len(main_tick_steps_out),
+        "main_tick_steps": main_tick_steps_out,
+        "state_tick_fields": state_tick_fields_out,
     }
     env.filters["format_union"] = lambda m, v: _format_union_init(m, v, schema)
 

@@ -9,8 +9,11 @@
 #include "system_interface.hpp"
 
 BluewhiteMessageHandler::BluewhiteMessageHandler(MicroSequenceExecutor* sequence_executor,
-                                                   CommCan* comm_for_bootloader)
-    : sequence_executor_(sequence_executor), comm_for_bootloader_(comm_for_bootloader) {}
+                                                   CommCan* comm_for_bootloader,
+                                                   GpcController* gpc_controller)
+    : sequence_executor_(sequence_executor),
+      comm_for_bootloader_(comm_for_bootloader),
+      gpc_controller_(gpc_controller) {}
 
 bool BluewhiteMessageHandler::handleInbound(const BluewhiteInboundMessage& message) {
   const bluelink::PayloadTypeIds payload_type =
@@ -37,6 +40,15 @@ bool BluewhiteMessageHandler::handleInbound(const BluewhiteInboundMessage& messa
     case bluelink::PayloadTypeIds::ACK_PACKET_RECEIVED:
     case bluelink::PayloadTypeIds::NACK_PACKET_RECEIVED:
       return true;
+
+    case bluelink::PayloadTypeIds::CONTROLLER_STATE_COMMAND:
+      if (gpc_controller_ != nullptr && message.length >= sizeof(bluelink::CommandsPayload::ControllerStateCommand)) {
+        const auto* cmd =
+            reinterpret_cast<const bluelink::CommandsPayload::ControllerStateCommand*>(message.data);
+        gpc_controller_->handleControllerStateCommand(*cmd);
+        return true;
+      }
+      return false;
 
     default:
       if (tryExecuteMicroCommand(payload_type, message.data, message.length)) {

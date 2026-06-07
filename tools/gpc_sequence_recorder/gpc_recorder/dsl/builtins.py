@@ -12,6 +12,7 @@ from gpc_recorder.validate import (
     validate_binding_count,
     validate_binding_step_count,
     validate_powerup_step_count,
+    validate_tick_step_count,
     validate_var_index,
 )
 
@@ -27,11 +28,18 @@ class RecorderContext:
         if component:
             self.session.component_id = component.split("::")[-1]
 
-    def begin_binding(self, trigger: str, command_struct: Any = None, **kwargs: Any) -> None:
+    def _ensure_not_recording(self, action: str) -> None:
         if self.session.recording_powerup:
-            raise RuntimeError("Call end_powerup() before starting a binding")
+            raise RuntimeError(f"Call end_powerup() before {action}")
+        if self.session.recording_main_tick:
+            raise RuntimeError(f"Call endMainTick() before {action}")
+        if self.session.recording_state_tick is not None:
+            raise RuntimeError(f"Call endStateTick() before {action}")
         if self.session.current_binding is not None:
-            raise RuntimeError("Call end_binding() before starting a new binding")
+            raise RuntimeError(f"Call end_binding() before {action}")
+
+    def begin_binding(self, trigger: str, command_struct: Any = None, **kwargs: Any) -> None:
+        self._ensure_not_recording("starting a binding")
         payload_type = trigger.split("::")[-1] if isinstance(trigger, str) else str(trigger)
         if payload_type not in self.schema.payload_type_ids:
             raise ValueError(f"Unknown PayloadTypeIds::{payload_type}")
@@ -63,11 +71,53 @@ class RecorderContext:
         print(f"Binding saved ({len(b.steps)} steps). Total bindings: {len(self.session.bindings)}")
 
     def begin_powerup(self) -> None:
-        if self.session.current_binding is not None:
-            raise RuntimeError("Call end_binding() before begin_powerup()")
+        self._ensure_not_recording("begin_powerup()")
         self.session.powerup_steps = []
         self.session.recording_powerup = True
         print("Powerup recording started.")
+
+    def begin_main_tick(self) -> None:
+        self._ensure_not_recording("beginMainTick()")
+        self.session.main_tick_steps = []
+        self.session.recording_main_tick = True
+        print("Main tick recording started.")
+
+    def end_main_tick(self) -> None:
+        if not self.session.recording_main_tick:
+            raise RuntimeError("Call beginMainTick() first")
+        validate_tick_step_count(len(self.session.main_tick_steps), label="Main tick sequence")
+        self.session.recording_main_tick = False
+        print(f"Main tick saved ({len(self.session.main_tick_steps)} steps).")
+
+    def clear_main_tick(self) -> None:
+        self.session.main_tick_steps = []
+        self.session.recording_main_tick = False
+        print("Main tick sequence cleared.")
+
+    def begin_state_tick(self, state: str) -> None:
+        self._ensure_not_recording("bindStateTick()")
+        state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
+        controller_state = self.schema.enums.get("ControllerState")
+        if controller_state is None or state_name not in controller_state.values:
+            raise ValueError(f"Unknown ControllerState::{state_name}")
+        self.session.state_tick_steps[state_name] = []
+        self.session.recording_state_tick = state_name
+        print(f"State tick recording started for {state_name}.")
+
+    def end_state_tick(self) -> None:
+        if self.session.recording_state_tick is None:
+            raise RuntimeError("Call bindStateTick() first")
+        state_name = self.session.recording_state_tick
+        validate_tick_step_count(len(self.session.state_tick_steps.get(state_name, [])), label=f"{state_name} tick")
+        self.session.recording_state_tick = None
+        print(f"State tick saved for {state_name} ({len(self.session.state_tick_steps[state_name])} steps).")
+
+    def clear_state_tick(self, state: str) -> None:
+        state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
+        self.session.state_tick_steps.pop(state_name, None)
+        if self.session.recording_state_tick == state_name:
+            self.session.recording_state_tick = None
+        print(f"State tick sequence cleared for {state_name}.")
 
     def end_powerup(self) -> None:
         if not self.session.recording_powerup:
@@ -90,6 +140,16 @@ class RecorderContext:
             self.session.powerup_steps.pop()
             print("Removed last step from powerup.")
             return
+        if self.session.recording_main_tick and self.session.main_tick_steps:
+            self.session.main_tick_steps.pop()
+            print("Removed last step from main tick.")
+            return
+        if self.session.recording_state_tick is not None:
+            steps = self.session.state_tick_steps.get(self.session.recording_state_tick, [])
+            if steps:
+                steps.pop()
+                print(f"Removed last step from {self.session.recording_state_tick} tick.")
+                return
         target = self.session.current_binding
         if target is not None and target.steps:
             target.steps.pop()
@@ -110,11 +170,19 @@ class RecorderContext:
         if self.session.recording_powerup:
             target = self.session.powerup_steps
             label = "powerup"
+        elif self.session.recording_main_tick:
+            target = self.session.main_tick_steps
+            label = "main tick"
+        elif self.session.recording_state_tick is not None:
+            target = self.session.state_tick_steps[self.session.recording_state_tick]
+            label = f"{self.session.recording_state_tick} tick"
         elif self.session.current_binding is not None:
             target = self.session.current_binding.steps
             label = "binding"
         else:
-            raise RuntimeError("Call begin_powerup() or begin_binding() first")
+            raise RuntimeError(
+                "Call begin_powerup(), bindMainTick(), bindStateTick(), or begin_binding() first"
+            )
         if union_member not in self.schema.micro_ops:
             raise ValueError(f"Unknown micro-op {union_member!r}")
         op = self.schema.micro_ops[union_member]
@@ -260,12 +328,18 @@ class RecorderContext:
         pu = len(self.session.powerup_steps)
         tag = " (recording)" if self.session.recording_powerup else ""
         lines.append(f"  powerup: {pu} steps{tag}")
+        mt = len(self.session.main_tick_steps)
+        tag = " (recording)" if self.session.recording_main_tick else ""
+        lines.append(f"  main_tick: {mt} steps{tag}")
+        for state_name, steps in self.session.state_tick_steps.items():
+            tag = " (recording)" if self.session.recording_state_tick == state_name else ""
+            lines.append(f"  state_tick[{state_name}]: {len(steps)} steps{tag}")
         summary = self.bindings_summary()
         for b in summary:
             tag = " (recording)" if b["in_progress"] else ""
             lines.append(f"  [{b['index']}] {b['payload_type']}: {b['step_count']} steps{tag}")
-        if pu == 0 and not summary:
-            return "No powerup or bindings yet."
+        if pu == 0 and mt == 0 and not self.session.state_tick_steps and not summary:
+            return "No powerup, tick sequences, or bindings yet."
         return "\n".join(lines)
 
     def preview(self) -> str:
@@ -273,8 +347,10 @@ class RecorderContext:
             not self.session.bindings
             and not self.session.current_binding
             and not self.session.powerup_steps
+            and not self.session.main_tick_steps
+            and not self.session.state_tick_steps
         ):
-            return "// No powerup or bindings to preview"
+            return "// No powerup, tick sequences, or bindings to preview"
         return emit_config_hpp(self.session.to_dict(), self.schema, write=False)
 
     def export(self, path: str = "") -> str:
@@ -282,12 +358,18 @@ class RecorderContext:
         if (
             not self.session.bindings
             and not self.session.powerup_steps
+            and not self.session.main_tick_steps
+            and not self.session.state_tick_steps
         ):
-            raise RuntimeError("No powerup or bindings to export")
+            raise RuntimeError("No powerup, tick sequences, or bindings to export")
         if self.session.current_binding is not None:
             raise RuntimeError("Call end_binding() before export")
         if self.session.recording_powerup:
             raise RuntimeError("Call end_powerup() before export")
+        if self.session.recording_main_tick:
+            raise RuntimeError("Call endMainTick() before export")
+        if self.session.recording_state_tick is not None:
+            raise RuntimeError("Call endStateTick() before export")
         session = self.session.to_dict()
         text = emit_config_hpp(session, self.schema, out, write=True)
         bin_path = DEFAULT_EXPORT_BIN_PATH
@@ -301,6 +383,8 @@ class RecorderContext:
         if not name:
             return (
                 "Commands: config(), begin_powerup(), end_powerup(), clear_powerup(), "
+                "bindMainTick(), endMainTick(), clearMainTick(), "
+                "bindStateTick(state), endStateTick(), clearStateTick(state), "
                 "begin_binding(), gpio_write(), adc_read(), dac_write(), delay_ms(), can_transmit(), "
                 "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), end_binding(), "
                 "show(), preview(), export()  # writes .hpp + .bin, help(), undo(), clear_binding()"
@@ -363,6 +447,12 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "begin_powerup": ctx.begin_powerup,
         "end_powerup": ctx.end_powerup,
         "clear_powerup": ctx.clear_powerup,
+        "bindMainTick": ctx.begin_main_tick,
+        "endMainTick": ctx.end_main_tick,
+        "clearMainTick": ctx.clear_main_tick,
+        "bindStateTick": ctx.begin_state_tick,
+        "endStateTick": ctx.end_state_tick,
+        "clearStateTick": ctx.clear_state_tick,
         "begin_binding": ctx.begin_binding,
         "end_binding": ctx.end_binding,
         "clear_binding": ctx.clear_binding,

@@ -4,6 +4,7 @@
 
 #include "bluewhite_can_comm.hpp"
 #include "bluewhite_usb_comm.hpp"
+#include "gpc_controller.hpp"
 #include "main.h"
 #include "micro_sequence_executor.hpp"
 #include "non_volatile_memory_interface.hpp"
@@ -18,6 +19,7 @@ extern FDCAN_HandleTypeDef hfdcan3;
 
 namespace {
 std::unique_ptr<MicroSequenceExecutor> g_sequence_executor;
+std::unique_ptr<GpcController> g_gpc_controller;
 std::unique_ptr<RawCanInterface> g_raw_can;
 std::unique_ptr<BluewhiteCanComm> g_bluewhite_can;
 std::unique_ptr<BluewhiteUsbComm> g_bluewhite_usb;
@@ -28,8 +30,10 @@ void applicationInit(void) {
   NonVolatileMemoryInterface::rewriteMetaData();
 
   g_sequence_executor = std::make_unique<MicroSequenceExecutor>();
+  g_gpc_controller = std::make_unique<GpcController>();
   g_raw_can = std::make_unique<RawCanInterface>(&hfdcan3);
   g_sequence_executor->setRawCanInterface(g_raw_can.get());
+  g_gpc_controller->setRawCanInterface(g_raw_can.get());
 
   if (config_valid) {
     const volatile MicroSequence& powerup =
@@ -50,12 +54,17 @@ void applicationInit(void) {
   }
 #endif
 
-  g_bluewhite_can = std::make_unique<BluewhiteCanComm>(&hfdcan2, g_sequence_executor.get());
-  g_bluewhite_usb = std::make_unique<BluewhiteUsbComm>(g_sequence_executor.get(), g_bluewhite_can->bootloaderComm());
+  g_bluewhite_can =
+      std::make_unique<BluewhiteCanComm>(&hfdcan2, g_sequence_executor.get(), g_gpc_controller.get());
+  g_bluewhite_usb = std::make_unique<BluewhiteUsbComm>(g_sequence_executor.get(), g_bluewhite_can->bootloaderComm(),
+                                                      g_gpc_controller.get());
   g_bluewhite_usb->initialize();
 }
 
 void applicationTick(void) {
+  if (g_gpc_controller) {
+    g_gpc_controller->tick();
+  }
   if (g_bluewhite_can) {
     g_bluewhite_can->tick();
   }

@@ -7,12 +7,14 @@
 #include "bluewhite_message_handler.hpp"
 #include "can_messenger.hpp"
 #include "comm_interface.hpp"
+#include "gpc_controller.hpp"
 #include "micro_sequence_executor.hpp"
 #include "stm32g4xx_hal.h"
 
 class BluewhiteCanComm {
  public:
-  explicit BluewhiteCanComm(FDCAN_HandleTypeDef* bluelink_fdcan, MicroSequenceExecutor* sequence_executor);
+  explicit BluewhiteCanComm(FDCAN_HandleTypeDef* bluelink_fdcan, MicroSequenceExecutor* sequence_executor,
+                            GpcController* gpc_controller = nullptr);
 
   void tick();
   MicroSequenceExecutor& getSequenceExecutor() { return *sequence_executor_; }

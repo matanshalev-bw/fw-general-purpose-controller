@@ -21,6 +21,12 @@ _EXAMPLES: Dict[str, str] = {
     "begin_powerup": "begin_powerup()",
     "end_powerup": "end_powerup()",
     "clear_powerup": "clear_powerup()",
+    "bindMainTick": "bindMainTick()",
+    "endMainTick": "endMainTick()",
+    "clearMainTick": "clearMainTick()",
+    "bindStateTick": "bindStateTick(CONTROLLER_STATE_OPERATIONAL)",
+    "endStateTick": "endStateTick()",
+    "clearStateTick": "clearStateTick(CONTROLLER_STATE_OPERATIONAL)",
     "begin_binding": "begin_binding(DRIVE_COMMAND, DriveCommand(require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL))",
     "end_binding": "end_binding()",
     "clear_binding": "clear_binding()",
@@ -46,6 +52,12 @@ _DESCRIPTIONS: Dict[str, str] = {
     "begin_powerup": "Start recording the power-up micro-op sequence.",
     "end_powerup": "Finish and save the current power-up sequence.",
     "clear_powerup": "Clear the current power-up sequence.",
+    "bindMainTick": "Start recording the main tick micro-op sequence (runs in every state).",
+    "endMainTick": "Finish and save the current main tick sequence.",
+    "clearMainTick": "Clear the main tick sequence.",
+    "bindStateTick": "Start recording a state tick micro-op sequence for a ControllerState.",
+    "endStateTick": "Finish and save the current state tick sequence.",
+    "clearStateTick": "Clear a saved state tick sequence.",
     "begin_binding": "Start recording a binding for a trigger payload type and its command struct.",
     "end_binding": "Finish and save the current binding.",
     "clear_binding": "Discard the in-progress binding (does not touch saved bindings).",
@@ -74,6 +86,12 @@ _RECORDER_PUBLIC_COMMANDS = [
     "begin_powerup",
     "end_powerup",
     "clear_powerup",
+    "bindMainTick",
+    "endMainTick",
+    "clearMainTick",
+    "bindStateTick",
+    "endStateTick",
+    "clearStateTick",
     "config",
     "undo",
     "gpio_write",
@@ -91,6 +109,21 @@ _RECORDER_PUBLIC_COMMANDS = [
     "export",
     "help",
 ]
+
+# Public REPL/GUI names that map to RecorderContext methods (see build_namespace in builtins.py).
+_RECORDER_COMMAND_METHODS: Dict[str, str] = {
+    "bindMainTick": "begin_main_tick",
+    "endMainTick": "end_main_tick",
+    "clearMainTick": "clear_main_tick",
+    "bindStateTick": "begin_state_tick",
+    "endStateTick": "end_state_tick",
+    "clearStateTick": "clear_state_tick",
+}
+
+
+def _resolve_recorder_method(ctx: RecorderContext, name: str):
+    method_name = _RECORDER_COMMAND_METHODS.get(name, name)
+    return getattr(ctx, method_name, None)
 
 def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
     has_default = p.default is not inspect._empty
@@ -112,17 +145,19 @@ def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
     }
 
 
-def recorder_commands_dictionary() -> Dict[str, List[Dict[str, Any]]]:
+def recorder_commands_dictionary() -> Dict[str, Any]:
     """
     Returns a stable list of DSL builtins available in the REPL.
 
     Format:
-      { "recorder_commands": [ { "name": "config", "signature": "(...)", "doc": "..." }, ... ] }
+      { "recorder_commands": [...], "controller_states": [...] }
     """
+    from gpc_recorder.paths import CONTROLLER_STATE_TICK_FIELDS
+
     ctx = RecorderContext()
     out: List[Dict[str, Any]] = []
     for name in _RECORDER_PUBLIC_COMMANDS:
-        value = getattr(ctx, name, None)
+        value = _resolve_recorder_method(ctx, name)
         if not _is_public_method(name, value):
             continue
         try:
@@ -149,5 +184,8 @@ def recorder_commands_dictionary() -> Dict[str, List[Dict[str, Any]]]:
             }
         )
 
-    return {"recorder_commands": out}
+    return {
+        "recorder_commands": out,
+        "controller_states": list(CONTROLLER_STATE_TICK_FIELDS.keys()),
+    }
 

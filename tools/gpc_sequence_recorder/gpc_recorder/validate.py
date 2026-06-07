@@ -26,6 +26,11 @@ def validate_powerup_step_count(count: int) -> None:
     validate_step_count(count, label="Powerup sequence")
 
 
+def validate_tick_step_count(count: int, *, label: str = "Tick sequence") -> None:
+    if count > MICRO_SEQUENCE_MAX_STEPS:
+        raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_STEPS} steps per {label.lower()}")
+
+
 def validate_binding_count(count: int) -> None:
     if count > MICRO_SEQUENCE_MAX_BINDINGS:
         raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_BINDINGS} bindings")

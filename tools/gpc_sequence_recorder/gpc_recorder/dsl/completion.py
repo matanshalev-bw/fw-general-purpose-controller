@@ -8,7 +8,10 @@ from gpc_recorder.schema.cpp_parser import Schema
 # Builtin call -> keyword argument names (with trailing '=')
 FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "config": ["name=", "component="],
+    "begin_powerup": [],
     "begin_binding": ["trigger=", "command_struct="],
+    "bindStateTick": ["state="],
+    "clearStateTick": ["state="],
     "gpio_write": ["port=", "pin=", "value="],
     "gpio_read": ["port=", "pin=", "var_index="],
     "adc_read": ["adc_instance=", "channel=", "var_index=", "store_raw="],

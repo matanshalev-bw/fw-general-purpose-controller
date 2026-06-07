@@ -22,18 +22,9 @@ def _build_example_session() -> dict:
     return {
         "config_name": "G474_GPC_CONFIG",
         "component_id": "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER",
-        "powerup_steps": [
-            {
-                "op_type": "MicroOpType::DIGITAL_GPIO_WRITE",
-                "union_member": "digital_gpio_write",
-                "values": {"port": 1, "pin": 1, "value": 1},
-            },
-            {
-                "op_type": "MicroOpType::DIGITAL_GPIO_WRITE",
-                "union_member": "digital_gpio_write",
-                "values": {"port": 2, "pin": 1, "value": 0},
-            },
-        ],
+        "powerup_steps": [],
+        "main_tick_steps": [],
+        "state_tick_steps": {},
         "bindings": [
             {
                 "payload_type": "DRIVE_COMMAND",
@@ -64,7 +55,7 @@ def _build_example_session() -> dict:
                         "union_member": "dac_write",
                         "values": {
                             "dac_instance": 1,
-                            "use_var": 1,
+                            "use_var": 0,
                             "var_index": 0,
                             "literal_value": 0,
                         },
@@ -118,3 +109,8 @@ def test_schema_loads_drive_command(schema):
 
 def test_schema_loads_component_ids(schema):
     assert "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER" in schema.component_ids
+
+
+def test_schema_loads_controller_state(schema):
+    assert "ControllerState" in schema.enums
+    assert "CONTROLLER_STATE_OPERATIONAL" in schema.enums["ControllerState"].values

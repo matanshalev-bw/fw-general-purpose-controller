@@ -23,7 +23,8 @@ class MicroSequenceExecutor {
   bool isRunning() const;
   State getState() const;
 
-  bool start(const volatile MicroSequence& sequence);
+  bool start(const volatile MicroSequence& sequence, bool loop_on_complete = false);
+  void stop();
   bool executeImmediateOp(const bluelink::MicroOpsPayload::MicroOpStep& step);
   void tick();
 
@@ -45,6 +46,7 @@ class MicroSequenceExecutor {
   RawCanInterface* raw_can_ = nullptr;
   const volatile MicroSequence* active_sequence_ = nullptr;
   uint8_t step_index_ = 0;
+  bool loop_on_complete_ = false;
   State state_ = State::IDLE;
   uint32_t vars_[MICRO_VAR_SLOT_COUNT] = {};
   uint32_t delay_start_ms_ = 0;

@@ -9,9 +9,10 @@
 
 BluewhiteUsbComm* BluewhiteUsbComm::instance_ = nullptr;
 
-BluewhiteUsbComm::BluewhiteUsbComm(MicroSequenceExecutor* sequence_executor, CommCan* comm_for_bootloader)
+BluewhiteUsbComm::BluewhiteUsbComm(MicroSequenceExecutor* sequence_executor, CommCan* comm_for_bootloader,
+                                   GpcController* gpc_controller)
     : sequence_executor_(sequence_executor),
-      message_handler_(sequence_executor, comm_for_bootloader) {}
+      message_handler_(sequence_executor, comm_for_bootloader, gpc_controller) {}
 
 void BluewhiteUsbComm::initialize() {
   UsbComm::instance().initialize();

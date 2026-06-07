@@ -5,6 +5,7 @@
 
 #include "bluelink_messages.hpp"
 #include "comm_interface.hpp"
+#include "gpc_controller.hpp"
 #include "micro_sequence_executor.hpp"
 
 struct BluewhiteInboundMessage {
@@ -18,7 +19,8 @@ struct BluewhiteInboundMessage {
 
 class BluewhiteMessageHandler {
  public:
-  BluewhiteMessageHandler(MicroSequenceExecutor* sequence_executor, CommCan* comm_for_bootloader);
+  BluewhiteMessageHandler(MicroSequenceExecutor* sequence_executor, CommCan* comm_for_bootloader,
+                          GpcController* gpc_controller = nullptr);
 
   bool handleInbound(const BluewhiteInboundMessage& message);
 
@@ -36,6 +38,7 @@ class BluewhiteMessageHandler {
  private:
   MicroSequenceExecutor* sequence_executor_ = nullptr;
   CommCan* comm_for_bootloader_ = nullptr;
+  GpcController* gpc_controller_ = nullptr;
 
   bool metadata_send_requested_ = false;
   bool bluelink_version_send_requested_ = false;

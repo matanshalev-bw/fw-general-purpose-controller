@@ -30,6 +30,16 @@ struct CommandSequenceBinding {
 
 struct SequencesConfig {
   MicroSequence powerup_sequence = {};
+  MicroSequence main_tick_sequence = {};
+  MicroSequence init_state_tick_sequence = {};
+  MicroSequence manual_state_tick_sequence = {};
+  MicroSequence disengagement_state_tick_sequence = {};
+  MicroSequence engaged_state_tick_sequence = {};
+  MicroSequence power_up_bit_state_tick_sequence = {};
+  MicroSequence operational_state_tick_sequence = {};
+  MicroSequence error_state_tick_sequence = {};
+  MicroSequence emergency_state_tick_sequence = {};
+  MicroSequence technician_state_tick_sequence = {};
   uint8_t binding_count = 0;
   CommandSequenceBinding bindings[MICRO_SEQUENCE_MAX_BINDINGS] = {};
 } __attribute__((packed));

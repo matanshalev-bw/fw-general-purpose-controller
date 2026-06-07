@@ -7,13 +7,15 @@
 #include "bluewhite_message_handler.hpp"
 #include "bluelink_serializer.hpp"
 #include "gpc_bluelink_usb_callbacks.hpp"
+#include "gpc_controller.hpp"
 #include "micro_sequence_executor.hpp"
 
 class CommCan;
 
 class BluewhiteUsbComm {
  public:
-  explicit BluewhiteUsbComm(MicroSequenceExecutor* sequence_executor, CommCan* comm_for_bootloader);
+  explicit BluewhiteUsbComm(MicroSequenceExecutor* sequence_executor, CommCan* comm_for_bootloader,
+                              GpcController* gpc_controller = nullptr);
 
   void initialize();
   void tick();
