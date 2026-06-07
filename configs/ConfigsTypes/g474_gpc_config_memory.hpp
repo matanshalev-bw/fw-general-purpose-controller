@@ -24,7 +24,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             .steps = {
             },
         },
-        .init_state_tick_sequence = {
+        .init_state_sequence = {
             .step_count = 0,
             .steps = {
             },
@@ -34,7 +34,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             .steps = {
             },
         },
-        .disengagement_state_tick_sequence = {
+        .disengagement_state_sequence = {
             .step_count = 0,
             .steps = {
             },
@@ -44,27 +44,12 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             .steps = {
             },
         },
-        .power_up_bit_state_tick_sequence = {
+        .power_up_bit_state_sequence = {
             .step_count = 0,
             .steps = {
             },
         },
         .operational_state_tick_sequence = {
-            .step_count = 0,
-            .steps = {
-            },
-        },
-        .error_state_tick_sequence = {
-            .step_count = 0,
-            .steps = {
-            },
-        },
-        .emergency_state_tick_sequence = {
-            .step_count = 0,
-            .steps = {
-            },
-        },
-        .technician_state_tick_sequence = {
             .step_count = 0,
             .steps = {
             },

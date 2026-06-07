@@ -24,6 +24,9 @@ _EXAMPLES: Dict[str, str] = {
     "bindMainTick": "bindMainTick()",
     "endMainTick": "endMainTick()",
     "clearMainTick": "clearMainTick()",
+    "bindState": "bindState(CONTROLLER_STATE_INIT)",
+    "endState": "endState()",
+    "clearState": "clearState(CONTROLLER_STATE_INIT)",
     "bindStateTick": "bindStateTick(CONTROLLER_STATE_OPERATIONAL)",
     "endStateTick": "endStateTick()",
     "clearStateTick": "clearStateTick(CONTROLLER_STATE_OPERATIONAL)",
@@ -55,7 +58,10 @@ _DESCRIPTIONS: Dict[str, str] = {
     "bindMainTick": "Start recording the main tick micro-op sequence (runs in every state).",
     "endMainTick": "Finish and save the current main tick sequence.",
     "clearMainTick": "Clear the main tick sequence.",
-    "bindStateTick": "Start recording a state tick micro-op sequence for a ControllerState.",
+    "bindState": "Record a one-shot state sequence (init/disengagement/power_up_bit); auto-transitions when done.",
+    "endState": "Finish and save the current one-shot state sequence.",
+    "clearState": "Clear a saved one-shot state sequence.",
+    "bindStateTick": "Start recording a looping state tick sequence (manual/engaged/operational).",
     "endStateTick": "Finish and save the current state tick sequence.",
     "clearStateTick": "Clear a saved state tick sequence.",
     "begin_binding": "Start recording a binding for a trigger payload type and its command struct.",
@@ -89,6 +95,9 @@ _RECORDER_PUBLIC_COMMANDS = [
     "bindMainTick",
     "endMainTick",
     "clearMainTick",
+    "bindState",
+    "endState",
+    "clearState",
     "bindStateTick",
     "endStateTick",
     "clearStateTick",
@@ -115,6 +124,9 @@ _RECORDER_COMMAND_METHODS: Dict[str, str] = {
     "bindMainTick": "begin_main_tick",
     "endMainTick": "end_main_tick",
     "clearMainTick": "clear_main_tick",
+    "bindState": "begin_state",
+    "endState": "end_state",
+    "clearState": "clear_state",
     "bindStateTick": "begin_state_tick",
     "endStateTick": "end_state_tick",
     "clearStateTick": "clear_state_tick",
@@ -150,9 +162,9 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
     Returns a stable list of DSL builtins available in the REPL.
 
     Format:
-      { "recorder_commands": [...], "controller_states": [...] }
+      { "recorder_commands": [...], "controller_states": [...], "controller_one_shot_states": [...], "controller_tick_states": [...] }
     """
-    from gpc_recorder.paths import CONTROLLER_STATE_TICK_FIELDS
+    from gpc_recorder.paths import CONTROLLER_STATE_SEQUENCE_FIELDS, CONTROLLER_STATE_TICK_FIELDS
 
     ctx = RecorderContext()
     out: List[Dict[str, Any]] = []
@@ -186,6 +198,9 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
 
     return {
         "recorder_commands": out,
-        "controller_states": list(CONTROLLER_STATE_TICK_FIELDS.keys()),
+        "controller_states": list(CONTROLLER_STATE_SEQUENCE_FIELDS.keys())
+        + list(CONTROLLER_STATE_TICK_FIELDS.keys()),
+        "controller_one_shot_states": list(CONTROLLER_STATE_SEQUENCE_FIELDS.keys()),
+        "controller_tick_states": list(CONTROLLER_STATE_TICK_FIELDS.keys()),
     }
 

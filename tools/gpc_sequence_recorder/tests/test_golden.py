@@ -24,6 +24,7 @@ def _build_example_session() -> dict:
         "component_id": "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER",
         "powerup_steps": [],
         "main_tick_steps": [],
+        "state_steps": {},
         "state_tick_steps": {},
         "bindings": [
             {

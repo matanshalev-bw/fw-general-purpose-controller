@@ -10,6 +10,8 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "config": ["name=", "component="],
     "begin_powerup": [],
     "begin_binding": ["trigger=", "command_struct="],
+    "bindState": ["state="],
+    "clearState": ["state="],
     "bindStateTick": ["state="],
     "clearStateTick": ["state="],
     "gpio_write": ["port=", "pin=", "value="],

@@ -41,6 +41,8 @@ class Session:
     recording_powerup: bool = False
     main_tick_steps: List[MicroOpStepState] = field(default_factory=list)
     recording_main_tick: bool = False
+    state_steps: Dict[str, List[MicroOpStepState]] = field(default_factory=dict)
+    recording_state: Optional[str] = None
     state_tick_steps: Dict[str, List[MicroOpStepState]] = field(default_factory=dict)
     recording_state_tick: Optional[str] = None
 
@@ -73,6 +75,9 @@ class Session:
             "bindings": bindings,
             "powerup_steps": _steps_to_dict(self.powerup_steps),
             "main_tick_steps": _steps_to_dict(self.main_tick_steps),
+            "state_steps": {
+                state: _steps_to_dict(steps) for state, steps in self.state_steps.items()
+            },
             "state_tick_steps": {
                 state: _steps_to_dict(steps) for state, steps in self.state_tick_steps.items()
             },
@@ -82,6 +87,7 @@ class Session:
         return (
             self.recording_powerup
             or self.recording_main_tick
+            or self.recording_state is not None
             or self.recording_state_tick is not None
             or self.current_binding is not None
         )

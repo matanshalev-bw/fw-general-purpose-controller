@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session
-from gpc_recorder.paths import DEFAULT_EXPORT_BIN_PATH, DEFAULT_EXPORT_PATH
+from gpc_recorder.paths import CONTROLLER_STATE_SEQUENCE_FIELDS, CONTROLLER_STATE_TICK_FIELDS, DEFAULT_EXPORT_BIN_PATH, DEFAULT_EXPORT_PATH
 from gpc_recorder.schema.loader import get_schema
 from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS
 from gpc_recorder.validate import (
@@ -33,6 +33,8 @@ class RecorderContext:
             raise RuntimeError(f"Call end_powerup() before {action}")
         if self.session.recording_main_tick:
             raise RuntimeError(f"Call endMainTick() before {action}")
+        if self.session.recording_state is not None:
+            raise RuntimeError(f"Call endState() before {action}")
         if self.session.recording_state_tick is not None:
             raise RuntimeError(f"Call endStateTick() before {action}")
         if self.session.current_binding is not None:
@@ -94,12 +96,40 @@ class RecorderContext:
         self.session.recording_main_tick = False
         print("Main tick sequence cleared.")
 
+    def begin_state(self, state: str) -> None:
+        self._ensure_not_recording("bindState()")
+        state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
+        if state_name not in CONTROLLER_STATE_SEQUENCE_FIELDS:
+            allowed = ", ".join(sorted(CONTROLLER_STATE_SEQUENCE_FIELDS))
+            raise ValueError(f"bindState() supports one-shot states only: {allowed}")
+        self.session.state_steps[state_name] = []
+        self.session.recording_state = state_name
+        print(f"State sequence recording started for {state_name} (runs once, then auto-transitions).")
+
+    def end_state(self) -> None:
+        if self.session.recording_state is None:
+            raise RuntimeError("Call bindState() first")
+        state_name = self.session.recording_state
+        validate_tick_step_count(len(self.session.state_steps.get(state_name, [])), label=f"{state_name} sequence")
+        self.session.recording_state = None
+        print(f"State sequence saved for {state_name} ({len(self.session.state_steps[state_name])} steps).")
+
+    def clear_state(self, state: str) -> None:
+        state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
+        if state_name not in CONTROLLER_STATE_SEQUENCE_FIELDS:
+            allowed = ", ".join(sorted(CONTROLLER_STATE_SEQUENCE_FIELDS))
+            raise ValueError(f"clearState() supports one-shot states only: {allowed}")
+        self.session.state_steps.pop(state_name, None)
+        if self.session.recording_state == state_name:
+            self.session.recording_state = None
+        print(f"State sequence cleared for {state_name}.")
+
     def begin_state_tick(self, state: str) -> None:
         self._ensure_not_recording("bindStateTick()")
         state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
-        controller_state = self.schema.enums.get("ControllerState")
-        if controller_state is None or state_name not in controller_state.values:
-            raise ValueError(f"Unknown ControllerState::{state_name}")
+        if state_name not in CONTROLLER_STATE_TICK_FIELDS:
+            allowed = ", ".join(sorted(CONTROLLER_STATE_TICK_FIELDS))
+            raise ValueError(f"bindStateTick() supports looping tick states only: {allowed}")
         self.session.state_tick_steps[state_name] = []
         self.session.recording_state_tick = state_name
         print(f"State tick recording started for {state_name}.")
@@ -114,6 +144,9 @@ class RecorderContext:
 
     def clear_state_tick(self, state: str) -> None:
         state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
+        if state_name not in CONTROLLER_STATE_TICK_FIELDS:
+            allowed = ", ".join(sorted(CONTROLLER_STATE_TICK_FIELDS))
+            raise ValueError(f"clearStateTick() supports looping tick states only: {allowed}")
         self.session.state_tick_steps.pop(state_name, None)
         if self.session.recording_state_tick == state_name:
             self.session.recording_state_tick = None
@@ -144,6 +177,12 @@ class RecorderContext:
             self.session.main_tick_steps.pop()
             print("Removed last step from main tick.")
             return
+        if self.session.recording_state is not None:
+            steps = self.session.state_steps.get(self.session.recording_state, [])
+            if steps:
+                steps.pop()
+                print(f"Removed last step from {self.session.recording_state} sequence.")
+                return
         if self.session.recording_state_tick is not None:
             steps = self.session.state_tick_steps.get(self.session.recording_state_tick, [])
             if steps:
@@ -173,6 +212,9 @@ class RecorderContext:
         elif self.session.recording_main_tick:
             target = self.session.main_tick_steps
             label = "main tick"
+        elif self.session.recording_state is not None:
+            target = self.session.state_steps[self.session.recording_state]
+            label = f"{self.session.recording_state} sequence"
         elif self.session.recording_state_tick is not None:
             target = self.session.state_tick_steps[self.session.recording_state_tick]
             label = f"{self.session.recording_state_tick} tick"
@@ -181,7 +223,7 @@ class RecorderContext:
             label = "binding"
         else:
             raise RuntimeError(
-                "Call begin_powerup(), bindMainTick(), bindStateTick(), or begin_binding() first"
+                "Call begin_powerup(), bindMainTick(), bindState(), bindStateTick(), or begin_binding() first"
             )
         if union_member not in self.schema.micro_ops:
             raise ValueError(f"Unknown micro-op {union_member!r}")
@@ -331,6 +373,9 @@ class RecorderContext:
         mt = len(self.session.main_tick_steps)
         tag = " (recording)" if self.session.recording_main_tick else ""
         lines.append(f"  main_tick: {mt} steps{tag}")
+        for state_name, steps in self.session.state_steps.items():
+            tag = " (recording)" if self.session.recording_state == state_name else ""
+            lines.append(f"  state[{state_name}]: {len(steps)} steps{tag}")
         for state_name, steps in self.session.state_tick_steps.items():
             tag = " (recording)" if self.session.recording_state_tick == state_name else ""
             lines.append(f"  state_tick[{state_name}]: {len(steps)} steps{tag}")
@@ -338,7 +383,7 @@ class RecorderContext:
         for b in summary:
             tag = " (recording)" if b["in_progress"] else ""
             lines.append(f"  [{b['index']}] {b['payload_type']}: {b['step_count']} steps{tag}")
-        if pu == 0 and mt == 0 and not self.session.state_tick_steps and not summary:
+        if pu == 0 and mt == 0 and not self.session.state_steps and not self.session.state_tick_steps and not summary:
             return "No powerup, tick sequences, or bindings yet."
         return "\n".join(lines)
 
@@ -348,6 +393,7 @@ class RecorderContext:
             and not self.session.current_binding
             and not self.session.powerup_steps
             and not self.session.main_tick_steps
+            and not self.session.state_steps
             and not self.session.state_tick_steps
         ):
             return "// No powerup, tick sequences, or bindings to preview"
@@ -359,6 +405,7 @@ class RecorderContext:
             not self.session.bindings
             and not self.session.powerup_steps
             and not self.session.main_tick_steps
+            and not self.session.state_steps
             and not self.session.state_tick_steps
         ):
             raise RuntimeError("No powerup, tick sequences, or bindings to export")
@@ -368,6 +415,8 @@ class RecorderContext:
             raise RuntimeError("Call end_powerup() before export")
         if self.session.recording_main_tick:
             raise RuntimeError("Call endMainTick() before export")
+        if self.session.recording_state is not None:
+            raise RuntimeError("Call endState() before export")
         if self.session.recording_state_tick is not None:
             raise RuntimeError("Call endStateTick() before export")
         session = self.session.to_dict()
@@ -384,6 +433,7 @@ class RecorderContext:
             return (
                 "Commands: config(), begin_powerup(), end_powerup(), clear_powerup(), "
                 "bindMainTick(), endMainTick(), clearMainTick(), "
+                "bindState(state), endState(), clearState(state), "
                 "bindStateTick(state), endStateTick(), clearStateTick(state), "
                 "begin_binding(), gpio_write(), adc_read(), dac_write(), delay_ms(), can_transmit(), "
                 "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), end_binding(), "
@@ -450,6 +500,9 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "bindMainTick": ctx.begin_main_tick,
         "endMainTick": ctx.end_main_tick,
         "clearMainTick": ctx.clear_main_tick,
+        "bindState": ctx.begin_state,
+        "endState": ctx.end_state,
+        "clearState": ctx.clear_state,
         "bindStateTick": ctx.begin_state_tick,
         "endStateTick": ctx.end_state_tick,
         "clearStateTick": ctx.clear_state_tick,

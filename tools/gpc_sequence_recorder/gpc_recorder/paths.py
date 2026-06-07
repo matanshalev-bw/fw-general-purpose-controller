@@ -24,17 +24,19 @@ MICRO_SEQUENCE_MAX_BINDINGS = 16
 MICRO_VAR_SLOT_COUNT = 8
 TRIGGER_DATA_SIZE = 8
 
-# Maps ControllerState enum name -> SequencesConfig field name
-CONTROLLER_STATE_TICK_FIELDS = {
-    "CONTROLLER_STATE_INIT": "init_state_tick_sequence",
-    "CONTROLLER_STATE_MANUAL": "manual_state_tick_sequence",
-    "CONTROLLER_STATE_DISENGAGEMENT": "disengagement_state_tick_sequence",
-    "CONTROLLER_STATE_ENGAGED": "engaged_state_tick_sequence",
-    "CONTROLLER_STATE_POWER_UP_BIT": "power_up_bit_state_tick_sequence",
-    "CONTROLLER_STATE_OPERATIONAL": "operational_state_tick_sequence",
-    "CONTROLLER_STATE_ERROR": "error_state_tick_sequence",
-    "CONTROLLER_STATE_EMERGENCY": "emergency_state_tick_sequence",
-    "CONTROLLER_STATE_TECHNICIAN": "technician_state_tick_sequence",
+# One-shot state sequences: run once then auto-transition (init->engaged, etc.)
+CONTROLLER_STATE_SEQUENCE_FIELDS = {
+    "CONTROLLER_STATE_INIT": "init_state_sequence",
+    "CONTROLLER_STATE_DISENGAGEMENT": "disengagement_state_sequence",
+    "CONTROLLER_STATE_POWER_UP_BIT": "power_up_bit_state_sequence",
 }
+
+# Looping tick sequences while in a state
+CONTROLLER_STATE_TICK_FIELDS = {
+    "CONTROLLER_STATE_MANUAL": "manual_state_tick_sequence",
+    "CONTROLLER_STATE_ENGAGED": "engaged_state_tick_sequence",
+    "CONTROLLER_STATE_OPERATIONAL": "operational_state_tick_sequence",
+}
+
 FLASH_CONFIG_ADDRESS = 0x08070000
 FLASH_CONFIG_BYTES_SIZE = 0x10000

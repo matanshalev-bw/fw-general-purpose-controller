@@ -7,7 +7,7 @@ GpcController::GpcController() = default;
 
 void GpcController::setRawCanInterface(RawCanInterface* raw_can) {
   main_tick_executor_.setRawCanInterface(raw_can);
-  state_tick_executor_.setRawCanInterface(raw_can);
+  state_sequence_executor_.setRawCanInterface(raw_can);
 }
 
 bool GpcController::sendSetStateRequest(bluelink::ControllerState req_state) {
@@ -27,15 +27,14 @@ bool GpcController::sendSetStateRequest(bluelink::ControllerState req_state) {
     return true;
   }
 
-  if (state_ == bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY ||
-      req_state == bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL ||
+  if (req_state == bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL ||
       req_state == bluelink::ControllerState::CONTROLLER_STATE_ERROR ||
-      req_state == bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY) {
+      req_state == bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY ||
+      req_state == bluelink::ControllerState::CONTROLLER_STATE_TECHNICIAN) {
     return false;
   }
 
-  state_ = req_state;
-  onStateChanged();
+  enterState(req_state);
   return true;
 }
 
@@ -44,33 +43,64 @@ bool GpcController::handleControllerStateCommand(
   return sendSetStateRequest(static_cast<bluelink::ControllerState>(cmd.controller_state));
 }
 
-void GpcController::onStateChanged() {
-  state_tick_executor_.stop();
+void GpcController::enterState(bluelink::ControllerState new_state) {
+  state_ = new_state;
+  onStateChanged();
 }
 
-const volatile MicroSequence* GpcController::getStateTickSequence(const volatile SequencesConfig& sequences,
-                                                                 bluelink::ControllerState state) {
+void GpcController::onStateChanged() {
+  state_sequence_executor_.stop();
+  state_sequence_started_ = false;
+}
+
+const volatile MicroSequence* GpcController::getStateSequence(const volatile SequencesConfig& sequences,
+                                                            bluelink::ControllerState state) {
   switch (state) {
     case bluelink::ControllerState::CONTROLLER_STATE_INIT:
-      return &sequences.init_state_tick_sequence;
+      return &sequences.init_state_sequence;
     case bluelink::ControllerState::CONTROLLER_STATE_MANUAL:
       return &sequences.manual_state_tick_sequence;
     case bluelink::ControllerState::CONTROLLER_STATE_DISENGAGEMENT:
-      return &sequences.disengagement_state_tick_sequence;
+      return &sequences.disengagement_state_sequence;
     case bluelink::ControllerState::CONTROLLER_STATE_ENGAGED:
       return &sequences.engaged_state_tick_sequence;
     case bluelink::ControllerState::CONTROLLER_STATE_POWER_UP_BIT:
-      return &sequences.power_up_bit_state_tick_sequence;
+      return &sequences.power_up_bit_state_sequence;
     case bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL:
       return &sequences.operational_state_tick_sequence;
-    case bluelink::ControllerState::CONTROLLER_STATE_ERROR:
-      return &sequences.error_state_tick_sequence;
-    case bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY:
-      return &sequences.emergency_state_tick_sequence;
-    case bluelink::ControllerState::CONTROLLER_STATE_TECHNICIAN:
-      return &sequences.technician_state_tick_sequence;
     default:
       return nullptr;
+  }
+}
+
+bool GpcController::isStateTickLoop(bluelink::ControllerState state) {
+  switch (state) {
+    case bluelink::ControllerState::CONTROLLER_STATE_MANUAL:
+    case bluelink::ControllerState::CONTROLLER_STATE_ENGAGED:
+    case bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bluelink::ControllerState GpcController::nextStateAfterSequence(bluelink::ControllerState state) {
+  switch (state) {
+    case bluelink::ControllerState::CONTROLLER_STATE_INIT:
+      return bluelink::ControllerState::CONTROLLER_STATE_ENGAGED;
+    case bluelink::ControllerState::CONTROLLER_STATE_DISENGAGEMENT:
+      return bluelink::ControllerState::CONTROLLER_STATE_MANUAL;
+    case bluelink::ControllerState::CONTROLLER_STATE_POWER_UP_BIT:
+      return bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL;
+    default:
+      return state;
+  }
+}
+
+void GpcController::onOneShotSequenceComplete() {
+  const bluelink::ControllerState next_state = nextStateAfterSequence(state_);
+  if (next_state != state_) {
+    enterState(next_state);
   }
 }
 
@@ -84,25 +114,31 @@ void GpcController::tickMainSequence() {
 
 void GpcController::tickStateSequence() {
   const volatile SequencesConfig& sequences = NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config;
-  const volatile MicroSequence* state_sequence = getStateTickSequence(sequences, state_);
-  if (state_sequence == nullptr) {
+  const volatile MicroSequence* state_sequence = getStateSequence(sequences, state_);
+  if (state_sequence == nullptr || state_sequence->step_count == 0) {
     return;
   }
 
-  state_tick_executor_.tick();
-  if (not state_tick_executor_.isRunning() && state_sequence->step_count > 0) {
-    state_tick_executor_.start(*state_sequence, true);
+  const bool loop_on_complete = isStateTickLoop(state_);
+  state_sequence_executor_.tick();
+
+  if (state_sequence_executor_.isRunning()) {
+    state_sequence_started_ = true;
+    return;
+  }
+
+  if (state_sequence_started_ && not loop_on_complete) {
+    state_sequence_started_ = false;
+    onOneShotSequenceComplete();
+    return;
+  }
+
+  if (not state_sequence_started_) {
+    state_sequence_executor_.start(*state_sequence, loop_on_complete);
   }
 }
 
 void GpcController::tick() {
-  switch (state_) {
-    case bluelink::ControllerState::CONTROLLER_STATE_MANUAL:
-      break;
-    default:
-      break;
-  }
-
   tickMainSequence();
   tickStateSequence();
 }
