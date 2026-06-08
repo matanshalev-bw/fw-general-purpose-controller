@@ -38,6 +38,7 @@ def payload_type_id(payload_type_name: str) -> int:
     return schema.payload_type_ids[payload_type_name]
 
 CONTROLLER_COMMANDS: List[Dict[str, str]] = [
+    {"label": "controller_state", "payload_type": "CONTROLLER_STATE_COMMAND"},
     {"label": "steering", "payload_type": "STEERING_CONTINUOUS_COMMAND"},
     {"label": "throttle", "payload_type": "THROTTLE_CONTINUOUS_COMMAND"},
     {"label": "brakes", "payload_type": "BRAKES_CONTINUOUS_COMMAND"},
@@ -171,24 +172,29 @@ def controller_commands_catalog() -> List[Dict[str, Any]]:
         fields = []
         for field in struct_def.fields:
             default: Any = 0
+            enum_values: Optional[List[str]] = None
+            enum_type = field.cpp_type.split("::")[-1]
+            if enum_type in schema.enums:
+                enum_values = sorted(schema.enums[enum_type].values.keys())
             if field.default_raw:
                 if field.array_size:
                     default = []
-                elif field.cpp_type in schema.enums:
+                elif field.cpp_type in schema.enums or enum_type in schema.enums:
                     default = field.default_raw.split("::")[-1]
                 else:
                     try:
                         default = int(field.default_raw, 0) if field.default_raw.startswith("0x") else int(field.default_raw)
                     except ValueError:
                         default = field.default_raw
-            fields.append(
-                {
-                    "name": field.name,
-                    "type": field.cpp_type,
-                    "array_size": field.array_size,
-                    "default": default,
-                }
-            )
+            entry: Dict[str, Any] = {
+                "name": field.name,
+                "type": field.cpp_type,
+                "array_size": field.array_size,
+                "default": default,
+            }
+            if enum_values is not None:
+                entry["enum_values"] = enum_values
+            fields.append(entry)
 
         catalog.append(
             {

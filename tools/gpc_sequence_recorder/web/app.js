@@ -772,6 +772,26 @@
   /** Built-in catalog so the controller dropdown works before/without API. */
   const FALLBACK_CONTROLLER_COMMANDS = [
     {
+      label: "controller_state",
+      payload_type: "CONTROLLER_STATE_COMMAND",
+      payload_type_id: 109,
+      fields: [
+        {
+          name: "controller_state",
+          type: "ControllerState",
+          default: "CONTROLLER_STATE_INIT",
+          enum_values: [
+            "CONTROLLER_STATE_INIT",
+            "CONTROLLER_STATE_MANUAL",
+            "CONTROLLER_STATE_DISENGAGEMENT",
+            "CONTROLLER_STATE_ENGAGED",
+            "CONTROLLER_STATE_POWER_UP_BIT",
+            "CONTROLLER_STATE_OPERATIONAL",
+          ],
+        },
+      ],
+    },
+    {
       label: "steering",
       payload_type: "STEERING_CONTINUOUS_COMMAND",
       payload_type_id: 4,
@@ -913,19 +933,34 @@
       const label = document.createElement("label");
       label.textContent = f.name;
       label.htmlFor = `usb-ctrl-field-${f.name}`;
-      const input = document.createElement("input");
-      input.id = `usb-ctrl-field-${f.name}`;
-      input.dataset.field = f.name;
-      if (f.array_size) {
-        input.classList.add("wide");
-        input.placeholder = `comma-separated (${f.array_size})`;
-        if (Array.isArray(f.default)) {
-          input.value = f.default.join(",");
+      let input;
+      if (f.enum_values && f.enum_values.length) {
+        input = document.createElement("select");
+        input.id = `usb-ctrl-field-${f.name}`;
+        f.enum_values.forEach((ev) => {
+          const opt = document.createElement("option");
+          opt.value = ev;
+          opt.textContent = ev;
+          input.appendChild(opt);
+        });
+        if (f.default !== undefined && f.default !== null) {
+          input.value = String(f.default);
         }
       } else {
-        input.value =
-          f.default !== undefined && f.default !== null ? String(f.default) : "0";
+        input = document.createElement("input");
+        input.id = `usb-ctrl-field-${f.name}`;
+        if (f.array_size) {
+          input.classList.add("wide");
+          input.placeholder = `comma-separated (${f.array_size})`;
+          if (Array.isArray(f.default)) {
+            input.value = f.default.join(",");
+          }
+        } else {
+          input.value =
+            f.default !== undefined && f.default !== null ? String(f.default) : "0";
+        }
       }
+      input.dataset.field = f.name;
       wrap.appendChild(label);
       wrap.appendChild(input);
       usbControllerFieldsEl.appendChild(wrap);
