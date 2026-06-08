@@ -1,4 +1,4 @@
-"""Tests for bindMainTick / bindState / bindStateTick DSL commands."""
+"""Tests for bind_main_tick / bind_state / bind_state_tick DSL commands."""
 
 import pytest
 
@@ -8,9 +8,9 @@ from gpc_recorder.dsl.builtins import RecorderContext, build_namespace
 def test_bind_main_tick_records_steps():
     ctx = RecorderContext()
     ns = build_namespace(ctx)
-    ns["bindMainTick"]()
+    ns["bind_main_tick"]()
     ns["gpio_write"](port=1, pin=0, value=1)
-    ns["endMainTick"]()
+    ns["end_binding"]()
     assert len(ctx.session.main_tick_steps) == 1
     assert ctx.session.main_tick_steps[0].union_member == "digital_gpio_write"
 
@@ -18,9 +18,9 @@ def test_bind_main_tick_records_steps():
 def test_bind_state_records_one_shot_steps():
     ctx = RecorderContext()
     ns = build_namespace(ctx)
-    ns["bindState"]("CONTROLLER_STATE_INIT")
+    ns["bind_state"]("CONTROLLER_STATE_INIT")
     ns["delay_ms"](100)
-    ns["endState"]()
+    ns["end_binding"]()
     assert "CONTROLLER_STATE_INIT" in ctx.session.state_steps
     assert len(ctx.session.state_steps["CONTROLLER_STATE_INIT"]) == 1
 
@@ -28,9 +28,9 @@ def test_bind_state_records_one_shot_steps():
 def test_bind_state_tick_records_loop_steps():
     ctx = RecorderContext()
     ns = build_namespace(ctx)
-    ns["bindStateTick"]("CONTROLLER_STATE_OPERATIONAL")
+    ns["bind_state_tick"]("CONTROLLER_STATE_OPERATIONAL")
     ns["delay_ms"](100)
-    ns["endStateTick"]()
+    ns["end_binding"]()
     assert "CONTROLLER_STATE_OPERATIONAL" in ctx.session.state_tick_steps
     assert len(ctx.session.state_tick_steps["CONTROLLER_STATE_OPERATIONAL"]) == 1
 
@@ -39,22 +39,32 @@ def test_bind_state_rejects_tick_only_states():
     ctx = RecorderContext()
     ns = build_namespace(ctx)
     with pytest.raises(ValueError, match="one-shot"):
-        ns["bindState"]("CONTROLLER_STATE_OPERATIONAL")
+        ns["bind_state"]("CONTROLLER_STATE_OPERATIONAL")
 
 
 def test_bind_state_tick_rejects_one_shot_states():
     ctx = RecorderContext()
     ns = build_namespace(ctx)
     with pytest.raises(ValueError, match="looping tick"):
-        ns["bindStateTick"]("CONTROLLER_STATE_INIT")
+        ns["bind_state_tick"]("CONTROLLER_STATE_INIT")
+
+
+def test_end_binding_finishes_powerup():
+    ctx = RecorderContext()
+    ns = build_namespace(ctx)
+    ns["bind_powerup"]()
+    ns["delay_ms"](10)
+    ns["end_binding"]()
+    assert not ctx.session.recording_powerup
+    assert len(ctx.session.powerup_steps) == 1
 
 
 def test_tick_recording_mutual_exclusion():
     ctx = RecorderContext()
     ns = build_namespace(ctx)
-    ns["bindMainTick"]()
+    ns["bind_main_tick"]()
     try:
-        ns["bindState"]("CONTROLLER_STATE_INIT")
+        ns["bind_state"]("CONTROLLER_STATE_INIT")
         assert False, "expected RuntimeError"
     except RuntimeError:
         pass

@@ -36,12 +36,12 @@ python -m gpc_recorder --repl
 ```python
 config(name="G474_GPC_CONFIG", component=COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER)
 
-begin_powerup()
+bind_powerup()
 gpio_write(port=1, pin=5, value=1)
 delay_ms(100)
-end_powerup()
+end_binding()
 
-begin_binding(
+bind_command(
   DRIVE_COMMAND,
   DriveCommand(require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL),
 )

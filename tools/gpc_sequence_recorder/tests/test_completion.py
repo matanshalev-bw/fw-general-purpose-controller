@@ -20,30 +20,30 @@ def test_complete_config_keyword():
     assert "component=" in matches
 
 
-def test_begin_binding_trigger_keyword():
+def test_bind_command_trigger_keyword():
     schema = get_schema()
     keys = sorted(build_namespace(RecorderContext()).keys())
-    assert "trigger=" in complete_line(schema, keys, "begin_binding(trig")
+    assert "trigger=" in complete_line(schema, keys, "bind_command(trig")
 
 
-def test_begin_binding_trigger_value():
+def test_bind_command_trigger_value():
     schema = get_schema()
     keys = sorted(build_namespace(RecorderContext()).keys())
-    matches = complete_line(schema, keys, "begin_binding(trigger=REVERSER_")
+    matches = complete_line(schema, keys, "bind_command(trigger=REVERSER_")
     assert "REVERSER_COMMAND" in matches
 
 
-def test_begin_binding_open_paren():
+def test_bind_command_open_paren():
     schema = get_schema()
     keys = sorted(build_namespace(RecorderContext()).keys())
-    matches = complete_line(schema, keys, "begin_binding(")
+    matches = complete_line(schema, keys, "bind_command(")
     assert matches == ["trigger="]
 
 
-def test_begin_binding_after_trigger_equals():
+def test_bind_command_after_trigger_equals():
     schema = get_schema()
     keys = sorted(build_namespace(RecorderContext()).keys())
-    matches = complete_line(schema, keys, "begin_binding(trigger=")
+    matches = complete_line(schema, keys, "bind_command(trigger=")
     assert "DRIVE_COMMAND" in matches
     assert "BRAKES_CONTINUOUS_COMMAND" in matches
 
@@ -54,7 +54,7 @@ def test_brakes_command_struct_fields():
     matches = complete_line(
         schema,
         keys,
-        "begin_binding(trigger=BRAKES_CONTINUOUS_COMMAND, BrakesContinuousCommand(",
+        "bind_command(trigger=BRAKES_CONTINUOUS_COMMAND, BrakesContinuousCommand(",
     )
     assert "brake_mode=" in matches
     assert "desired_brakes_position_in_percentage=" in matches
@@ -62,14 +62,14 @@ def test_brakes_command_struct_fields():
     assert "DRIVE_COMMAND" not in matches
 
 
-def test_begin_binding_command_struct():
+def test_bind_command_command_struct():
     schema = get_schema()
     keys = sorted(build_namespace(RecorderContext()).keys())
     assert "BrakesContinuousCommand" in schema.command_structs
     matches = complete_line(
         schema,
         keys,
-        "begin_binding(trigger=BRAKES_CONTINUOUS_COMMAND, Brakes",
+        "bind_command(trigger=BRAKES_CONTINUOUS_COMMAND, Brakes",
     )
     assert matches == ["BrakesContinuousCommand"]
 

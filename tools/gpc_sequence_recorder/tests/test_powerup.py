@@ -8,10 +8,10 @@ from gpc_recorder.schema.loader import get_schema
 def test_powerup_repl_and_export():
     engine = ReplEngine()
     for line in (
-        "begin_powerup()",
+        "bind_powerup()",
         "gpio_write(port=1, pin=5, value=1)",
         "delay_ms(50)",
-        "end_powerup()",
+        "end_binding()",
     ):
         out, cont = engine.execute(line)
         assert cont, out
@@ -25,9 +25,9 @@ def test_powerup_repl_and_export():
     assert "powerup_sequence" in text
 
 
-def test_begin_powerup_in_completion():
+def test_bind_powerup_in_completion():
     from gpc_recorder.dsl.builtins import build_namespace, RecorderContext
 
     ns = build_namespace(RecorderContext())
-    assert "begin_powerup" in ns
-    assert "end_powerup" in ns
+    assert "bind_powerup" in ns
+    assert "end_binding" in ns

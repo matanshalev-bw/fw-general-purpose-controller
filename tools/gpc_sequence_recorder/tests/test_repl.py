@@ -6,7 +6,7 @@ from gpc_recorder.dsl.repl import ReplEngine
 def test_repl_builds_example_binding():
     engine = ReplEngine()
     lines = [
-        'begin_binding(DRIVE_COMMAND, DriveCommand(require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL))',
+        'bind_command(DRIVE_COMMAND, DriveCommand(require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL))',
         "gpio_write(port=1, pin=5, value=1)",
         "adc_read(adc_instance=2, channel=0, var_index=0, store_raw=1)",
         "dac_write(dac_instance=1, use_var=1, var_index=0, literal_value=0)",
@@ -29,10 +29,10 @@ def test_repl_builds_example_binding():
     assert ".delay_ms = {500}" in hpp
 
 
-def test_begin_binding_partial_struct_fields():
+def test_bind_command_partial_struct_fields():
     engine = ReplEngine()
     line = (
-        "begin_binding(trigger=BRAKES_CONTINUOUS_COMMAND,"
+        "bind_command(trigger=BRAKES_CONTINUOUS_COMMAND,"
         "BrakesContinuousCommand(brake_mode=BRAKE_MODE_FULLY_RELEASED))"
     )
     out, cont = engine.execute(line)
@@ -41,10 +41,10 @@ def test_begin_binding_partial_struct_fields():
     assert engine.ctx.session.current_binding.field_values["desired_brakes_position_in_percentage"] == 0
 
 
-def test_begin_binding_trigger_then_struct_syntax():
+def test_bind_command_trigger_then_struct_syntax():
     engine = ReplEngine()
     line = (
-        "begin_binding(trigger=BRAKES_CONTINUOUS_COMMAND,"
+        "bind_command(trigger=BRAKES_CONTINUOUS_COMMAND,"
         "BrakesContinuousCommand(brake_mode=BRAKE_MODE_ARMED, desired_brakes_position_in_percentage=20))"
     )
     out, cont = engine.execute(line)

@@ -8,12 +8,12 @@ from gpc_recorder.schema.cpp_parser import Schema
 # Builtin call -> keyword argument names (with trailing '=')
 FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "config": ["name=", "component="],
-    "begin_powerup": [],
-    "begin_binding": ["trigger=", "command_struct="],
-    "bindState": ["state="],
-    "clearState": ["state="],
-    "bindStateTick": ["state="],
-    "clearStateTick": ["state="],
+    "bind_powerup": [],
+    "bind_command": ["trigger=", "command_struct="],
+    "bind_state": ["state="],
+    "clear_state": ["state="],
+    "bind_state_tick": ["state="],
+    "clear_state_tick": ["state="],
     "gpio_write": ["port=", "pin=", "value="],
     "gpio_read": ["port=", "pin=", "var_index="],
     "adc_read": ["adc_instance=", "channel=", "var_index=", "store_raw="],
@@ -85,12 +85,12 @@ def _kwarg_before_cursor(line: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _begin_binding_struct_candidates(
+def _bind_command_struct_candidates(
     line: str, schema: Schema, prefix: str
 ) -> List[str]:
-    """Second argument to begin_binding: Command struct matching trigger."""
+    """Second argument to bind_command: Command struct matching trigger."""
     m = re.search(
-        r"begin_binding\s*\(\s*(?:trigger\s*=\s*)?(\w+)\s*,\s*(?:command_struct\s*=\s*)?([A-Za-z_][A-Za-z0-9_]*)?$",
+        r"bind_command\s*\(\s*(?:trigger\s*=\s*)?(\w+)\s*,\s*(?:command_struct\s*=\s*)?([A-Za-z_][A-Za-z0-9_]*)?$",
         line,
     )
     if not m:
@@ -172,11 +172,11 @@ def complete_line(schema: Schema, namespace_keys: List[str], line: str) -> List[
             return _values_for_kwarg(schema, namespace_keys, kw, word)
         return sorted(name for name in namespace_keys if name.startswith(word))
 
-    # begin_binding( — suggest keyword first (trigger=…)
-    if re.search(r"begin_binding\s*\(\s*$", line):
+    # bind_command( — suggest keyword first (trigger=…)
+    if re.search(r"bind_command\s*\(\s*$", line):
         return ["trigger="]
 
-    struct_candidates = _begin_binding_struct_candidates(line, schema, word)
+    struct_candidates = _bind_command_struct_candidates(line, schema, word)
     if struct_candidates:
         return struct_candidates
 

@@ -450,19 +450,11 @@
     });
   }
 
-  function isListAnnotation(ann) {
-    if (!ann) return false;
-    return (
-      String(ann).includes("List[") ||
-      String(ann).includes("list[") ||
-      String(ann).includes("List[int]") ||
-      String(ann).includes("List[typing") ||
-      String(ann).includes("List[") ||
-      String(ann).includes("List[") ||
-      String(ann).includes("List[") ||
-      String(ann).includes("List[") ||
-      String(ann).includes("List[")
-    );
+  function isListParam(p) {
+    if (!p) return false;
+    if (p.is_list) return true;
+    const ann = String(p.annotation || "");
+    return ann === "List" || ann.includes("List[") || ann.includes("list[");
   }
 
   function renderRecorderFields(cmd) {
@@ -470,7 +462,7 @@
     recorderFieldsEl.innerHTML = "";
     if (!cmd || !cmd.params) return;
 
-    if (cmd.name === "begin_binding") {
+    if (cmd.name === "bind_command") {
       const triggerWrap = document.createElement("div");
       triggerWrap.className = "field";
       const triggerLabel = document.createElement("label");
@@ -554,7 +546,7 @@
       return;
     }
 
-    if (cmd.name === "bindState" || cmd.name === "clearState") {
+    if (cmd.name === "bind_state" || cmd.name === "clear_state") {
       const stateWrap = document.createElement("div");
       stateWrap.className = "field";
       const stateLabel = document.createElement("label");
@@ -578,7 +570,7 @@
       return;
     }
 
-    if (cmd.name === "bindStateTick" || cmd.name === "clearStateTick") {
+    if (cmd.name === "bind_state_tick" || cmd.name === "clear_state_tick") {
       const stateWrap = document.createElement("div");
       stateWrap.className = "field";
       const stateLabel = document.createElement("label");
@@ -607,15 +599,15 @@
       const wrap = document.createElement("div");
       wrap.className = "field";
       const label = document.createElement("label");
-      label.textContent = p.name;
-      label.htmlFor = `rec-field-${p.name}`;
       const input = document.createElement("input");
       input.id = `rec-field-${p.name}`;
       input.dataset.param = p.name;
       input.dataset.annotation = p.annotation || "";
       input.dataset.hasDefault = p.has_default ? "1" : "0";
 
-      const isList = isListAnnotation(p.annotation);
+      const isList = isListParam(p);
+      label.textContent = isList ? `${p.name}[]` : p.name;
+      label.htmlFor = `rec-field-${p.name}`;
       if (isList) {
         input.classList.add("wide");
         input.placeholder = "comma-separated";
@@ -657,7 +649,7 @@
 
   function buildRecorderCall(cmd) {
     if (!cmd) return "";
-    if (cmd.name === "begin_binding") {
+    if (cmd.name === "bind_command") {
       const trigger = document.getElementById("rec-bind-trigger")?.value || "";
       if (!trigger) return "";
       const kwargs = [`trigger=${pythonLiteral(trigger)}`];
@@ -674,10 +666,10 @@
           }
         });
       }
-      return `begin_binding(${kwargs.join(", ")})`;
+      return `bind_command(${kwargs.join(", ")})`;
     }
-    if (cmd.name === "bindState" || cmd.name === "clearState" ||
-        cmd.name === "bindStateTick" || cmd.name === "clearStateTick") {
+    if (cmd.name === "bind_state" || cmd.name === "clear_state" ||
+        cmd.name === "bind_state_tick" || cmd.name === "clear_state_tick") {
       const state = document.getElementById("rec-state-select")?.value || "";
       if (!state) return "";
       return `${cmd.name}(${pythonLiteral(state)})`;
@@ -693,7 +685,7 @@
       if (isEmpty && p.has_default) return;
       if (isEmpty && !p.has_default) return; // required but missing
 
-      const isList = isListAnnotation(p.annotation);
+      const isList = isListParam(p);
       const lit = isList ? pythonListLiteral(raw) : pythonLiteral(raw);
       kwargs.push(`${p.name}=${lit}`);
     });
@@ -756,12 +748,12 @@
     if (!cmd) return;
     const call = buildRecorderCall(cmd);
     if (!call) return;
-    terminalInsert(call);
-    // Execute immediately (same as pressing Enter in the terminal).
     if (ws && ws.readyState === WebSocket.OPEN) {
-      term.write("\r\n");
+      term.write("\r\n" + prompt + call + "\r\n");
       ws.send(call.trim());
       lineBuffer = "";
+    } else {
+      terminalInsert(call);
     }
   });
 

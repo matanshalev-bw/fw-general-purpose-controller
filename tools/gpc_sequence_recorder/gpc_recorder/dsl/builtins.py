@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Optional
 
 from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
+from gpc_recorder.dsl.coerce import coerce_int_byte_list
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session
 from gpc_recorder.paths import CONTROLLER_STATE_SEQUENCE_FIELDS, CONTROLLER_STATE_TICK_FIELDS, DEFAULT_EXPORT_BIN_PATH, DEFAULT_EXPORT_PATH
@@ -29,19 +30,11 @@ class RecorderContext:
             self.session.component_id = component.split("::")[-1]
 
     def _ensure_not_recording(self, action: str) -> None:
-        if self.session.recording_powerup:
-            raise RuntimeError(f"Call end_powerup() before {action}")
-        if self.session.recording_main_tick:
-            raise RuntimeError(f"Call endMainTick() before {action}")
-        if self.session.recording_state is not None:
-            raise RuntimeError(f"Call endState() before {action}")
-        if self.session.recording_state_tick is not None:
-            raise RuntimeError(f"Call endStateTick() before {action}")
-        if self.session.current_binding is not None:
+        if self.session.is_recording():
             raise RuntimeError(f"Call end_binding() before {action}")
 
-    def begin_binding(self, trigger: str, command_struct: Any = None, **kwargs: Any) -> None:
-        self._ensure_not_recording("starting a binding")
+    def bind_command(self, trigger: str, command_struct: Any = None, **kwargs: Any) -> None:
+        self._ensure_not_recording("bind_command()")
         payload_type = trigger.split("::")[-1] if isinstance(trigger, str) else str(trigger)
         if payload_type not in self.schema.payload_type_ids:
             raise ValueError(f"Unknown PayloadTypeIds::{payload_type}")
@@ -63,8 +56,32 @@ class RecorderContext:
         print(f"Binding started: {payload_type} ({struct_name}), {len(data)} bytes packed")
 
     def end_binding(self) -> None:
+        if self.session.recording_powerup:
+            validate_powerup_step_count(len(self.session.powerup_steps))
+            self.session.recording_powerup = False
+            print(f"Powerup saved ({len(self.session.powerup_steps)} steps).")
+            return
+        if self.session.recording_main_tick:
+            validate_tick_step_count(len(self.session.main_tick_steps), label="Main tick sequence")
+            self.session.recording_main_tick = False
+            print(f"Main tick saved ({len(self.session.main_tick_steps)} steps).")
+            return
+        if self.session.recording_state is not None:
+            state_name = self.session.recording_state
+            validate_tick_step_count(len(self.session.state_steps.get(state_name, [])), label=f"{state_name} sequence")
+            self.session.recording_state = None
+            print(f"State sequence saved for {state_name} ({len(self.session.state_steps[state_name])} steps).")
+            return
+        if self.session.recording_state_tick is not None:
+            state_name = self.session.recording_state_tick
+            validate_tick_step_count(
+                len(self.session.state_tick_steps.get(state_name, [])), label=f"{state_name} tick"
+            )
+            self.session.recording_state_tick = None
+            print(f"State tick saved for {state_name} ({len(self.session.state_tick_steps[state_name])} steps).")
+            return
         if self.session.current_binding is None:
-            raise RuntimeError("No binding in progress")
+            raise RuntimeError("No recording in progress")
         b = self.session.current_binding
         validate_binding_step_count(len(b.steps))
         validate_binding_count(len(self.session.bindings) + 1)
@@ -72,99 +89,69 @@ class RecorderContext:
         self.session.current_binding = None
         print(f"Binding saved ({len(b.steps)} steps). Total bindings: {len(self.session.bindings)}")
 
-    def begin_powerup(self) -> None:
-        self._ensure_not_recording("begin_powerup()")
+    def bind_powerup(self) -> None:
+        self._ensure_not_recording("bind_powerup()")
         self.session.powerup_steps = []
         self.session.recording_powerup = True
         print("Powerup recording started.")
 
-    def begin_main_tick(self) -> None:
-        self._ensure_not_recording("beginMainTick()")
+    def bind_main_tick(self) -> None:
+        self._ensure_not_recording("bind_main_tick()")
         self.session.main_tick_steps = []
         self.session.recording_main_tick = True
         print("Main tick recording started.")
-
-    def end_main_tick(self) -> None:
-        if not self.session.recording_main_tick:
-            raise RuntimeError("Call beginMainTick() first")
-        validate_tick_step_count(len(self.session.main_tick_steps), label="Main tick sequence")
-        self.session.recording_main_tick = False
-        print(f"Main tick saved ({len(self.session.main_tick_steps)} steps).")
 
     def clear_main_tick(self) -> None:
         self.session.main_tick_steps = []
         self.session.recording_main_tick = False
         print("Main tick sequence cleared.")
 
-    def begin_state(self, state: str) -> None:
-        self._ensure_not_recording("bindState()")
+    def bind_state(self, state: str) -> None:
+        self._ensure_not_recording("bind_state()")
         state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
         if state_name not in CONTROLLER_STATE_SEQUENCE_FIELDS:
             allowed = ", ".join(sorted(CONTROLLER_STATE_SEQUENCE_FIELDS))
-            raise ValueError(f"bindState() supports one-shot states only: {allowed}")
+            raise ValueError(f"bind_state() supports one-shot states only: {allowed}")
         self.session.state_steps[state_name] = []
         self.session.recording_state = state_name
         print(f"State sequence recording started for {state_name} (runs once, then auto-transitions).")
-
-    def end_state(self) -> None:
-        if self.session.recording_state is None:
-            raise RuntimeError("Call bindState() first")
-        state_name = self.session.recording_state
-        validate_tick_step_count(len(self.session.state_steps.get(state_name, [])), label=f"{state_name} sequence")
-        self.session.recording_state = None
-        print(f"State sequence saved for {state_name} ({len(self.session.state_steps[state_name])} steps).")
 
     def clear_state(self, state: str) -> None:
         state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
         if state_name not in CONTROLLER_STATE_SEQUENCE_FIELDS:
             allowed = ", ".join(sorted(CONTROLLER_STATE_SEQUENCE_FIELDS))
-            raise ValueError(f"clearState() supports one-shot states only: {allowed}")
+            raise ValueError(f"clear_state() supports one-shot states only: {allowed}")
         self.session.state_steps.pop(state_name, None)
         if self.session.recording_state == state_name:
             self.session.recording_state = None
         print(f"State sequence cleared for {state_name}.")
 
-    def begin_state_tick(self, state: str) -> None:
-        self._ensure_not_recording("bindStateTick()")
+    def bind_state_tick(self, state: str) -> None:
+        self._ensure_not_recording("bind_state_tick()")
         state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
         if state_name not in CONTROLLER_STATE_TICK_FIELDS:
             allowed = ", ".join(sorted(CONTROLLER_STATE_TICK_FIELDS))
-            raise ValueError(f"bindStateTick() supports looping tick states only: {allowed}")
+            raise ValueError(f"bind_state_tick() supports looping tick states only: {allowed}")
         self.session.state_tick_steps[state_name] = []
         self.session.recording_state_tick = state_name
         print(f"State tick recording started for {state_name}.")
-
-    def end_state_tick(self) -> None:
-        if self.session.recording_state_tick is None:
-            raise RuntimeError("Call bindStateTick() first")
-        state_name = self.session.recording_state_tick
-        validate_tick_step_count(len(self.session.state_tick_steps.get(state_name, [])), label=f"{state_name} tick")
-        self.session.recording_state_tick = None
-        print(f"State tick saved for {state_name} ({len(self.session.state_tick_steps[state_name])} steps).")
 
     def clear_state_tick(self, state: str) -> None:
         state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
         if state_name not in CONTROLLER_STATE_TICK_FIELDS:
             allowed = ", ".join(sorted(CONTROLLER_STATE_TICK_FIELDS))
-            raise ValueError(f"clearStateTick() supports looping tick states only: {allowed}")
+            raise ValueError(f"clear_state_tick() supports looping tick states only: {allowed}")
         self.session.state_tick_steps.pop(state_name, None)
         if self.session.recording_state_tick == state_name:
             self.session.recording_state_tick = None
         print(f"State tick sequence cleared for {state_name}.")
-
-    def end_powerup(self) -> None:
-        if not self.session.recording_powerup:
-            raise RuntimeError("Call begin_powerup() first")
-        validate_powerup_step_count(len(self.session.powerup_steps))
-        self.session.recording_powerup = False
-        print(f"Powerup saved ({len(self.session.powerup_steps)} steps).")
 
     def clear_powerup(self) -> None:
         self.session.powerup_steps = []
         self.session.recording_powerup = False
         print("Powerup sequence cleared.")
 
-    def clear_binding(self) -> None:
+    def clear_command(self) -> None:
         self.session.current_binding = None
         print("Current binding cleared.")
 
@@ -223,7 +210,7 @@ class RecorderContext:
             label = "binding"
         else:
             raise RuntimeError(
-                "Call begin_powerup(), bindMainTick(), bindState(), bindStateTick(), or begin_binding() first"
+                "Call bind_powerup(), bind_main_tick(), bind_state(), bind_state_tick(), or bind_command() first"
             )
         if union_member not in self.schema.micro_ops:
             raise ValueError(f"Unknown micro-op {union_member!r}")
@@ -288,7 +275,7 @@ class RecorderContext:
     ) -> None:
         self._add_step(
             "can_transmit",
-            {"can_bus": can_bus, "id": id, "dlc": dlc, "data": list(data)},
+            {"can_bus": can_bus, "id": id, "dlc": dlc, "data": coerce_int_byte_list(data, name="data")},
         )
 
     def pwm_set(
@@ -313,13 +300,13 @@ class RecorderContext:
     def uart_transmit(self, uart_instance: int, length: int, data: List[int]) -> None:
         self._add_step(
             "uart_transmit",
-            {"uart_instance": uart_instance, "length": length, "data": list(data)},
+            {"uart_instance": uart_instance, "length": length, "data": coerce_int_byte_list(data, name="data")},
         )
 
     def spi_transfer(self, spi_instance: int, tx_len: int, tx_data: List[int]) -> None:
         self._add_step(
             "spi_transfer",
-            {"spi_instance": spi_instance, "tx_len": tx_len, "tx_data": list(tx_data)},
+            {"spi_instance": spi_instance, "tx_len": tx_len, "tx_data": coerce_int_byte_list(tx_data, name="tx_data")},
         )
 
     def i2c_write(
@@ -335,7 +322,7 @@ class RecorderContext:
                 "i2c_instance": i2c_instance,
                 "device_addr": device_addr,
                 "length": length,
-                "data": list(data),
+                "data": coerce_int_byte_list(data, name="data"),
             },
         )
 
@@ -409,16 +396,8 @@ class RecorderContext:
             and not self.session.state_tick_steps
         ):
             raise RuntimeError("No powerup, tick sequences, or bindings to export")
-        if self.session.current_binding is not None:
+        if self.session.is_recording():
             raise RuntimeError("Call end_binding() before export")
-        if self.session.recording_powerup:
-            raise RuntimeError("Call end_powerup() before export")
-        if self.session.recording_main_tick:
-            raise RuntimeError("Call endMainTick() before export")
-        if self.session.recording_state is not None:
-            raise RuntimeError("Call endState() before export")
-        if self.session.recording_state_tick is not None:
-            raise RuntimeError("Call endStateTick() before export")
         session = self.session.to_dict()
         text = emit_config_hpp(session, self.schema, out, write=True)
         bin_path = DEFAULT_EXPORT_BIN_PATH
@@ -431,13 +410,14 @@ class RecorderContext:
     def help(self, name: str = "") -> str:
         if not name:
             return (
-                "Commands: config(), begin_powerup(), end_powerup(), clear_powerup(), "
-                "bindMainTick(), endMainTick(), clearMainTick(), "
-                "bindState(state), endState(), clearState(state), "
-                "bindStateTick(state), endStateTick(), clearStateTick(state), "
-                "begin_binding(), gpio_write(), adc_read(), dac_write(), delay_ms(), can_transmit(), "
-                "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), end_binding(), "
-                "show(), preview(), export()  # writes .hpp + .bin, help(), undo(), clear_binding()"
+                "Commands: config(), bind_powerup(), clear_powerup(), "
+                "bind_main_tick(), clear_main_tick(), "
+                "bind_state(state), clear_state(state), "
+                "bind_state_tick(state), clear_state_tick(state), "
+                "bind_command(), end_binding(), clear_command(), "
+                "gpio_write(), adc_read(), dac_write(), delay_ms(), can_transmit(), "
+                "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), "
+                "show(), preview(), export(), help(), undo()"
             )
         name = name.split("::")[-1]
         if name in self.schema.micro_ops:
@@ -479,7 +459,7 @@ def _extract_struct_fields(
 
 
 class StructInstance:
-    """Simple struct placeholder for begin_binding(DRIVE_COMMAND, DriveCommand(...))."""
+    """Simple struct placeholder for bind_command(DRIVE_COMMAND, DriveCommand(...))."""
 
     def __init__(self, struct_name: str, **fields: Any):
         self._struct_name = struct_name
@@ -494,21 +474,17 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
     schema = ctx.schema
     ns: Dict[str, Any] = {
         "config": ctx.config,
-        "begin_powerup": ctx.begin_powerup,
-        "end_powerup": ctx.end_powerup,
+        "bind_powerup": ctx.bind_powerup,
         "clear_powerup": ctx.clear_powerup,
-        "bindMainTick": ctx.begin_main_tick,
-        "endMainTick": ctx.end_main_tick,
-        "clearMainTick": ctx.clear_main_tick,
-        "bindState": ctx.begin_state,
-        "endState": ctx.end_state,
-        "clearState": ctx.clear_state,
-        "bindStateTick": ctx.begin_state_tick,
-        "endStateTick": ctx.end_state_tick,
-        "clearStateTick": ctx.clear_state_tick,
-        "begin_binding": ctx.begin_binding,
+        "bind_main_tick": ctx.bind_main_tick,
+        "clear_main_tick": ctx.clear_main_tick,
+        "bind_state": ctx.bind_state,
+        "clear_state": ctx.clear_state,
+        "bind_state_tick": ctx.bind_state_tick,
+        "clear_state_tick": ctx.clear_state_tick,
+        "bind_command": ctx.bind_command,
         "end_binding": ctx.end_binding,
-        "clear_binding": ctx.clear_binding,
+        "clear_command": ctx.clear_command,
         "undo": ctx.undo,
         "gpio_write": ctx.gpio_write,
         "gpio_read": ctx.gpio_read,

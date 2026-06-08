@@ -18,21 +18,17 @@ def _is_public_method(name: str, value: Any) -> bool:
 
 _EXAMPLES: Dict[str, str] = {
     "config": "config(name=\"G474_GPC_CONFIG\", component=COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER)",
-    "begin_powerup": "begin_powerup()",
-    "end_powerup": "end_powerup()",
+    "bind_powerup": "bind_powerup()",
     "clear_powerup": "clear_powerup()",
-    "bindMainTick": "bindMainTick()",
-    "endMainTick": "endMainTick()",
-    "clearMainTick": "clearMainTick()",
-    "bindState": "bindState(CONTROLLER_STATE_INIT)",
-    "endState": "endState()",
-    "clearState": "clearState(CONTROLLER_STATE_INIT)",
-    "bindStateTick": "bindStateTick(CONTROLLER_STATE_OPERATIONAL)",
-    "endStateTick": "endStateTick()",
-    "clearStateTick": "clearStateTick(CONTROLLER_STATE_OPERATIONAL)",
-    "begin_binding": "begin_binding(DRIVE_COMMAND, DriveCommand(require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL))",
+    "bind_main_tick": "bind_main_tick()",
+    "clear_main_tick": "clear_main_tick()",
+    "bind_state": "bind_state(CONTROLLER_STATE_INIT)",
+    "clear_state": "clear_state(CONTROLLER_STATE_INIT)",
+    "bind_state_tick": "bind_state_tick(CONTROLLER_STATE_OPERATIONAL)",
+    "clear_state_tick": "clear_state_tick(CONTROLLER_STATE_OPERATIONAL)",
+    "bind_command": "bind_command(DRIVE_COMMAND, DriveCommand(require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL))",
     "end_binding": "end_binding()",
-    "clear_binding": "clear_binding()",
+    "clear_command": "clear_command()",
     "undo": "undo()",
     "gpio_write": "gpio_write(port=1, pin=5, value=1)",
     "gpio_read": "gpio_read(port=1, pin=5, var_index=0)",
@@ -52,21 +48,17 @@ _EXAMPLES: Dict[str, str] = {
 
 _DESCRIPTIONS: Dict[str, str] = {
     "config": "Set config name and target component id for export.",
-    "begin_powerup": "Start recording the power-up micro-op sequence.",
-    "end_powerup": "Finish and save the current power-up sequence.",
+    "bind_powerup": "Start recording the power-up micro-op sequence.",
     "clear_powerup": "Clear the current power-up sequence.",
-    "bindMainTick": "Start recording the main tick micro-op sequence (runs in every state).",
-    "endMainTick": "Finish and save the current main tick sequence.",
-    "clearMainTick": "Clear the main tick sequence.",
-    "bindState": "Record a one-shot state sequence (init/disengagement/power_up_bit); auto-transitions when done.",
-    "endState": "Finish and save the current one-shot state sequence.",
-    "clearState": "Clear a saved one-shot state sequence.",
-    "bindStateTick": "Start recording a looping state tick sequence (manual/engaged/operational).",
-    "endStateTick": "Finish and save the current state tick sequence.",
-    "clearStateTick": "Clear a saved state tick sequence.",
-    "begin_binding": "Start recording a binding for a trigger payload type and its command struct.",
-    "end_binding": "Finish and save the current binding.",
-    "clear_binding": "Discard the in-progress binding (does not touch saved bindings).",
+    "bind_main_tick": "Start recording the main tick micro-op sequence (runs in every state).",
+    "clear_main_tick": "Clear the main tick sequence.",
+    "bind_state": "Record a one-shot state sequence (init/disengagement/power_up_bit); auto-transitions when done.",
+    "clear_state": "Clear a saved one-shot state sequence.",
+    "bind_state_tick": "Start recording a looping state tick sequence (manual/engaged/operational).",
+    "clear_state_tick": "Clear a saved state tick sequence.",
+    "bind_command": "Start recording a binding for a trigger payload type and its command struct.",
+    "end_binding": "Finish and save the current recording (powerup, tick, state, or trigger binding).",
+    "clear_command": "Discard the in-progress trigger binding (does not touch saved bindings).",
     "undo": "Undo the last recorded step (power-up or binding).",
     "gpio_write": "Add an immediate GPIO write micro-op step.",
     "gpio_read": "Add an immediate GPIO read micro-op step (stores into var_index).",
@@ -86,21 +78,17 @@ _DESCRIPTIONS: Dict[str, str] = {
 
 
 _RECORDER_PUBLIC_COMMANDS = [
-    "begin_binding",
+    "bind_command",
     "end_binding",
-    "clear_binding",
-    "begin_powerup",
-    "end_powerup",
+    "clear_command",
+    "bind_powerup",
     "clear_powerup",
-    "bindMainTick",
-    "endMainTick",
-    "clearMainTick",
-    "bindState",
-    "endState",
-    "clearState",
-    "bindStateTick",
-    "endStateTick",
-    "clearStateTick",
+    "bind_main_tick",
+    "clear_main_tick",
+    "bind_state",
+    "clear_state",
+    "bind_state_tick",
+    "clear_state_tick",
     "config",
     "undo",
     "gpio_write",
@@ -119,23 +107,10 @@ _RECORDER_PUBLIC_COMMANDS = [
     "help",
 ]
 
-# Public REPL/GUI names that map to RecorderContext methods (see build_namespace in builtins.py).
-_RECORDER_COMMAND_METHODS: Dict[str, str] = {
-    "bindMainTick": "begin_main_tick",
-    "endMainTick": "end_main_tick",
-    "clearMainTick": "clear_main_tick",
-    "bindState": "begin_state",
-    "endState": "end_state",
-    "clearState": "clear_state",
-    "bindStateTick": "begin_state_tick",
-    "endStateTick": "end_state_tick",
-    "clearStateTick": "clear_state_tick",
-}
-
 
 def _resolve_recorder_method(ctx: RecorderContext, name: str):
-    method_name = _RECORDER_COMMAND_METHODS.get(name, name)
-    return getattr(ctx, method_name, None)
+    return getattr(ctx, name, None)
+
 
 def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
     has_default = p.default is not inspect._empty
@@ -148,12 +123,16 @@ def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
         except Exception:
             ann_str = str(ann).replace("typing.", "")
     kind = str(p.kind).split(".")[-1]
+    is_list = False
+    if ann_str:
+        is_list = ann_str == "List" or ann_str.startswith("List[")
     return {
         "name": p.name,
         "kind": kind,
         "annotation": ann_str,
         "has_default": has_default,
         "default": default,
+        "is_list": is_list,
     }
 
 
@@ -191,7 +170,7 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
                 "signature": sig,
                 "description": _DESCRIPTIONS.get(name, ""),
                 "doc": doc,
-                "example": _EXAMPLES.get(name, f"{name}()"),  # best-effort
+                "example": _EXAMPLES.get(name, f"{name}()"),
                 "params": params,
             }
         )
@@ -203,4 +182,3 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
         "controller_one_shot_states": list(CONTROLLER_STATE_SEQUENCE_FIELDS.keys()),
         "controller_tick_states": list(CONTROLLER_STATE_TICK_FIELDS.keys()),
     }
-
