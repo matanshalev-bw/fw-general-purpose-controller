@@ -2,6 +2,7 @@
 #define GPC_CONTROLLER_HPP_
 
 #include "PayloadFieldDefinitions.hpp"
+#include "bluelink_messages.hpp"
 #include "micro_sequence_executor.hpp"
 #include "sequences_configs.hpp"
 
