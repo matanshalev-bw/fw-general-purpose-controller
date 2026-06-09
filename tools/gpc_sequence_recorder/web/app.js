@@ -121,6 +121,56 @@
 
   window.addEventListener("resize", () => fitAddon.fit());
 
+  function flashConfigViaUsb(port) {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    return new Promise((resolve, reject) => {
+      const flashWs = new WebSocket(`${proto}//${location.host}/ws/flash`);
+      let settled = false;
+
+      const finish = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        fn(value);
+      };
+
+      flashWs.onopen = () => {
+        term.writeln(`[Flash] Starting programmer on ${port}…`);
+        flashWs.send(JSON.stringify({ port }));
+      };
+
+      flashWs.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "output" && msg.text) {
+          term.write(msg.text);
+          return;
+        }
+        if (msg.type === "done") {
+          term.writeln("");
+          flashWs.close();
+          finish(resolve, msg);
+          return;
+        }
+        if (msg.type === "error") {
+          term.writeln("");
+          term.writeln(`[Flash] ${msg.message || "Flash failed"}`);
+          flashWs.close();
+          finish(reject, new Error(msg.message || "Flash failed"));
+        }
+      };
+
+      flashWs.onerror = () => {
+        flashWs.close();
+        finish(reject, new Error("Flash WebSocket connection failed"));
+      };
+
+      flashWs.onclose = () => {
+        if (!settled) {
+          finish(reject, new Error("Flash connection closed before completion"));
+        }
+      };
+    });
+  }
+
   document.getElementById("btn-flash").addEventListener("click", async () => {
     const port = document.getElementById("usb-port")?.value || "";
     const binPath = "config_projects/config_g474/Debug/config_g474.bin";
@@ -139,23 +189,8 @@
     btnFlash.disabled = true;
     statusEl.textContent = "Flashing config…";
     try {
-      const res = await fetch("/api/flash", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ port }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        statusEl.textContent = `Flashed ${data.bin_path} to ${data.port}`;
-        if (data.output) {
-          data.output.split("\n").forEach((line) => {
-            if (line.trim()) term.writeln(`[Flash] ${line}`);
-          });
-        }
-      } else {
-        statusEl.textContent = `Flash failed: ${data.error}`;
-        if (data.error) term.writeln(`[Flash] ${data.error}`);
-      }
+      const data = await flashConfigViaUsb(port);
+      statusEl.textContent = `Flashed ${data.bin_path} to ${data.port}`;
     } catch (e) {
       statusEl.textContent = `Flash failed: ${e.message}`;
     } finally {

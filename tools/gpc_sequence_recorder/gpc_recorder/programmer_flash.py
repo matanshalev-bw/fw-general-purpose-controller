@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import platform
+import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 from gpc_recorder.paths import (
     DEFAULT_EXPORT_BIN_PATH,
@@ -60,12 +62,12 @@ def resolve_config_bin(bin_path: Optional[Path] = None) -> Path:
     )
 
 
-def flash_config_via_usb(
+def build_flash_command(
     port: str,
     *,
     bin_path: Optional[Path] = None,
     controller_type: str = "gpc",
-) -> Dict[str, Any]:
+) -> tuple[List[str], Path]:
     port = str(port).strip()
     if not port:
         raise ProgrammerFlashError("Select a USB port first")
@@ -83,6 +85,89 @@ def flash_config_via_usb(
         "config",
         str(image),
     ]
+    if shutil.which("stdbuf"):
+        cmd = ["stdbuf", "-oL", *cmd]
+    return cmd, image
+
+
+async def flash_config_via_usb_stream(
+    port: str,
+    *,
+    bin_path: Optional[Path] = None,
+    controller_type: str = "gpc",
+) -> AsyncIterator[Dict[str, Any]]:
+    cmd, image = build_flash_command(
+        port,
+        bin_path=bin_path,
+        controller_type=controller_type,
+    )
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            cwd=str(REPO_ROOT),
+        )
+    except OSError as exc:
+        raise ProgrammerFlashError(f"Failed to run programmer: {exc}") from exc
+
+    output_parts: List[str] = []
+    deadline = asyncio.get_running_loop().time() + FLASH_TIMEOUT_S
+    try:
+        assert proc.stdout is not None
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                proc.kill()
+                await proc.wait()
+                raise ProgrammerFlashError(f"Flash timed out after {FLASH_TIMEOUT_S}s")
+
+            try:
+                chunk = await asyncio.wait_for(proc.stdout.read(1024), timeout=remaining)
+            except asyncio.TimeoutError as exc:
+                proc.kill()
+                await proc.wait()
+                raise ProgrammerFlashError(f"Flash timed out after {FLASH_TIMEOUT_S}s") from exc
+
+            if not chunk:
+                break
+
+            text = chunk.decode(errors="replace")
+            output_parts.append(text)
+            yield {"type": "output", "text": text}
+
+        return_code = await proc.wait()
+        output = "".join(output_parts).strip()
+        if return_code != 0:
+            detail = output or f"programmer exit code {return_code}"
+            yield {"type": "error", "message": detail, "output": output}
+            return
+
+        yield {
+            "type": "done",
+            "ok": True,
+            "port": port,
+            "bin_path": str(image),
+            "output": output,
+        }
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
+
+
+def flash_config_via_usb(
+    port: str,
+    *,
+    bin_path: Optional[Path] = None,
+    controller_type: str = "gpc",
+) -> Dict[str, Any]:
+    cmd, image = build_flash_command(
+        port,
+        bin_path=bin_path,
+        controller_type=controller_type,
+    )
 
     try:
         result = subprocess.run(

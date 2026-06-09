@@ -5,7 +5,11 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from gpc_recorder.dsl.repl import ReplEngine
-from gpc_recorder.programmer_flash import ProgrammerFlashError, flash_config_via_usb
+from gpc_recorder.programmer_flash import (
+    ProgrammerFlashError,
+    flash_config_via_usb,
+    flash_config_via_usb_stream,
+)
 from gpc_recorder.usb_bridge import (
     UsbBridgeError,
     get_usb_session,
@@ -144,6 +148,26 @@ async def flash_config(body: dict) -> dict:
         return flash_config_via_usb(str(port))
     except ProgrammerFlashError as e:
         return {"ok": False, "error": str(e)}
+
+
+@app.websocket("/ws/flash")
+async def flash_ws(websocket: WebSocket) -> None:
+    await websocket.accept()
+    try:
+        body = await websocket.receive_json()
+        port = body.get("port")
+        if not port:
+            await websocket.send_json({"type": "error", "message": "Missing port"})
+            return
+
+        async for event in flash_config_via_usb_stream(str(port)):
+            await websocket.send_json(event)
+            if event["type"] in {"done", "error"}:
+                break
+    except WebSocketDisconnect:
+        pass
+    except ProgrammerFlashError as e:
+        await websocket.send_json({"type": "error", "message": str(e)})
 
 
 @app.post("/api/export")
