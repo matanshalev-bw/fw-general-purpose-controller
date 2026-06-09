@@ -20,8 +20,24 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .main_tick_sequence = {
-            .step_count = 0,
+            .step_count = 4,
             .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {2, 15, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {500},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {2, 15, 0},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {500},
+                        },
             },
         },
         .init_state_sequence = {
@@ -54,39 +70,8 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             .steps = {
             },
         },
-        .binding_count = 1,
+        .binding_count = 0,
         .bindings = {
-            {
-                .trigger = {
-                    .payload_type = bluelink::PayloadTypeIds::DRIVE_COMMAND,
-                    .data = {0, static_cast<uint8_t>(bluelink::DRIVE_MODE_BRAKE_NEUTRAL), 0, 0, 0, 0, 0, 0},
-                },
-                .sequence = {
-                    .step_count = 5,
-                    .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {1, 5, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::ADC_READ,
-                            .adc_read = {2, 0, 0, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DAC_WRITE,
-                            .dac_write = {1, 0, 0, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {500},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 4, 0x12, {0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0}},
-                        },
-                    },
-                },
-            },
         },
     },
 };

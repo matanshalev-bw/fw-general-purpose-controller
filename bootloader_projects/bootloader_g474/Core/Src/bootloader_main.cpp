@@ -221,6 +221,7 @@ bool BootloaderMain::handleInboundMessage(const BootloaderInboundMessage& messag
     case bluelink::PayloadTypeIds::PROGRAMMING_COMMAND:
         last_programming_source_id_ = message.source_id;
         last_programming_transport_ = transport;
+        has_programming_command_transport_ = true;
         processProgrammingCommand(message);
         return true;
 
@@ -356,6 +357,12 @@ void BootloaderMain::processProgrammingCommand(const BootloaderInboundMessage& m
         transitionToState(BootloaderState::PROGRAMMING_READY);
         return;
     }
+
+    if (bootloader_state_ == BootloaderState::WAITING_FOR_PROGRAMMING_READY and
+        cmd_type == bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START) {
+        sendProgrammingStartRequests();
+        return;
+    }
     
     bool is_state_cmd = (cmd_type == bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START) or
                        (cmd_type == bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_APPLICATION_FLASHING) or
@@ -473,9 +480,16 @@ void BootloaderMain::sendProgrammingStartRequests() {
     prog_cmd.programming_command_union.programming_command_type =
         bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START;
 
+    BootloaderTransport response_transport = last_programming_transport_;
+    uint8_t response_destination = last_programming_source_id_;
+    if (not has_programming_command_transport_) {
+        response_transport = BootloaderTransport::USB_BLUELINK;
+        response_destination = bluelink::ComponentId::COMPONENT_ID_HLC;
+    }
+
     programming_data_to_send_ = prog_cmd;
-    programming_response_destination_id_ = last_programming_source_id_;
-    programming_response_transport_ = last_programming_transport_;
+    programming_response_destination_id_ = response_destination;
+    programming_response_transport_ = response_transport;
     is_programming_data_send_requested_ = true;
 }
 

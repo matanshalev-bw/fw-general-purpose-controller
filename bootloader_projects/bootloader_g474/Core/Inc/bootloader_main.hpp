@@ -78,6 +78,7 @@ public:
   BootloaderTransport programming_response_transport_ = BootloaderTransport::CAN;
   uint8_t last_programming_source_id_ = bluelink::ComponentId::COMPONENT_ID_HLC;
   BootloaderTransport last_programming_transport_ = BootloaderTransport::CAN;
+  bool has_programming_command_transport_ = false;
 
   BootloaderUsbComm* bootloader_usb_comm_ = nullptr;
 

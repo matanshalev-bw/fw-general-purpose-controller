@@ -19,6 +19,9 @@ class BluelinkTransport {
   virtual bool receiveProgrammingCommand(bluelink::ComponentId expected_source,
                                          bluelink::CommandsPayload::ProgrammingCommand& cmd,
                                          int timeout_ms) = 0;
+
+  virtual void flushOutput() {}
+  virtual void drainInput() {}
 };
 
 #endif  // PROGRAMMER_G474_BLUELINK_TRANSPORT_HPP_

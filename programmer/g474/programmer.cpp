@@ -23,7 +23,8 @@
 
 const std::string DEFAULT_CAN_INTERFACE = "can1";
 const std::string DEFAULT_USB_PORT = "/dev/ttyACM0";
-const std::string DEFAULT_BIN = "../../application_projects/application_g474/Debug/application_g474.bin";
+const std::string DEFAULT_APP_BIN = "../../application_projects/application_g474/Debug/application_g474.bin";
+const std::string DEFAULT_CONFIG_BIN = "../../config_projects/config_g474/Debug/config_g474.bin";
 const bluelink::ComponentId DEFAULT_FLASHED_CONTROLLER =
     bluelink::ComponentId::COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER;
 const int START_ADDRESS_APPLICATION = FLASH_APPLICATION_ADDRESS;
@@ -56,7 +57,7 @@ const std::map<std::string, FlashTarget> FLASH_TARGET_MAP = {
 };
 
 const std::map<uint8_t, std::string> CONFIG_TYPE_TO_BIN_MAP = {
-    {static_cast<uint8_t>(1), "../../config_projects/config_g474/build/fw-config-g4.bin"},
+    {static_cast<uint8_t>(1), DEFAULT_CONFIG_BIN},
 };
 
 struct ProgrammerOptions {
@@ -116,37 +117,76 @@ bool writeFlashData(uint32_t address, uint32_t data) {
   return false;
 }
 
-bool isInProgrammingMode() {
-  bluelink::CommandsPayload::ProgrammingCommand response{};
-  const int tries = 100;
+bluelink::CommandsPayload::ProgrammingCommand makeProgrammingStartCommand() {
+  bluelink::CommandsPayload::ProgrammingCommand prog_cmd{};
+  prog_cmd.programming_command_union.programming_command_type =
+      bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START;
+  return prog_cmd;
+}
 
-  for (int i = 0; i < tries; ++i) {
-    if (g_transport->receiveProgrammingCommand(bluelink::ComponentId::COMPONENT_ID_BOOTLOADER, response, 800)) {
-      if (response.programming_command_union.programming_command_type ==
-          bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START) {
-        return true;
-      }
+void sendStartProgrammingToApp() {
+  g_transport->sendProgrammingCommand(g_flashed_controller, makeProgrammingStartCommand());
+}
+
+void sendStartProgramming() {
+  sendStartProgrammingToApp();
+  g_transport->sendProgrammingCommand(bluelink::ComponentId::COMPONENT_ID_BOOTLOADER, makeProgrammingStartCommand());
+}
+
+void sendStartToBootloader() {
+  g_transport->sendProgrammingCommand(bluelink::ComponentId::COMPONENT_ID_BOOTLOADER, makeProgrammingStartCommand());
+}
+
+bool isProgrammingStartAck(const bluelink::CommandsPayload::ProgrammingCommand& response) {
+  return response.programming_command_union.programming_command_type ==
+         bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START;
+}
+
+bool waitForBootloaderProgrammingAck(int timeout_ms) {
+  bluelink::CommandsPayload::ProgrammingCommand response{};
+  const int step_ms = 100;
+  int elapsed = 0;
+
+  while (elapsed < timeout_ms) {
+    sendStartToBootloader();
+    g_transport->flushOutput();
+
+    if (g_transport->receiveProgrammingCommand(bluelink::ComponentId::COMPONENT_ID_BOOTLOADER, response, step_ms) &&
+        isProgrammingStartAck(response)) {
+      return true;
     }
-    delay(10);
+
+    elapsed += step_ms;
   }
 
   return false;
 }
 
-void sendStartProgramming() {
-  bluelink::CommandsPayload::ProgrammingCommand prog_cmd{};
-  prog_cmd.programming_command_union.programming_command_type =
-      bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START;
-
-  g_transport->sendProgrammingCommand(g_flashed_controller, prog_cmd);
-  g_transport->sendProgrammingCommand(bluelink::ComponentId::COMPONENT_ID_BOOTLOADER, prog_cmd);
+bool isInProgrammingMode() {
+  return waitForBootloaderProgrammingAck(15000);
 }
 
-void sendStartToBootloader() {
-  bluelink::CommandsPayload::ProgrammingCommand prog_cmd{};
-  prog_cmd.programming_command_union.programming_command_type =
-      bluelink::CommandsPayload::ProgrammingCommand::PROGRAMMING_STATE_START;
-  g_transport->sendProgrammingCommand(bluelink::ComponentId::COMPONENT_ID_BOOTLOADER, prog_cmd);
+bool beginUsbProgrammingSession() {
+  std::cout << "Sending programming start to application over USB\n";
+
+  for (int i = 0; i < 3; ++i) {
+    sendStartProgrammingToApp();
+    g_transport->flushOutput();
+    delay(100);
+  }
+
+  delay(200);
+  std::cout << "Closing USB before bootloader jump\n";
+  g_transport->shutdown();
+  delay(500);
+
+  std::cout << "Waiting for USB reconnect after reset\n";
+  if (!g_transport->reopenAfterReset()) {
+    return false;
+  }
+
+  std::cout << "USB reconnected, requesting bootloader programming ACK\n";
+  return true;
 }
 
 void sendReadyFlashing() {
@@ -193,7 +233,8 @@ void printUsage() {
   std::cout << "  --port PATH     - USB serial port (default: " << DEFAULT_USB_PORT << ")\n";
   std::cout << "  CONTROLLER_TYPE - Target controller type (default: gpc)\n";
   std::cout << "  FLASH_TARGET    - Flash target area (app, config, or customized_config) (default: app)\n";
-  std::cout << "  BIN_FILE        - Path to the binary file (default: " << DEFAULT_BIN << ")\n";
+  std::cout << "  BIN_FILE        - Path to the binary file (default for app: " << DEFAULT_APP_BIN << ")\n";
+  std::cout << "                    (default for config: " << DEFAULT_CONFIG_BIN << ")\n";
   std::cout << "                    (not required when using customized_config target)\n\n";
 
   std::cout << "Supported controller types:\n";
@@ -404,8 +445,10 @@ bool parseOptions(int argc, char* argv[], ProgrammerOptions& opts) {
 
   if (positional < argc && std::string(argv[positional]) != "") {
     opts.bin_file = argv[positional];
-  } else if (g_flash_target != FlashTarget::CUSTOMIZED_CONFIG) {
-    opts.bin_file = DEFAULT_BIN;
+  } else if (g_flash_target == FlashTarget::CONFIG) {
+    opts.bin_file = DEFAULT_CONFIG_BIN;
+  } else if (g_flash_target == FlashTarget::APPLICATION) {
+    opts.bin_file = DEFAULT_APP_BIN;
   }
 
   return true;
@@ -484,31 +527,24 @@ int main(int argc, char* argv[]) {
 
   std::cout << "Send start programming request and wait for ACK\n";
 
-  sendStartProgramming();
-  delay(500);
-
   if (opts.transport == TransportType::USB) {
-    if (!g_transport->reopenAfterReset()) {
+    if (!beginUsbProgrammingSession()) {
       std::cout << "Failed to reconnect USB after bootloader jump\n";
       g_transport->shutdown();
       return -2;
     }
-    sendStartToBootloader();
-    delay(200);
+  } else {
+    sendStartProgramming();
+    delay(500);
   }
 
   if (!isInProgrammingMode()) {
     std::cout << "Didn't get ACK from controller, trying again\n";
-    sendStartProgramming();
-    delay(1000);
     if (opts.transport == TransportType::USB) {
-      if (!g_transport->reopenAfterReset()) {
-        std::cout << "Failed to reconnect USB after bootloader jump\n";
-        g_transport->shutdown();
-        return -2;
-      }
-      sendStartToBootloader();
-      delay(200);
+      std::cout << "Retrying bootloader programming ACK over USB\n";
+    } else {
+      sendStartProgramming();
+      delay(1000);
     }
     if (!isInProgrammingMode()) {
       std::cout << "Didn't get ACK from controller";

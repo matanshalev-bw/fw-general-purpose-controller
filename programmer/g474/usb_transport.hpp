@@ -25,6 +25,9 @@ class UsbTransport : public BluelinkTransport {
                                  bluelink::CommandsPayload::ProgrammingCommand& cmd,
                                  int timeout_ms) override;
 
+  void flushOutput() override;
+  void drainInput() override;
+
  private:
   bool processIncoming(int timeout_ms);
   bool openSerial();

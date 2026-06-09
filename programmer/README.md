@@ -17,7 +17,8 @@ Defaults:
 - USB port = `/dev/ttyACM0`
 - Target controller type = `gpc` (`COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER`)
 - Flash target area = `app`
-- Binary file = `../../application_projects/application_g474/Debug/application_g474.bin`
+- Binary file (app) = `../../application_projects/application_g474/Debug/application_g474.bin`
+- Binary file (config) = `../../config_projects/config_g474/Debug/config_g474.bin`
 
 Supported controller types:
 - `gpc`
@@ -52,11 +53,13 @@ ip -details link show can1
 ./g474
 ./g474 can1
 ./g474 can1 gpc
-./g474 can1 gpc config /path/to/fw-config-g4.bin
+./g474 can1 gpc config
+./g474 can1 gpc config /path/to/config_g474.bin
 ./g474 can1 gpc app /path/to/application_g474.bin
 ./g474 can1 gpc customized_config
 ./g474 --transport usb --port /dev/ttyACM0 gpc app /path/to/application_g474.bin
 ./g474 --transport usb gpc app
+./g474 --transport usb gpc config
 ```
 
 ## Build

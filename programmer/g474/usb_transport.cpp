@@ -11,7 +11,8 @@ namespace {
 
 constexpr int kSerialTimeoutMs = 700;
 constexpr int kDefaultBaud = 115200;
-constexpr int kReopenWaitMs = 2000;
+constexpr int kReopenWaitMs = 3500;
+constexpr int kPostAppStartDelayMs = 400;
 
 void delayMs(unsigned ms) { usleep(ms * 1000); }
 
@@ -89,9 +90,46 @@ bool UsbTransport::init() {
   return true;
 }
 
+void UsbTransport::flushOutput() {
+  if (serial_ == nullptr) {
+    return;
+  }
+
+  try {
+    if (serial_->isOpen()) {
+      serial_->flushOutput();
+    }
+  } catch (const std::exception&) {
+  }
+}
+
+void UsbTransport::drainInput() {
+  if (serial_ == nullptr || bluelink_ == nullptr) {
+    return;
+  }
+
+  try {
+    for (int i = 0; i < 20 && serial_->isOpen() && serial_->available() > 0; ++i) {
+      bluelink_->processReceivedData(process_buffer_);
+      delayMs(10);
+    }
+  } catch (const std::exception&) {
+  }
+}
+
 void UsbTransport::shutdown() {
-  if (serial_ != nullptr && serial_->isOpen()) {
-    serial_->close();
+  bluelink_.reset();
+  callbacks_.reset();
+
+  if (serial_ == nullptr) {
+    return;
+  }
+
+  try {
+    if (serial_->isOpen()) {
+      serial_->close();
+    }
+  } catch (const std::exception&) {
   }
 }
 
@@ -99,8 +137,9 @@ bool UsbTransport::reopenAfterReset() {
   shutdown();
   delayMs(kReopenWaitMs);
 
-  for (int attempt = 0; attempt < 20; ++attempt) {
+  for (int attempt = 0; attempt < 30; ++attempt) {
     if (init()) {
+      drainInput();
       return true;
     }
     delayMs(250);
