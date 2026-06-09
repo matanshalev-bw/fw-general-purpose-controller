@@ -92,6 +92,11 @@
     lineBuffer = "";
   }
 
+  /** Piped subprocess stdout uses LF-only newlines; xterm needs CRLF for column reset. */
+  function writeProcessOutput(text) {
+    term.write(text.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n"));
+  }
+
   term.onData((data) => {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     if (data === "\r") {
@@ -141,7 +146,7 @@
       flashWs.onmessage = (ev) => {
         const msg = JSON.parse(ev.data);
         if (msg.type === "output" && msg.text) {
-          term.write(msg.text);
+          writeProcessOutput(msg.text);
           return;
         }
         if (msg.type === "done") {
