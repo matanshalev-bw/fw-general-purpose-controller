@@ -88,12 +88,16 @@ def schema():
     return get_schema()
 
 
-def test_golden_matches_example(schema, tmp_path):
+def test_golden_reload_round_trip(schema, tmp_path):
+    """Reload repo config and re-emit; output must match the source file."""
     expected_path = REPO_ROOT / "configs/ConfigsTypes/g474_gpc_config_memory.hpp"
     expected = _normalize(expected_path.read_text(encoding="utf-8"))
 
+    from gpc_recorder.codegen.config_loader import load_config_hpp
+
+    session = load_config_hpp(expected_path, schema)
     generated = emit_config_hpp(
-        _build_example_session(),
+        session.to_dict(),
         schema,
         tmp_path / "out.hpp",
         write=False,

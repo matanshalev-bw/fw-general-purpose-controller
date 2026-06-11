@@ -1,7 +1,9 @@
 """DSL builtins exposed to the REPL namespace."""
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from gpc_recorder.codegen.config_loader import load_config_hpp
 from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
 from gpc_recorder.dsl.coerce import coerce_int_byte_list
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
@@ -22,6 +24,7 @@ class RecorderContext:
     def __init__(self) -> None:
         self.session = Session()
         self.schema = get_schema()
+        self._config_path: Path = DEFAULT_EXPORT_PATH
         self._last_export_path: Optional[str] = None
 
     def config(self, name: str = "G474_GPC_CONFIG", component: str = "") -> None:
@@ -387,8 +390,19 @@ class RecorderContext:
             return "// No powerup, tick sequences, or bindings to preview"
         return emit_config_hpp(self.session.to_dict(), self.schema, write=False)
 
+    def reload(self, path: str = "") -> str:
+        self._ensure_not_recording("reload()")
+        src = self._config_path if not path else Path(path)
+        if not src.is_file():
+            raise FileNotFoundError(f"Config file not found: {src}")
+        self.session = load_config_hpp(src, self.schema)
+        self._config_path = src.resolve()
+        summary = self.show()
+        print(f"Reloaded from {self._config_path}")
+        return summary
+
     def export(self, path: str = "") -> str:
-        out = DEFAULT_EXPORT_PATH if not path else __import__("pathlib").Path(path)
+        out = self._config_path if not path else Path(path)
         if (
             not self.session.bindings
             and not self.session.powerup_steps
@@ -403,22 +417,24 @@ class RecorderContext:
         text = emit_config_hpp(session, self.schema, out, write=True)
         bin_path = DEFAULT_EXPORT_BIN_PATH
         emit_config_bin(session, self.schema, bin_path, write=True)
+        self._config_path = out.resolve()
         self._last_export_path = str(out)
-        print(f"Exported to {out}")
+        print(f"Updated {out}")
         print(f"Exported to {bin_path}")
         return text
 
     def help(self, name: str = "") -> str:
         if not name:
             return (
-                "Commands: config(), bind_powerup(), clear_powerup(), "
+                "Commands: reload(), show(), bind_command(), end_binding(), "
+                "preview(), export(), config(), clear_command(), "
+                "bind_powerup(), clear_powerup(), "
                 "bind_main_tick(), clear_main_tick(), "
                 "bind_state(state), clear_state(state), "
                 "bind_state_tick(state), clear_state_tick(state), "
-                "bind_command(), end_binding(), clear_command(), "
                 "gpio_write(), adc_read(), dac_write(), delay_ms(), can_transmit(), "
                 "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), "
-                "show(), preview(), export(), help(), undo()"
+                "undo(), help()"
             )
         name = name.split("::")[-1]
         if name in self.schema.micro_ops:
@@ -474,7 +490,14 @@ class StructInstance:
 def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
     schema = ctx.schema
     ns: Dict[str, Any] = {
+        "reload": ctx.reload,
+        "show": ctx.show,
+        "bind_command": ctx.bind_command,
+        "end_binding": ctx.end_binding,
+        "preview": ctx.preview,
+        "export": ctx.export,
         "config": ctx.config,
+        "clear_command": ctx.clear_command,
         "bind_powerup": ctx.bind_powerup,
         "clear_powerup": ctx.clear_powerup,
         "bind_main_tick": ctx.bind_main_tick,
@@ -483,9 +506,6 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "clear_state": ctx.clear_state,
         "bind_state_tick": ctx.bind_state_tick,
         "clear_state_tick": ctx.clear_state_tick,
-        "bind_command": ctx.bind_command,
-        "end_binding": ctx.end_binding,
-        "clear_command": ctx.clear_command,
         "undo": ctx.undo,
         "gpio_write": ctx.gpio_write,
         "gpio_read": ctx.gpio_read,
@@ -497,9 +517,6 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "uart_transmit": ctx.uart_transmit,
         "spi_transfer": ctx.spi_transfer,
         "i2c_write": ctx.i2c_write,
-        "show": ctx.show,
-        "preview": ctx.preview,
-        "export": ctx.export,
         "help": ctx.help,
         "True": True,
         "False": False,

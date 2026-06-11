@@ -12,10 +12,26 @@ from gpc_recorder.dsl.normalize import normalize_line
 
 
 class ReplEngine:
-    def __init__(self) -> None:
+    def __init__(self, *, auto_reload: bool = True) -> None:
         self.ctx = RecorderContext()
         self._namespace = build_namespace(self.ctx)
         self._history: List[str] = []
+        self._startup_message = self._auto_reload() if auto_reload else ""
+
+    def _auto_reload(self) -> str:
+        buf = io.StringIO()
+        try:
+            with redirect_stdout(buf):
+                self.ctx.reload()
+        except FileNotFoundError as e:
+            return f"Warning: {e}"
+        except Exception as e:
+            return f"Warning: failed to reload config: {e}"
+        return buf.getvalue().rstrip()
+
+    @property
+    def startup_message(self) -> str:
+        return self._startup_message
 
     def execute(self, line: str) -> Tuple[str, bool]:
         line = line.strip()

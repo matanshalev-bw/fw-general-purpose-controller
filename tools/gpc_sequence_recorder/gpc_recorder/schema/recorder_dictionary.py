@@ -40,6 +40,7 @@ _EXAMPLES: Dict[str, str] = {
     "uart_transmit": "uart_transmit(uart_instance=1, length=3, data=[0x01, 0x02, 0x03])",
     "spi_transfer": "spi_transfer(spi_instance=1, tx_len=3, tx_data=[0x9F, 0x00, 0x00])",
     "i2c_write": "i2c_write(i2c_instance=1, device_addr=0x50, length=2, data=[0x00, 0x01])",
+    "reload": "reload()",
     "show": "show()",
     "preview": "preview()",
     "export": "export()",
@@ -70,16 +71,22 @@ _DESCRIPTIONS: Dict[str, str] = {
     "uart_transmit": "Add a UART transmit micro-op step.",
     "spi_transfer": "Add a SPI transfer micro-op step.",
     "i2c_write": "Add an I2C write micro-op step.",
+    "reload": "Load sequences and bindings from the current g474_gpc_config_memory.hpp.",
     "show": "Print current session summary (power-up + bindings).",
     "preview": "Generate the current HPP preview (no files written).",
-    "export": "Write the config HPP + packed BIN output files.",
+    "export": "Update the loaded config HPP + packed BIN output files.",
     "help": "Show DSL help or details for a payload/struct name.",
 }
 
 
 _RECORDER_PUBLIC_COMMANDS = [
+    "reload",
+    "show",
     "bind_command",
     "end_binding",
+    "preview",
+    "export",
+    "config",
     "clear_command",
     "bind_powerup",
     "clear_powerup",
@@ -89,7 +96,6 @@ _RECORDER_PUBLIC_COMMANDS = [
     "clear_state",
     "bind_state_tick",
     "clear_state_tick",
-    "config",
     "undo",
     "gpio_write",
     "gpio_read",
@@ -101,9 +107,6 @@ _RECORDER_PUBLIC_COMMANDS = [
     "uart_transmit",
     "spi_transfer",
     "i2c_write",
-    "show",
-    "preview",
-    "export",
     "help",
 ]
 

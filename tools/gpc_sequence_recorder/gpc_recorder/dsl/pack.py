@@ -178,3 +178,61 @@ def pack_trigger_data(
         )
     padded = list(raw) + [0] * (size - len(raw))
     return padded, len(raw)
+
+
+def _unpack_field(schema: Schema, field: FieldDef, chunk: bytes) -> Any:
+    t = _normalize_type(field.cpp_type)
+    if t == "bool":
+        return bool(chunk[0])
+    if t in schema.enums:
+        val = chunk[0]
+        enum_def = schema.enums[t]
+        for name, num in enum_def.values.items():
+            if num == val:
+                return name
+        return val
+    if t in ("uint8_t", "char", "unsigned char"):
+        return chunk[0]
+    if t == "int8_t":
+        return struct.unpack("<b", chunk[:1])[0]
+    if t == "uint16_t":
+        return struct.unpack("<H", chunk[:2])[0]
+    if t == "int16_t":
+        return struct.unpack("<h", chunk[:2])[0]
+    if t == "uint32_t":
+        return struct.unpack("<I", chunk[:4])[0]
+    if t == "int32_t":
+        return struct.unpack("<i", chunk[:4])[0]
+    if t == "float":
+        return struct.unpack("<f", chunk[:4])[0]
+    raise ValueError(f"Cannot unpack type {field.cpp_type!r}")
+
+
+def unpack_trigger_data(
+    schema: Schema,
+    struct_name: str,
+    data: List[int],
+    data_size: int,
+) -> Dict[str, Any]:
+    """Reverse pack_trigger_data: bytes back to named struct field values."""
+    struct_def = schema.command_structs[struct_name]
+    raw = bytes(data[:data_size])
+    field_values: Dict[str, Any] = {}
+    offset = 0
+    for field in struct_def.fields:
+        sz = _field_size(schema, field)
+        chunk = raw[offset : offset + sz]
+        if len(chunk) < sz:
+            chunk = chunk + bytes(sz - len(chunk))
+        if field.array_size:
+            size_str = field.array_size.strip()
+            n = int(size_str) if size_str.isdigit() else len(chunk)
+            base_sz = sz // n if n else 1
+            field_values[field.name] = [
+                _unpack_field(schema, FieldDef(_normalize_type(field.cpp_type), "elem"), chunk[i : i + base_sz])
+                for i in range(0, len(chunk), base_sz)
+            ][:n]
+        else:
+            field_values[field.name] = _unpack_field(schema, field, chunk)
+        offset += sz
+    return field_values

@@ -20,24 +20,8 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .main_tick_sequence = {
-            .step_count = 4,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {500},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {500},
-                        },
             },
         },
         .init_state_sequence = {
@@ -56,8 +40,24 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .engaged_state_tick_sequence = {
-            .step_count = 0,
+            .step_count = 4,
             .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {2, 15, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {200},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {2, 15, 0},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {200},
+                        },
             },
         },
         .power_up_bit_state_sequence = {
@@ -66,12 +66,60 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .operational_state_tick_sequence = {
-            .step_count = 0,
+            .step_count = 4,
             .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {2, 15, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {1000},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {2, 15, 0},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {1000},
+                        },
             },
         },
-        .binding_count = 0,
+        .binding_count = 2,
         .bindings = {
+            {
+                .trigger = {
+                    .payload_type = bluelink::PayloadTypeIds::BRAKES_CONTINUOUS_COMMAND,
+                    .size = 2,
+                    .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_RELEASED), 0, 0, 0, 0, 0, 0, 0},
+                },
+                .sequence = {
+                    .step_count = 1,
+                    .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {2, 15, 1},
+                        },
+                    },
+                },
+            },
+            {
+                .trigger = {
+                    .payload_type = bluelink::PayloadTypeIds::DRIVER_STATE_COMMAND,
+                    .size = 1,
+                    .data = {static_cast<uint8_t>(bluelink::DRIVER_STATE_MANUAL), 0, 0, 0, 0, 0, 0, 0},
+                },
+                .sequence = {
+                    .step_count = 1,
+                    .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
+                            .digital_gpio_write = {2, 15, 0},
+                        },
+                    },
+                },
+            },
         },
     },
 };

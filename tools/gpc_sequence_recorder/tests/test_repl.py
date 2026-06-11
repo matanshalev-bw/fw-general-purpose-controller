@@ -4,7 +4,7 @@ from gpc_recorder.dsl.repl import ReplEngine
 
 
 def test_repl_builds_example_binding():
-    engine = ReplEngine()
+    engine = ReplEngine(auto_reload=False)
     lines = [
         'bind_command(DRIVE_COMMAND, DriveCommand(require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL))',
         "gpio_write(port=1, pin=5, value=1)",
@@ -30,7 +30,7 @@ def test_repl_builds_example_binding():
 
 
 def test_bind_command_partial_struct_fields():
-    engine = ReplEngine()
+    engine = ReplEngine(auto_reload=False)
     line = (
         "bind_command(trigger=BRAKES_CONTINUOUS_COMMAND,"
         "BrakesContinuousCommand(brake_mode=BRAKE_MODE_FULLY_RELEASED))"
@@ -42,7 +42,7 @@ def test_bind_command_partial_struct_fields():
 
 
 def test_bind_command_trigger_then_struct_syntax():
-    engine = ReplEngine()
+    engine = ReplEngine(auto_reload=False)
     line = (
         "bind_command(trigger=BRAKES_CONTINUOUS_COMMAND,"
         "BrakesContinuousCommand(brake_mode=BRAKE_MODE_ARMED, desired_brakes_position_in_percentage=20))"

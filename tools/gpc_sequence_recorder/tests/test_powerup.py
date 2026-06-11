@@ -6,7 +6,7 @@ from gpc_recorder.schema.loader import get_schema
 
 
 def test_powerup_repl_and_export():
-    engine = ReplEngine()
+    engine = ReplEngine(auto_reload=False)
     for line in (
         "bind_powerup()",
         "gpio_write(port=1, pin=5, value=1)",

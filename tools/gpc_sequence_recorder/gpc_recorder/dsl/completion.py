@@ -24,6 +24,8 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "uart_transmit": ["uart_instance=", "length=", "data="],
     "spi_transfer": ["spi_instance=", "tx_len=", "tx_data="],
     "i2c_write": ["i2c_instance=", "device_addr=", "length=", "data="],
+    "reload": ["path="],
+    "export": ["path="],
 }
 
 

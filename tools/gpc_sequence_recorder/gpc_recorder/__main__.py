@@ -12,6 +12,8 @@ from gpc_recorder.paths import TOOL_DIR
 def _stdin_repl() -> None:
     engine = ReplEngine()
     print("GPC Sequence Recorder (stdin REPL). Type help(), exit to quit.")
+    if engine.startup_message:
+        print(engine.startup_message)
     while True:
         try:
             line = input(">>> ")
