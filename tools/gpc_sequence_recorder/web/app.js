@@ -464,9 +464,11 @@
 
   // --- Recorder command bar (insert into terminal) ---
   const recorderCmdEl = document.getElementById("recorder-cmd");
+  const recorderCmdTooltipEl = document.getElementById("recorder-cmd-tooltip");
   const recorderFieldsEl = document.getElementById("recorder-fields");
   const btnRecorderInsert = document.getElementById("btn-recorder-insert");
   let recorderCmds = [];
+  let recorderCmdTooltipHover = false;
   let controllerOneShotStates = [];
   let controllerTickStates = [];
   let bindableCommands = []; // from /api/schema/commands-dictionary
@@ -478,6 +480,35 @@
     lineBuffer += s;
   }
 
+  function hideRecorderCmdTooltip() {
+    if (!recorderCmdTooltipEl) return;
+    recorderCmdTooltipEl.hidden = true;
+    recorderCmdTooltipEl.textContent = "";
+  }
+
+  function showRecorderCmdTooltip(anchor, description) {
+    if (!recorderCmdTooltipEl || !description) {
+      hideRecorderCmdTooltip();
+      return;
+    }
+    recorderCmdTooltipEl.textContent = description;
+    recorderCmdTooltipEl.hidden = false;
+    const rect = anchor.getBoundingClientRect();
+    recorderCmdTooltipEl.style.left = `${rect.left + rect.width / 2}px`;
+    recorderCmdTooltipEl.style.top = `${rect.top - 8}px`;
+    recorderCmdTooltipEl.style.transform = "translate(-50%, -100%)";
+  }
+
+  function recorderCmdDescription(name) {
+    const cmd = recorderCmds.find((c) => c.name === name);
+    return cmd?.description || "";
+  }
+
+  function updateRecorderCmdTooltip() {
+    if (!recorderCmdTooltipHover || !recorderCmdEl) return;
+    showRecorderCmdTooltip(recorderCmdEl, recorderCmdDescription(recorderCmdEl.value));
+  }
+
   function setRecorderCmdSelect(cmds) {
     if (!recorderCmdEl) return;
     recorderCmdEl.innerHTML = "";
@@ -486,9 +517,28 @@
       opt.value = c.name;
       opt.textContent = c.name;
       opt.title = c.description || "";
+      opt.dataset.description = c.description || "";
       recorderCmdEl.appendChild(opt);
     });
   }
+
+  recorderCmdEl?.addEventListener("mouseenter", () => {
+    recorderCmdTooltipHover = true;
+    updateRecorderCmdTooltip();
+  });
+  recorderCmdEl?.addEventListener("mouseleave", () => {
+    recorderCmdTooltipHover = false;
+    hideRecorderCmdTooltip();
+  });
+  recorderCmdEl?.addEventListener("input", updateRecorderCmdTooltip);
+  recorderCmdEl?.addEventListener("focus", () => {
+    recorderCmdTooltipHover = true;
+    updateRecorderCmdTooltip();
+  });
+  recorderCmdEl?.addEventListener("blur", () => {
+    recorderCmdTooltipHover = false;
+    hideRecorderCmdTooltip();
+  });
 
   function isListParam(p) {
     if (!p) return false;
@@ -794,6 +844,7 @@
   recorderCmdEl?.addEventListener("change", () => {
     const cmd = recorderCmds.find((c) => c.name === recorderCmdEl.value);
     renderRecorderFields(cmd);
+    updateRecorderCmdTooltip();
   });
 
   btnRecorderInsert?.addEventListener("click", () => {

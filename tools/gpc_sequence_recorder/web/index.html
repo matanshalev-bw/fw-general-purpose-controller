@@ -154,6 +154,21 @@
       font-family: "Consolas", "Monaco", monospace;
       font-size: 0.8rem;
     }
+    .recorder-cmd-wrap { position: relative; }
+    .recorder-cmd-tooltip {
+      position: fixed;
+      z-index: 2000;
+      max-width: 22rem;
+      padding: 0.4rem 0.55rem;
+      background: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
     #rec-bind-trigger {
       min-width: 20rem;
       max-width: 30rem;
@@ -346,7 +361,10 @@
     <p class="recorder-bar-heading">Recorder (terminal DSL)</p>
     <div class="recorder-row">
       <label for="recorder-cmd">Recorder command</label>
-      <select id="recorder-cmd" title="Insert a Recorder DSL command"></select>
+      <div class="recorder-cmd-wrap">
+        <div id="recorder-cmd-tooltip" class="recorder-cmd-tooltip" role="tooltip" hidden></div>
+        <select id="recorder-cmd" title="Insert a Recorder DSL command"></select>
+      </div>
       <div id="recorder-fields"></div>
       <button type="button" id="btn-recorder-insert" class="secondary">Insert</button>
     </div>
