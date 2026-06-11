@@ -115,11 +115,18 @@ void GpcController::tickMainSequence() {
 void GpcController::tickStateSequence() {
   const volatile SequencesConfig& sequences = NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config;
   const volatile MicroSequence* state_sequence = getStateSequence(sequences, state_);
-  if (state_sequence == nullptr || state_sequence->step_count == 0) {
+  if (state_sequence == nullptr) {
     return;
   }
 
   const bool loop_on_complete = isStateTickLoop(state_);
+  if (state_sequence->step_count == 0) {
+    if (not loop_on_complete) {
+      onOneShotSequenceComplete();
+    }
+    return;
+  }
+
   state_sequence_executor_.tick();
 
   if (state_sequence_executor_.isRunning()) {
