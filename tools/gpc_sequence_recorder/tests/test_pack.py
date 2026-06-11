@@ -12,7 +12,7 @@ def schema():
 
 
 def test_drive_command_brake_neutral(schema):
-    data, _ = pack_trigger_data(
+    data, data_size = pack_trigger_data(
         schema,
         "DriveCommand",
         {
@@ -23,15 +23,16 @@ def test_drive_command_brake_neutral(schema):
     assert data[:2] == [0, 1]
     assert all(b == 0 for b in data[2:])
     assert len(data) == 8
+    assert data_size == 2
 
 
 def test_brakes_command_omitted_fields_use_defaults(schema):
-    data, _ = pack_trigger_data(
+    data, data_size = pack_trigger_data(
         schema,
         "BrakesContinuousCommand",
         {"brake_mode": "BRAKE_MODE_FULLY_RELEASED"},
     )
-    assert len(data) >= 2
+    assert data_size == 2
     assert data[0] == 1  # BRAKE_MODE_FULLY_RELEASED
     assert data[1] == 0  # desired_brakes_position_in_percentage default
 

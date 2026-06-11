@@ -172,13 +172,13 @@ bool BluewhiteMessageHandler::tryStartSequenceForMessage(uint8_t payload_type_id
       continue;
     }
 
-    if (length < sizeof(binding.trigger.data)) {
+    if (length < binding.trigger.size) {
       continue;
     }
 
     if (memcmp(payload,
                const_cast<const void*>(static_cast<const volatile void*>(binding.trigger.data)),
-               sizeof(binding.trigger.data)) != 0) {
+               binding.trigger.size) != 0) {
       continue;
     }
 

@@ -147,6 +147,7 @@ def emit_config_hpp(
         bindings_out.append(
             {
                 "payload_type": b["payload_type"],
+                "data_size": b["data_size"],
                 "data_init": _format_data_array(
                     b["data"], b["struct_name"], b["field_values"], schema
                 ),

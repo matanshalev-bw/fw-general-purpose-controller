@@ -84,6 +84,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             {
                 .trigger = {
                     .payload_type = bluelink::PayloadTypeIds::{{ b.payload_type }},
+                    .size = {{ b.data_size }},
                     .data = { {{- b.data_init -}} },
                 },
                 .sequence = {

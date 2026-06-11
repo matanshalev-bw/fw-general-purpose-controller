@@ -35,6 +35,7 @@ def _build_example_session() -> dict:
                     "desired_drive_mode": "DRIVE_MODE_BRAKE_NEUTRAL",
                 },
                 "data": [0, 1, 0, 0, 0, 0, 0, 0],
+                "data_size": 2,
                 "steps": [
                     {
                         "op_type": "MicroOpType::DIGITAL_GPIO_WRITE",

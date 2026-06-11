@@ -168,8 +168,8 @@ def pack_trigger_data(
     struct_name: str,
     field_values: Dict[str, Any],
     size: int = 8,
-) -> Tuple[List[int], List[str]]:
-    """Returns (data bytes padded to size, list of C++ literal fragments for non-trivial enums)."""
+) -> Tuple[List[int], int]:
+    """Returns (data bytes padded to size, packed wire byte count)."""
     struct_def = schema.command_structs[struct_name]
     raw = pack_struct(schema, struct_def, field_values)
     if len(raw) > size:
@@ -177,4 +177,4 @@ def pack_trigger_data(
             f"{struct_name} packs to {len(raw)} bytes, max trigger data is {size}"
         )
     padded = list(raw) + [0] * (size - len(raw))
-    return padded, []
+    return padded, len(raw)

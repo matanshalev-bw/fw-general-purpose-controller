@@ -564,17 +564,32 @@
           const label = document.createElement("label");
           label.textContent = f.name;
           label.htmlFor = `rec-bind-field-${f.name}`;
-          const input = document.createElement("input");
-          input.id = `rec-bind-field-${f.name}`;
+          let input;
+          if (f.enum_values && f.enum_values.length) {
+            input = document.createElement("select");
+            input.id = `rec-bind-field-${f.name}`;
+            f.enum_values.forEach((ev) => {
+              const opt = document.createElement("option");
+              opt.value = ev.name;
+              opt.textContent = ev.name;
+              input.appendChild(opt);
+            });
+            if (f.default !== undefined && f.default !== null) {
+              input.value = String(f.default);
+            }
+          } else {
+            input = document.createElement("input");
+            input.id = `rec-bind-field-${f.name}`;
+            if (f.array_size) {
+              input.classList.add("wide");
+              input.placeholder = `comma-separated (${f.array_size})`;
+              if (Array.isArray(f.default)) input.value = f.default.join(",");
+            } else if (f.default !== undefined && f.default !== null) {
+              input.value = String(f.default);
+            }
+          }
           input.dataset.field = f.name;
           input.dataset.type = f.type || "";
-          if (f.array_size) {
-            input.classList.add("wide");
-            input.placeholder = `comma-separated (${f.array_size})`;
-            if (Array.isArray(f.default)) input.value = f.default.join(",");
-          } else if (f.default !== undefined && f.default !== null) {
-            input.value = String(f.default);
-          }
           wrap.appendChild(label);
           wrap.appendChild(input);
           fieldsContainer.appendChild(wrap);

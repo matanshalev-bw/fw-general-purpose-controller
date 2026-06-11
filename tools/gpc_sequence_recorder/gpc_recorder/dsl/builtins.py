@@ -46,14 +46,15 @@ class RecorderContext:
         field_values = _extract_struct_fields(command_struct, struct_name, kwargs)
         struct_def = self.schema.command_structs[struct_name]
         field_values = fill_struct_fields(self.schema, struct_def, field_values)
-        data, _ = pack_trigger_data(self.schema, struct_name, field_values)
+        data, data_size = pack_trigger_data(self.schema, struct_name, field_values)
         self.session.current_binding = BindingState(
             payload_type=payload_type,
             struct_name=struct_name,
             field_values=field_values,
             data=data,
+            data_size=data_size,
         )
-        print(f"Binding started: {payload_type} ({struct_name}), {len(data)} bytes packed")
+        print(f"Binding started: {payload_type} ({struct_name}), {data_size} bytes packed")
 
     def end_binding(self) -> None:
         if self.session.recording_powerup:

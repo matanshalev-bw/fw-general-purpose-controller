@@ -17,6 +17,7 @@ class BindingState:
     struct_name: str
     field_values: Dict[str, Any]
     data: List[int]
+    data_size: int
     steps: List[MicroOpStepState] = field(default_factory=list)
 
 
@@ -55,6 +56,7 @@ class Session:
                     "struct_name": b.struct_name,
                     "field_values": b.field_values,
                     "data": b.data,
+                    "data_size": b.data_size,
                     "steps": _steps_to_dict(b.steps),
                 }
             )
@@ -66,6 +68,7 @@ class Session:
                     "struct_name": cb.struct_name,
                     "field_values": cb.field_values,
                     "data": cb.data,
+                    "data_size": cb.data_size,
                     "steps": _steps_to_dict(cb.steps),
                 }
             )

@@ -15,6 +15,7 @@ struct BluelinkIdentityConfig {
 
 struct CommandTrigger {
   bluelink::PayloadTypeIds payload_type = bluelink::PayloadTypeIds::UNKNOWN;
+  uint8_t size = 0;
   uint8_t data[8] = {};
 } __attribute__((packed));
 
