@@ -37,6 +37,13 @@ def payload_type_id(payload_type_name: str) -> int:
         raise UsbBridgeError(f"Payload type {payload_type_name} not in schema")
     return schema.payload_type_ids[payload_type_name]
 
+CONTROLLER_STATE_COMMAND_VALUES = (
+    "CONTROLLER_STATE_DISENGAGEMENT",
+    "CONTROLLER_STATE_INIT",
+    "CONTROLLER_STATE_ENGAGED",
+    "CONTROLLER_STATE_POWER_UP_BIT",
+)
+
 CONTROLLER_COMMANDS: List[Dict[str, str]] = [
     {"label": "controller_state", "payload_type": "CONTROLLER_STATE_COMMAND"},
     {"label": "steering", "payload_type": "STEERING_CONTINUOUS_COMMAND"},
@@ -176,6 +183,10 @@ def controller_commands_catalog() -> List[Dict[str, Any]]:
             enum_type = field.cpp_type.split("::")[-1]
             if enum_type in schema.enums:
                 enum_values = sorted(schema.enums[enum_type].values.keys())
+                if payload_type == "CONTROLLER_STATE_COMMAND":
+                    enum_values = [
+                        v for v in CONTROLLER_STATE_COMMAND_VALUES if v in enum_values
+                    ]
             if field.default_raw:
                 if field.array_size:
                     default = []

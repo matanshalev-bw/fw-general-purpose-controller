@@ -836,12 +836,10 @@
           type: "ControllerState",
           default: "CONTROLLER_STATE_INIT",
           enum_values: [
-            "CONTROLLER_STATE_INIT",
-            "CONTROLLER_STATE_MANUAL",
             "CONTROLLER_STATE_DISENGAGEMENT",
+            "CONTROLLER_STATE_INIT",
             "CONTROLLER_STATE_ENGAGED",
             "CONTROLLER_STATE_POWER_UP_BIT",
-            "CONTROLLER_STATE_OPERATIONAL",
           ],
         },
       ],
