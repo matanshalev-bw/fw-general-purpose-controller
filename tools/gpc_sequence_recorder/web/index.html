@@ -147,6 +147,30 @@
     #usb-status { color: #888; min-width: 5rem; }
     #usb-status.open { color: #4ec9b0; }
     #usb-port { min-width: 14rem; max-width: 22rem; }
+    #usb-dest-component {
+      min-width: 18rem;
+      max-width: 26rem;
+      width: 18rem;
+      font-family: "Consolas", "Monaco", monospace;
+      font-size: 0.8rem;
+    }
+    #usb-dest-component:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .usb-dest-unlock {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: #aaa;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    .usb-dest-unlock input {
+      margin: 0;
+      cursor: pointer;
+    }
     #usb-micro-op, #usb-controller-cmd, #recorder-cmd {
       min-width: 20rem;
       max-width: 30rem;
@@ -336,6 +360,23 @@
       <button type="button" id="btn-usb-open">Open</button>
       <button type="button" id="btn-usb-close" class="secondary" disabled>Close</button>
       <span id="usb-status">Closed</span>
+    </div>
+    <div class="usb-row">
+      <label for="usb-dest-component">Destination</label>
+      <select id="usb-dest-component" title="Bluelink destination ComponentId" disabled>
+        <option value="COMPONENT_ID_REVERSER_DRIVER">COMPONENT_ID_REVERSER_DRIVER (0x0A)</option>
+        <option value="COMPONENT_ID_IMPLEMENT_DRIVER">COMPONENT_ID_IMPLEMENT_DRIVER (0x0B)</option>
+        <option value="COMPONENT_ID_POWER_PANEL_DRIVER">COMPONENT_ID_POWER_PANEL_DRIVER (0x0C)</option>
+        <option value="COMPONENT_ID_STEERING_DRIVER">COMPONENT_ID_STEERING_DRIVER (0x0D)</option>
+        <option value="COMPONENT_ID_REVERSER_AUX">COMPONENT_ID_REVERSER_AUX (0x0E)</option>
+        <option value="COMPONENT_ID_POWER_PANEL_AUX">COMPONENT_ID_POWER_PANEL_AUX (0x0F)</option>
+        <option value="COMPONENT_ID_POWER_PANEL_TESTER">COMPONENT_ID_POWER_PANEL_TESTER (0x10)</option>
+        <option value="COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER" selected>COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER (0x11)</option>
+      </select>
+      <label class="usb-dest-unlock" for="usb-dest-unlock">
+        <input type="checkbox" id="usb-dest-unlock" />
+        Change destination
+      </label>
     </div>
     <div class="usb-row">
       <label for="usb-micro-op">Micro command</label>

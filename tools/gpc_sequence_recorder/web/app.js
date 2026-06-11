@@ -866,6 +866,8 @@
   // --- USB immediate micro commands ---
   const usbPortEl = document.getElementById("usb-port");
   const usbStatusEl = document.getElementById("usb-status");
+  const usbDestComponentEl = document.getElementById("usb-dest-component");
+  const usbDestUnlockEl = document.getElementById("usb-dest-unlock");
   const usbMicroOpEl = document.getElementById("usb-micro-op");
   const usbMicroFieldsEl = document.getElementById("usb-micro-fields");
   const usbControllerCmdEl = document.getElementById("usb-controller-cmd");
@@ -874,6 +876,18 @@
   const btnUsbClose = document.getElementById("btn-usb-close");
   const btnUsbSend = document.getElementById("btn-usb-send");
   const btnUsbSendController = document.getElementById("btn-usb-send-controller");
+
+  /** Built-in catalog so the destination dropdown works before/without API. */
+  const FALLBACK_DESTINATION_COMPONENTS = [
+    { name: "COMPONENT_ID_REVERSER_DRIVER", value: 0x0a },
+    { name: "COMPONENT_ID_IMPLEMENT_DRIVER", value: 0x0b },
+    { name: "COMPONENT_ID_POWER_PANEL_DRIVER", value: 0x0c },
+    { name: "COMPONENT_ID_STEERING_DRIVER", value: 0x0d },
+    { name: "COMPONENT_ID_REVERSER_AUX", value: 0x0e },
+    { name: "COMPONENT_ID_POWER_PANEL_AUX", value: 0x0f },
+    { name: "COMPONENT_ID_POWER_PANEL_TESTER", value: 0x10 },
+    { name: "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER", value: 0x11 },
+  ];
 
   /** Built-in catalog so the controller dropdown works before/without API. */
   const FALLBACK_CONTROLLER_COMMANDS = [
@@ -936,6 +950,43 @@
   let usbMicroOps = [];
   let usbControllerCmds = [...FALLBACK_CONTROLLER_COMMANDS];
   let usbOpened = false;
+
+  function setUsbDestinationLocked(locked) {
+    if (usbDestComponentEl) usbDestComponentEl.disabled = locked;
+  }
+
+  function selectedDestinationComponent() {
+    return usbDestComponentEl ? usbDestComponentEl.value : "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER";
+  }
+
+  function applyDestinationComponentCatalog(items) {
+    if (!usbDestComponentEl || !items.length) return;
+    const prev = usbDestComponentEl.value;
+    usbDestComponentEl.innerHTML = "";
+    items.forEach((item) => {
+      const opt = document.createElement("option");
+      opt.value = item.name;
+      opt.textContent = `${item.name} (0x${item.value.toString(16).toUpperCase().padStart(2, "0")})`;
+      usbDestComponentEl.appendChild(opt);
+    });
+    const stillValid = items.some((item) => item.name === prev);
+    usbDestComponentEl.value = stillValid
+      ? prev
+      : "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER";
+  }
+
+  async function loadUsbDestinationComponents() {
+    applyDestinationComponentCatalog(FALLBACK_DESTINATION_COMPONENTS);
+    try {
+      const res = await fetch("/api/usb/component-ids");
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = data.component_ids || [];
+      if (items.length) applyDestinationComponentCatalog(items);
+    } catch (_e) {
+      /* keep built-in / HTML catalog */
+    }
+  }
 
   function setUsbUi() {
     if (btnUsbOpen) btnUsbOpen.disabled = usbOpened;
@@ -1182,6 +1233,13 @@
     });
   }
 
+  if (usbDestUnlockEl) {
+    usbDestUnlockEl.addEventListener("change", () => {
+      setUsbDestinationLocked(!usbDestUnlockEl.checked);
+    });
+    setUsbDestinationLocked(!usbDestUnlockEl.checked);
+  }
+
   document.getElementById("btn-usb-refresh").addEventListener("click", refreshUsbPorts);
 
   btnUsbOpen.addEventListener("click", async () => {
@@ -1226,6 +1284,7 @@
       body: JSON.stringify({
         union_member: op.union_member,
         values,
+        destination_component: selectedDestinationComponent(),
         qos: "none",
       }),
     });
@@ -1253,6 +1312,7 @@
       body: JSON.stringify({
         payload_type: cmd.payload_type,
         values,
+        destination_component: selectedDestinationComponent(),
         qos: "none",
       }),
     });
@@ -1271,6 +1331,7 @@
   (async function initUsb() {
     loadBindableCommandsForRecorder();
     loadRecorderCommandsForBar();
+    loadUsbDestinationComponents();
     loadUsbControllerCommands();
     loadUsbMicroOps();
     try {

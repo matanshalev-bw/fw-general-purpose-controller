@@ -12,6 +12,7 @@ from gpc_recorder.programmer_flash import (
 )
 from gpc_recorder.usb_bridge import (
     UsbBridgeError,
+    destination_component_ids_catalog,
     get_usb_session,
     list_serial_ports,
     controller_commands_catalog,
@@ -73,6 +74,11 @@ async def usb_controller_commands() -> dict:
     return {"controller_commands": controller_commands_catalog()}
 
 
+@app.get("/api/usb/component-ids")
+async def usb_component_ids() -> dict:
+    return {"component_ids": destination_component_ids_catalog()}
+
+
 @app.get("/api/schema/commands-dictionary")
 async def schema_commands_dictionary() -> dict:
     return bluelink_commands_dictionary()
@@ -111,6 +117,8 @@ async def usb_send_micro(body: dict) -> dict:
         result = send_micro_command(
             str(union_member),
             values,
+            destination_component=body.get("destination_component"),
+            destination_component_id=body.get("destination_component_id"),
             qos=str(qos),
             retries=int(body.get("retries", 5)),
             timeout_ms=int(body.get("timeout_ms", 2000)),
@@ -130,6 +138,8 @@ async def usb_send_controller(body: dict) -> dict:
         result = send_controller_command(
             str(payload_type),
             values,
+            destination_component=body.get("destination_component"),
+            destination_component_id=body.get("destination_component_id"),
             qos=str(qos),
             retries=int(body.get("retries", 5)),
             timeout_ms=int(body.get("timeout_ms", 2000)),

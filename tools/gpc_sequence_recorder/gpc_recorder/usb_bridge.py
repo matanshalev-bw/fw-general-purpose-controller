@@ -14,8 +14,19 @@ from gpc_recorder.schema.cpp_parser import StructDef
 from gpc_recorder.schema.loader import get_schema
 
 USB_TOOL_DIR = TOOL_DIR.parent / "gpc_usb_bluelink"
-GPC_COMPONENT_ID = 0x11
+DEFAULT_DESTINATION_COMPONENT = "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER"
 DEFAULT_SOURCE_ID = 0x02  # HLC_ADDRESS on wire
+
+USB_DESTINATION_COMPONENT_IDS: Dict[str, int] = {
+    "COMPONENT_ID_REVERSER_DRIVER": 0x0A,
+    "COMPONENT_ID_IMPLEMENT_DRIVER": 0x0B,
+    "COMPONENT_ID_POWER_PANEL_DRIVER": 0x0C,
+    "COMPONENT_ID_STEERING_DRIVER": 0x0D,
+    "COMPONENT_ID_REVERSER_AUX": 0x0E,
+    "COMPONENT_ID_POWER_PANEL_AUX": 0x0F,
+    "COMPONENT_ID_POWER_PANEL_TESTER": 0x10,
+    "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER": 0x11,
+}
 
 MICRO_OP_TO_PAYLOAD_TYPE: Dict[str, str] = {
     "digital_gpio_write": "MICRO_DIGITAL_GPIO_WRITE_COMMAND",
@@ -57,6 +68,34 @@ CONTROLLER_COMMANDS: List[Dict[str, str]] = [
 
 class UsbBridgeError(Exception):
     pass
+
+
+def destination_component_ids_catalog() -> List[Dict[str, Any]]:
+    return [
+        {"name": name, "value": value}
+        for name, value in USB_DESTINATION_COMPONENT_IDS.items()
+    ]
+
+
+def resolve_destination_component_id(
+    *,
+    name: Optional[str] = None,
+    value: Optional[int] = None,
+) -> int:
+    if value is not None:
+        try:
+            numeric = int(value)
+        except (TypeError, ValueError) as exc:
+            raise UsbBridgeError(f"Invalid destination component id: {value}") from exc
+        for candidate in USB_DESTINATION_COMPONENT_IDS.values():
+            if candidate == numeric:
+                return numeric
+        raise UsbBridgeError(f"Unsupported destination component id: 0x{numeric:02x}")
+
+    component_name = name or DEFAULT_DESTINATION_COMPONENT
+    if component_name not in USB_DESTINATION_COMPONENT_IDS:
+        raise UsbBridgeError(f"Unknown destination component: {component_name}")
+    return USB_DESTINATION_COMPONENT_IDS[component_name]
 
 
 class UsbSession:
@@ -242,6 +281,8 @@ def send_micro_command(
     values: Dict[str, Any],
     *,
     port: Optional[str] = None,
+    destination_component_id: Optional[int] = None,
+    destination_component: Optional[str] = None,
     qos: str = "none",
     retries: int = 5,
     timeout_ms: int = 2000,
@@ -260,13 +301,17 @@ def send_micro_command(
     type_id = payload_type_id(payload_type_name)
     payload_hex = pack_micro_op_hex(union_member, values)
     binary = usb_bluelink_binary()
+    dest_id = resolve_destination_component_id(
+        name=destination_component,
+        value=destination_component_id,
+    )
 
     cmd = [
         str(binary),
         "-p",
         use_port,
         "-d",
-        str(GPC_COMPONENT_ID),
+        str(dest_id),
         "-s",
         str(DEFAULT_SOURCE_ID),
         "-t",
@@ -301,6 +346,7 @@ def send_micro_command(
     return {
         "ok": True,
         "port": use_port,
+        "destination_component_id": dest_id,
         "payload_type": payload_type_name,
         "payload_type_id": type_id,
         "payload_hex": payload_hex,
@@ -313,6 +359,8 @@ def send_controller_command(
     values: Dict[str, Any],
     *,
     port: Optional[str] = None,
+    destination_component_id: Optional[int] = None,
+    destination_component: Optional[str] = None,
     qos: str = "none",
     retries: int = 5,
     timeout_ms: int = 2000,
@@ -327,13 +375,17 @@ def send_controller_command(
     type_id = payload_type_id(payload_type)
     payload_hex = pack_controller_command_hex(payload_type, values)
     binary = usb_bluelink_binary()
+    dest_id = resolve_destination_component_id(
+        name=destination_component,
+        value=destination_component_id,
+    )
 
     cmd = [
         str(binary),
         "-p",
         use_port,
         "-d",
-        str(GPC_COMPONENT_ID),
+        str(dest_id),
         "-s",
         str(DEFAULT_SOURCE_ID),
         "-t",
@@ -368,6 +420,7 @@ def send_controller_command(
     return {
         "ok": True,
         "port": use_port,
+        "destination_component_id": dest_id,
         "payload_type": payload_type,
         "payload_type_id": type_id,
         "payload_hex": payload_hex,
