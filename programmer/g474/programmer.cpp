@@ -105,7 +105,7 @@ bool writeFlashData(uint32_t address, uint32_t data) {
   for (int i = 0; i < tries; ++i) {
     g_transport->sendProgrammingCommand(bluelink::ComponentId::COMPONENT_ID_BOOTLOADER, prog_cmd);
     if (g_transport->receiveProgrammingCommand(bluelink::ComponentId::COMPONENT_ID_BOOTLOADER, data_received,
-                                               800)) {
+                                               50)) {
       const uint32_t received_addr =
           data_received.programming_command_union.programming_command_data.programming_address;
       if (received_addr == address) {
