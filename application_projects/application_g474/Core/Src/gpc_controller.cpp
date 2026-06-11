@@ -130,7 +130,6 @@ void GpcController::tickStateSequence() {
   state_sequence_executor_.tick();
 
   if (state_sequence_executor_.isRunning()) {
-    state_sequence_started_ = true;
     return;
   }
 
@@ -141,7 +140,7 @@ void GpcController::tickStateSequence() {
   }
 
   if (not state_sequence_started_) {
-    state_sequence_executor_.start(*state_sequence, loop_on_complete);
+    state_sequence_started_ = state_sequence_executor_.start(*state_sequence, loop_on_complete);
   }
 }
 
