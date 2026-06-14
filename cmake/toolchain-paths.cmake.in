@@ -1,0 +1,23 @@
+# ARM GCC Toolchain Path Configuration Template
+#
+# Copy this file to cmake/toolchain-paths.cmake and customize the paths below
+# for your specific development environment.
+#
+# This template file is tracked in git. Your custom toolchain-paths.cmake
+# file should be gitignored to avoid committing personal paths.
+
+# =============================================================================
+# OPTION 1: Specify full path to toolchain bin directory
+# =============================================================================
+# set(TOOLCHAIN_PATH "/usr/local/gcc-arm-none-eabi/bin")
+# set(TOOLCHAIN_PATH "/opt/gcc-arm-none-eabi/bin")
+
+# =============================================================================
+# OPTION 2: Use toolchain from system PATH (default when no CubeIDE install)
+# =============================================================================
+set(TOOLCHAIN_PATH "")
+
+# =============================================================================
+# OPTION 3: STM32CubeIDE bundled GNU Tools (CMake builds without IDE headless)
+# =============================================================================
+# set(TOOLCHAIN_PATH "/opt/st/stm32cubeide_1.19.0/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.13.3.rel1.linux64_1.0.0.202410170706/tools/bin/")

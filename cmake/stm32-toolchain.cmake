@@ -1,0 +1,62 @@
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR arm)
+
+set(CMAKE_CROSSCOMPILING TRUE)
+set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
+
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/toolchain-paths.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/toolchain-paths.cmake")
+    message(STATUS "Loaded toolchain configuration from: ${CMAKE_CURRENT_LIST_DIR}/toolchain-paths.cmake")
+elseif(DEFINED ENV{STM32_CUBE_GCC_BIN})
+    get_filename_component(TOOLCHAIN_PATH "${ENV{STM32_CUBE_GCC_BIN}}" DIRECTORY)
+    set(TOOLCHAIN_PATH "${TOOLCHAIN_PATH}/")
+    message(STATUS "Using STM32_CUBE_GCC_BIN: ${TOOLCHAIN_PATH}")
+else()
+    file(GLOB _stm32_gcc_candidates
+        /opt/st/stm32cubeide_*/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.*.linux64_*/tools/bin/arm-none-eabi-gcc)
+    if(_stm32_gcc_candidates)
+        list(SORT _stm32_gcc_candidates ORDER DESCENDING)
+        list(GET _stm32_gcc_candidates 0 _stm32_gcc)
+        get_filename_component(TOOLCHAIN_PATH "${_stm32_gcc}" DIRECTORY)
+        set(TOOLCHAIN_PATH "${TOOLCHAIN_PATH}/")
+        message(STATUS "Auto-detected STM32CubeIDE GNU Tools: ${TOOLCHAIN_PATH}")
+    else()
+        set(TOOLCHAIN_PATH "")
+        message(STATUS "No toolchain configuration found, using PATH")
+    endif()
+endif()
+
+if(DEFINED TOOLCHAIN_PATH_OVERRIDE)
+    set(TOOLCHAIN_PATH ${TOOLCHAIN_PATH_OVERRIDE})
+    message(STATUS "Toolchain path overridden via command line: ${TOOLCHAIN_PATH}")
+endif()
+
+message(STATUS "Using STM32 toolchain path: ${TOOLCHAIN_PATH}")
+
+set(CMAKE_C_COMPILER ${TOOLCHAIN_PATH}arm-none-eabi-gcc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PATH}arm-none-eabi-g++)
+set(CMAKE_ASM_COMPILER ${TOOLCHAIN_PATH}arm-none-eabi-gcc)
+set(CMAKE_AR ${TOOLCHAIN_PATH}arm-none-eabi-ar)
+set(CMAKE_OBJCOPY ${TOOLCHAIN_PATH}arm-none-eabi-objcopy)
+set(CMAKE_OBJDUMP ${TOOLCHAIN_PATH}arm-none-eabi-objdump)
+set(CMAKE_SIZE ${TOOLCHAIN_PATH}arm-none-eabi-size)
+set(CMAKE_DEBUGGER ${TOOLCHAIN_PATH}arm-none-eabi-gdb)
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+
+set(CMAKE_C_COMPILER_WORKS 1)
+set(CMAKE_CXX_COMPILER_WORKS 1)
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+if(CMAKE_C_COMPILER)
+    message(STATUS "C Compiler: ${CMAKE_C_COMPILER}")
+    message(STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}")
+endif()
+
+message(STATUS "STM32 Toolchain configured for ${CMAKE_BUILD_TYPE} build")

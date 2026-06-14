@@ -5,7 +5,7 @@ project(fw-config-g4 LANGUAGES C CXX ASM)
 
 # Set C and C++ standards
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 
 # Define the target MCU
 set(MCU_FAMILY STM32G4xx)
@@ -32,9 +32,9 @@ add_definitions(-DCONFIG_TYPE=${CONFIG_TYPE})
 message(STATUS "Configuration Type: ${CONFIG_TYPE}")
 
 # Mixed optimization approach matching IDE: HAL drivers (-O0), Interface files (-Os)
-set(CMAKE_C_FLAGS "-mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb")
+set(CMAKE_C_FLAGS "-mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb")
 
-set(CMAKE_CXX_FLAGS "-mcpu=cortex-m4 -std=gnu++14 -g3 -DDEBUG -O0 -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -fno-use-cxa-atexit -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb")
+set(CMAKE_CXX_FLAGS "-mcpu=cortex-m4 -std=gnu++20 -g3 -DDEBUG -O0 -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -fno-use-cxa-atexit -Wall -fstack-usage -MMD -MP --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb")
 
 set(CMAKE_ASM_FLAGS "-mcpu=cortex-m4 -g3 -DDEBUG --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb")
 
@@ -72,6 +72,9 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/configs/ConfigsTypes/g474-Configs/NHCloseCabin
     ${CMAKE_SOURCE_DIR}/configs/ConfigsTypes/g474-Configs/Test
     ${CMAKE_SOURCE_DIR}/interface/g474/InterfaceDefines
+    ${CMAKE_SOURCE_DIR}/interfaces/interfaces_g474/MemoryMap
+    ${CMAKE_SOURCE_DIR}/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include
+    ${CMAKE_SOURCE_DIR}/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include/PayloadStructs
     ${CMAKE_SOURCE_DIR}
 )
 
@@ -126,8 +129,10 @@ add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O ihex --only-section=.config $<TARGET_FILE:${PROJECT_NAME}.elf> ${PROJECT_NAME}.hex
     # Generate config-only bin file as the main bin file (matches reference files)
     COMMAND ${CMAKE_OBJCOPY} -O binary --only-section=.config $<TARGET_FILE:${PROJECT_NAME}.elf> ${PROJECT_NAME}.bin
+    # CubeIDE artifact name for compatibility with config_g474.bin consumers
+    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_NAME}.bin config_g474.bin
     COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${PROJECT_NAME}.elf>
-    COMMENT "Building ${PROJECT_NAME}.hex (config-only) and ${PROJECT_NAME}.bin (config-only)"
+    COMMENT "Building ${PROJECT_NAME}.hex (config-only), ${PROJECT_NAME}.bin, and config_g474.bin"
 )
 
 # Generate additional outputs
@@ -145,6 +150,7 @@ install(TARGETS ${PROJECT_NAME}.elf
 
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.bin
+    ${CMAKE_CURRENT_BINARY_DIR}/config_g474.bin
     ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.hex
     ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.list
     # ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.map

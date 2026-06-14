@@ -186,7 +186,7 @@ def emit_config_bin(
     write: bool = True,
     hpp_path: Path | None = None,
 ) -> str:
-    """Write config_g474.bin via STM32CubeIDE (matches compiled g474_gpc_config_memory.hpp)."""
+    """Write config_g474.bin via CMake arm-none-eabi build (CubeIDE fallback)."""
     del hpp_path
     dest = Path(output_path) if output_path is not None else None
     try:

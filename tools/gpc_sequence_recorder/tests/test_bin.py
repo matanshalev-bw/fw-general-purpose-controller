@@ -1,32 +1,24 @@
-"""Config bin export via STM32CubeIDE headless build."""
+"""Config bin export via CMake (arm-none-eabi) or STM32CubeIDE headless build."""
 
 import pytest
 
 from gpc_recorder.codegen.config_build import (
-    ConfigBuildError,
+    arm_toolchain_available,
     build_config_bin,
-    find_stm32cubeide_headless,
 )
 from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
 from gpc_recorder.paths import DEFAULT_EXPORT_BIN_PATH, FLASH_CONFIG_BYTES_SIZE, REPO_ROOT
 from gpc_recorder.schema.loader import get_schema
 from tests.test_golden import _build_example_session
 
-def _stm32cubeide_available() -> bool:
-    try:
-        find_stm32cubeide_headless()
-        return True
-    except ConfigBuildError:
-        return False
-
 
 pytestmark = pytest.mark.skipif(
-    not _stm32cubeide_available(),
-    reason="STM32CubeIDE not installed (set STM32CUBEIDE or install under /opt/st/)",
+    not arm_toolchain_available(),
+    reason="arm-none-eabi-gcc not installed (sudo apt install gcc-arm-none-eabi)",
 )
 
 
-def test_headless_build_produces_bin():
+def test_cmake_build_produces_bin():
     schema = get_schema()
     session = _build_example_session()
     hpp = REPO_ROOT / "configs/ConfigsTypes/g474_gpc_config_memory.hpp"

@@ -1,0 +1,74 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "displayName": "Base STM32 Configuration",
+            "description": "Base configuration for STM32 firmware projects",
+            "generator": "Unix Makefiles",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "config-g474-base",
+            "inherits": "base",
+            "displayName": "G474 Config Base",
+            "description": "Base configuration for G474 config firmware (fw-config-g4)",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/stm32-toolchain.cmake",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "BUILD_COMPONENT": "fw-config-g4"
+            }
+        },
+        {
+            "name": "config-g474.Debug",
+            "inherits": "config-g474-base",
+            "displayName": "G474 Config (Debug)",
+            "description": "Debug build of G474 configuration firmware (config_g474.bin)",
+            "binaryDir": "${sourceDir}/out/build/config-g474/Debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/config-g474/Debug"
+            }
+        },
+        {
+            "name": "config-g474.Release",
+            "inherits": "config-g474-base",
+            "displayName": "G474 Config (Release)",
+            "description": "Release build of G474 configuration firmware (config_g474.bin)",
+            "binaryDir": "${sourceDir}/out/build/config-g474/Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/config-g474/Release"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "base-build",
+            "hidden": true,
+            "jobs": 4
+        },
+        {
+            "name": "config-g474.Debug",
+            "inherits": "base-build",
+            "displayName": "G474 Config (Debug)",
+            "configurePreset": "config-g474.Debug"
+        },
+        {
+            "name": "config-g474.Release",
+            "inherits": "base-build",
+            "displayName": "G474 Config (Release)",
+            "configurePreset": "config-g474.Release"
+        }
+    ]
+}

@@ -11,6 +11,10 @@ DEFAULT_EXPORT_BIN_PATH = (
     REPO_ROOT / "config_projects/config_g474/Debug/config_g474.bin"
 )
 
+CMAKE_CONFIG_PRESET = "config-g474.Debug"
+CMAKE_CONFIG_BUILD_DIR = REPO_ROOT / "out/build/config-g474/Debug"
+CMAKE_CONFIG_INSTALL_DIR = REPO_ROOT / "out/install/config-g474/Debug"
+
 PROGRAMMER_DIR = REPO_ROOT / "programmer/g474"
 PROGRAMMER_CMAKE_BUILD_DIR = REPO_ROOT / "programmer/build"
 

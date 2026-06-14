@@ -52,14 +52,25 @@ delay_ms(500)
 can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])
 end_binding()
 
-export()  # writes .hpp + .bin (bin from STM32CubeIDE headless build of config_g474)
+export()  # writes .hpp + .bin (CMake arm-none-eabi build of config_g474; CubeIDE fallback)
 ```
 
-## Config bin build (STM32CubeIDE)
+## Config bin build (CMake)
 
-`export()` writes `g474_gpc_config_memory.hpp`, then runs STM32CubeIDE headless build on `config_projects/config_g474` and copies `Debug/config_g474.bin`.
+`export()` writes `g474_gpc_config_memory.hpp`, then builds `config_g474.bin` with CMake using the `config-g474.Debug` preset (same layout as fw-llc CI builds). Requires `cmake`, `make`, and `gcc-arm-none-eabi`:
 
-Set `STM32CUBEIDE` to your install directory if it is not under `/opt/st/stm32cubeide_*` (e.g. `/opt/st/stm32cubeide_1.19.0`). First export imports the project into `out/stm32cubeide-ws` (gitignored); later exports reuse that workspace.
+```bash
+sudo apt install cmake gcc-arm-none-eabi
+./build_all.sh config-g474 debug
+```
+
+Output: `out/build/config-g474/Debug/config_projects/config_g474/config_g474.bin` (also copied to `config_projects/config_g474/Debug/config_g474.bin` on export).
+
+CMake auto-detects STM32CubeIDE's bundled GNU Tools 13.x under `/opt/st/stm32cubeide_*` when apt's gcc-arm-none-eabi is too old for designated initializers. Optional: copy `cmake/toolchain-paths.cmake.in` to `cmake/toolchain-paths.cmake` for a custom toolchain path.
+
+### STM32CubeIDE fallback
+
+If CMake/arm-none-eabi is unavailable, export falls back to STM32CubeIDE headless build. Set `STM32CUBEIDE` to your install directory if it is not under `/opt/st/stm32cubeide_*`.
 
 ## Tests
 
@@ -70,7 +81,7 @@ export PYTHONPATH=.
 pytest -v
 ```
 
-Bin export tests call STM32CubeIDE and are skipped when it is not installed.
+Bin export tests require gcc-arm-none-eabi and are skipped when it is not installed.
 
 ## Layout
 

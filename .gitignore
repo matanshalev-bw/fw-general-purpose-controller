@@ -1,2 +1,3 @@
 out/
+cmake/toolchain-paths.cmake
 config_projects/.metadata/
