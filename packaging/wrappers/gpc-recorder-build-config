@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper: build G474 config firmware (config_g474.bin)
+set -euo pipefail
+exec /opt/gpc-recorder/repo/build_all.sh "$@"

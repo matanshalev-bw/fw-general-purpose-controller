@@ -22,7 +22,7 @@ REPO_ROOT := ../..
 BLUELINK_MSG := $(REPO_ROOT)/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include
 BLUELINK_VER := $(REPO_ROOT)/3rd_party/bluelink_sdk/bluelink_version
 BLUELINK_SER := $(REPO_ROOT)/3rd_party/bluelink_sdk/bluelink_serializer/bluelink_serializer_include
-LLC_COMMON := $(REPO_ROOT)/../fw-llc/scripts/common
+LLC_COMMON ?= $(REPO_ROOT)/../fw-llc/scripts/common
 
 OBJ_DIR := build
 

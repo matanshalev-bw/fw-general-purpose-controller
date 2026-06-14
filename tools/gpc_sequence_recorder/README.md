@@ -72,6 +72,20 @@ CMake auto-detects STM32CubeIDE's bundled GNU Tools 13.x under `/opt/st/stm32cub
 
 If CMake/arm-none-eabi is unavailable, export falls back to STM32CubeIDE headless build. Set `STM32CUBEIDE` to your install directory if it is not under `/opt/st/stm32cubeide_*`.
 
+## Debian package
+
+Build a local `.deb` that installs the recorder, USB bridge, programmer, and firmware tree:
+
+```bash
+# Requires fw-llc at ../fw-llc (for serial/unix sources vendored into the package)
+./packaging/build_deb.sh
+sudo apt install ./packaging/out/gpc-recorder_*_amd64.deb
+```
+
+Installed commands: `gpc-recorder`, `gpc-recorder-repl`, `gpc-recorder-build-config`, `prog-gpc-g4`, `gpc-usb-bluelink`.
+
+Tree lives under `/opt/gpc-recorder/repo`.
+
 ## Tests
 
 ```bash

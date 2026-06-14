@@ -2,6 +2,8 @@
 #   make CC=g++ all
 #   make CC=aarch64-linux-gnu-g++ all
 
+CC ?= g++
+
 ifeq ($(CC),aarch64-linux-gnu-g++)
 	OUTPUT := gpc_usb_bluelink_aarch64
 else ifeq ($(CC),g++)
@@ -11,7 +13,7 @@ else
 endif
 
 REPO_ROOT := ../..
-LLC_COMMON := $(REPO_ROOT)/../fw-llc/scripts/common
+LLC_COMMON ?= $(REPO_ROOT)/../fw-llc/scripts/common
 BLUELINK_MSG := $(REPO_ROOT)/3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include
 BLUELINK_VER := $(REPO_ROOT)/3rd_party/bluelink_sdk/bluelink_version
 BLUELINK_SER := $(REPO_ROOT)/3rd_party/bluelink_sdk/bluelink_serializer/bluelink_serializer_include

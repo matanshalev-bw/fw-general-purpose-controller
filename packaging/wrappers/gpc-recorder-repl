@@ -1,0 +1,11 @@
+#!/bin/bash
+# Wrapper: GPC sequence recorder stdin REPL
+set -euo pipefail
+GPC_ROOT=/opt/gpc-recorder/repo
+TOOL_DIR="$GPC_ROOT/tools/gpc_sequence_recorder"
+VENV="$TOOL_DIR/.venv"
+export PYTHONPATH="$TOOL_DIR"
+if [[ -x "$VENV/bin/python" ]]; then
+  exec "$VENV/bin/python" -m gpc_recorder --repl "$@"
+fi
+exec python3 -m gpc_recorder --repl "$@"
