@@ -18,11 +18,14 @@ from gpc_recorder.paths import (
     CMAKE_CONFIG_INSTALL_DIR,
     CMAKE_CONFIG_PRESET,
     DEFAULT_EXPORT_BIN_PATH,
+    DEFAULT_EXPORT_PATH,
+    GPC_EXPORT_CONFIG_DIR,
     REPO_ROOT,
     STM32CUBEIDE_BUILD_CONFIG,
     STM32CUBEIDE_ECLIPSE_CONFIG,
     STM32CUBEIDE_PROJECT_DIR,
     STM32CUBEIDE_WORKSPACE,
+    USE_USER_DATA_PATHS,
 )
 from gpc_recorder.schema.cpp_parser import Schema
 
@@ -190,9 +193,34 @@ def _locate_built_bin(search_paths: list[Path]) -> Optional[Path]:
 
 
 def _run_cmake_build() -> None:
+    if not DEFAULT_EXPORT_PATH.is_file():
+        raise ConfigBuildError(
+            f"Export config header missing: {DEFAULT_EXPORT_PATH}. "
+            "Run export() in the recorder before building the bin."
+        )
+
     try:
+        if USE_USER_DATA_PATHS:
+            CMAKE_CONFIG_BUILD_DIR.mkdir(parents=True, exist_ok=True)
+            GPC_EXPORT_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            configure_cmd = [
+                "cmake",
+                "-S",
+                str(REPO_ROOT),
+                "-B",
+                str(CMAKE_CONFIG_BUILD_DIR),
+                f"-DCMAKE_TOOLCHAIN_FILE={REPO_ROOT / 'cmake/stm32-toolchain.cmake'}",
+                "-DBUILD_COMPONENT=fw-config-g4",
+                "-DCMAKE_BUILD_TYPE=Debug",
+                f"-DGPC_EXPORT_CONFIG_DIR={GPC_EXPORT_CONFIG_DIR}",
+            ]
+            build_cmd = ["cmake", "--build", str(CMAKE_CONFIG_BUILD_DIR)]
+        else:
+            configure_cmd = ["cmake", "--preset", CMAKE_CONFIG_PRESET]
+            build_cmd = ["cmake", "--build", "--preset", CMAKE_CONFIG_PRESET]
+
         configure = subprocess.run(
-            ["cmake", "--preset", CMAKE_CONFIG_PRESET],
+            configure_cmd,
             cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,
@@ -212,7 +240,7 @@ def _run_cmake_build() -> None:
 
     try:
         build = subprocess.run(
-            ["cmake", "--build", "--preset", CMAKE_CONFIG_PRESET],
+            build_cmd,
             cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,

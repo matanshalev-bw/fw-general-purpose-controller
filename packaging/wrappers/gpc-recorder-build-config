@@ -1,4 +1,9 @@
 #!/bin/bash
 # Wrapper: build G474 config firmware (config_g474.bin)
 set -euo pipefail
+export GPC_RECORDER_DATA="${GPC_RECORDER_DATA:-${XDG_CACHE_HOME:-$HOME/.cache}/gpc-recorder}"
+# shellcheck source=/opt/gpc-recorder/seed-exports.sh
+source /opt/gpc-recorder/seed-exports.sh
+gpc_require_writable_data_dir "$GPC_RECORDER_DATA"
+gpc_seed_exports "$GPC_RECORDER_DATA"
 exec /opt/gpc-recorder/repo/build_all.sh "$@"

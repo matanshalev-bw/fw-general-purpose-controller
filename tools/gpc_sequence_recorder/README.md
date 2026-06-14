@@ -64,9 +64,9 @@ sudo apt install cmake gcc-arm-none-eabi
 ./build_all.sh config-g474 debug
 ```
 
-Output: `out/build/config-g474/Debug/config_projects/config_g474/config_g474.bin` (also copied to `config_projects/config_g474/Debug/config_g474.bin` on export).
+Output: `out/build/config-g474/Debug/config_projects/config_g474/config_g474.bin` (also copied to `config_projects/config_g474/Debug/config_g474.bin` on export in a git clone).
 
-CMake auto-detects STM32CubeIDE's bundled GNU Tools 13.x under `/opt/st/stm32cubeide_*` when apt's gcc-arm-none-eabi is too old for designated initializers. Optional: copy `cmake/toolchain-paths.cmake.in` to `cmake/toolchain-paths.cmake` for a custom toolchain path.
+When installed from `.deb`, exports and builds go under `~/.cache/gpc-recorder/`.
 
 ### STM32CubeIDE fallback
 
@@ -84,7 +84,13 @@ sudo apt install ./packaging/out/gpc-recorder_*_amd64.deb
 
 Installed commands: `gpc-recorder`, `gpc-recorder-repl`, `gpc-recorder-build-config`, `prog-gpc-g4`, `gpc-usb-bluelink`.
 
-Tree lives under `/opt/gpc-recorder/repo`.
+Installed layout:
+
+- `/opt/gpc-recorder/bin/` — `g474_x86_64`, `gpc_usb_bluelink_x86_64` (+ aarch64 when built), `can_setup.sh`
+- `/opt/gpc-recorder/repo/` — sequence recorder, config CMake project, schema headers (no programmer/USB source)
+- `~/.cache/gpc-recorder/` — exports, builds, venv
+
+On install, the packaged default `g474_gpc_config_memory.hpp` is copied to `~/.cache/gpc-recorder/exports/`.
 
 ## Tests
 

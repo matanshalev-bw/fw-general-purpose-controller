@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import glob
 import platform
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_struct
-from gpc_recorder.paths import REPO_ROOT, TOOL_DIR
+from gpc_recorder.paths import REPO_ROOT, TOOL_DIR, _INSTALLED_BIN_DIR
 from gpc_recorder.schema.cpp_parser import StructDef
 from gpc_recorder.schema.loader import get_schema
 
@@ -125,18 +126,25 @@ def get_usb_session() -> UsbSession:
 
 
 def usb_bluelink_binary() -> Path:
+    resolved = shutil.which("gpc-usb-bluelink")
+    if resolved:
+        return Path(resolved)
+
     name = (
         "gpc_usb_bluelink_aarch64"
         if platform.machine().lower() in ("aarch64", "arm64")
         else "gpc_usb_bluelink_x86_64"
     )
-    path = USB_TOOL_DIR / name
-    if not path.is_file():
-        raise UsbBridgeError(
-            f"USB bridge binary not found at {path}. "
-            f"Build with: cd {USB_TOOL_DIR} && make CC=g++ all"
-        )
-    return path
+    for base in (_INSTALLED_BIN_DIR, USB_TOOL_DIR):
+        path = base / name
+        if path.is_file():
+            return path
+
+    raise UsbBridgeError(
+        f"USB bridge binary not found ({name}). "
+        f"Installed package: gpc-usb-bluelink. "
+        f"Dev build: cd tools/gpc_usb_bluelink && make CC=g++ all"
+    )
 
 
 def list_serial_ports() -> List[str]:

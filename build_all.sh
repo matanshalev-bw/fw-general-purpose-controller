@@ -6,7 +6,26 @@
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUT_DIR="${REPO_ROOT}/out"
+
+gpc_user_data_dir() {
+    if [ -n "${GPC_RECORDER_DATA:-}" ]; then
+        echo "$GPC_RECORDER_DATA"
+        return 0
+    fi
+    if [ "$REPO_ROOT" = "/opt/gpc-recorder/repo" ]; then
+        echo "${XDG_CACHE_HOME:-$HOME/.cache}/gpc-recorder"
+        return 0
+    fi
+    return 1
+}
+
+USER_DATA_DIR="$(gpc_user_data_dir 2>/dev/null || true)"
+if [ -n "$USER_DATA_DIR" ]; then
+    export GPC_RECORDER_DATA="$USER_DATA_DIR"
+    OUT_DIR="${USER_DATA_DIR}/build"
+else
+    OUT_DIR="${REPO_ROOT}/out"
+fi
 
 show_usage() {
     echo "Usage: $0 [TARGET] [BUILD_TYPE]"
@@ -31,11 +50,16 @@ show_usage() {
 clean_all() {
     echo ""
     echo "Cleaning all build outputs..."
-    if [ -d "$OUT_DIR" ]; then
+    if [ -n "$USER_DATA_DIR" ]; then
+        if [ -d "$USER_DATA_DIR" ]; then
+            rm -rf "${USER_DATA_DIR}/build"
+            echo "  Removed ${USER_DATA_DIR}/build"
+        fi
+    elif [ -d "$OUT_DIR" ]; then
         rm -rf "$OUT_DIR"
         echo "  Removed $OUT_DIR"
     else
-        echo "  No out directory at $OUT_DIR"
+        echo "  No build output directory found"
     fi
     echo ""
 }
@@ -98,6 +122,34 @@ build_preset() {
     echo "  $preset built successfully"
 }
 
+build_config_user_data() {
+    local build_type="$1"
+    local build_dir="${USER_DATA_DIR}/build/config-g474/${build_type}"
+    local export_dir="${USER_DATA_DIR}/exports"
+    echo "Building config-g474 ${build_type} (user data)..."
+    mkdir -p "$build_dir" "$export_dir"
+    if [ ! -f "${export_dir}/g474_gpc_config_memory.hpp" ]; then
+        echo "Missing ${export_dir}/g474_gpc_config_memory.hpp — export from gpc-recorder first." >&2
+        exit 1
+    fi
+    cmake -S "$REPO_ROOT" -B "$build_dir" \
+        -DCMAKE_TOOLCHAIN_FILE="${REPO_ROOT}/cmake/stm32-toolchain.cmake" \
+        -DBUILD_COMPONENT=fw-config-g4 \
+        -DCMAKE_BUILD_TYPE="$build_type" \
+        -DGPC_EXPORT_CONFIG_DIR="$export_dir"
+    cmake --build "$build_dir"
+    echo "  config-g474 ${build_type} built successfully"
+}
+
+build_config_type() {
+    local build_type="$1"
+    if [ -n "$USER_DATA_DIR" ]; then
+        build_config_user_data "$build_type"
+    else
+        build_preset "config-g474.${build_type}"
+    fi
+}
+
 TARGET="${1:-config-g474}"
 BUILD_TYPE="${2:-both}"
 
@@ -125,14 +177,14 @@ cd "$REPO_ROOT"
 
 case "$BUILD_TYPE" in
     both)
-        build_preset "config-g474.Debug"
-        build_preset "config-g474.Release"
+        build_config_type "Debug"
+        build_config_type "Release"
         ;;
     debug)
-        build_preset "config-g474.Debug"
+        build_config_type "Debug"
         ;;
     release)
-        build_preset "config-g474.Release"
+        build_config_type "Release"
         ;;
     *)
         echo "Unknown build type: $BUILD_TYPE"
@@ -143,12 +195,23 @@ esac
 
 echo ""
 echo "Config binaries:"
-for path in \
-    "${OUT_DIR}/build/config-g474/Debug/config_projects/config_g474/config_g474.bin" \
-    "${OUT_DIR}/build/config-g474/Release/config_projects/config_g474/config_g474.bin"; do
-    if [ -f "$path" ]; then
-        echo "  $path ($(wc -c < "$path") bytes)"
-    fi
-done
+if [ -n "$USER_DATA_DIR" ]; then
+    for path in \
+        "${USER_DATA_DIR}/exports/config_g474.bin" \
+        "${USER_DATA_DIR}/build/config-g474/Debug/config_projects/config_g474/config_g474.bin" \
+        "${USER_DATA_DIR}/build/config-g474/Release/config_projects/config_g474/config_g474.bin"; do
+        if [ -f "$path" ]; then
+            echo "  $path ($(wc -c < "$path") bytes)"
+        fi
+    done
+else
+    for path in \
+        "${OUT_DIR}/build/config-g474/Debug/config_projects/config_g474/config_g474.bin" \
+        "${OUT_DIR}/build/config-g474/Release/config_projects/config_g474/config_g474.bin"; do
+        if [ -f "$path" ]; then
+            echo "  $path ($(wc -c < "$path") bytes)"
+        fi
+    done
+fi
 echo ""
 echo "All selected builds completed successfully."

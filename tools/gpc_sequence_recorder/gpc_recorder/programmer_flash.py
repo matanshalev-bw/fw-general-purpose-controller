@@ -24,6 +24,11 @@ class ProgrammerFlashError(Exception):
 
 
 def programmer_binary() -> Path:
+    for cmd in ("prog-gpc-g4",):
+        resolved = shutil.which(cmd)
+        if resolved:
+            return Path(resolved)
+
     is_arm = platform.machine().lower() in ("aarch64", "arm64")
     makefile_names = ("g474_aarch64", "g474_x86_64") if is_arm else ("g474_x86_64", "g474_aarch64")
     cmake_names = ("prog-gpc-g4_aarch64", "prog-gpc-g4_x86_64") if is_arm else (
@@ -46,8 +51,8 @@ def programmer_binary() -> Path:
         return fallback
 
     raise ProgrammerFlashError(
-        f"Programmer binary not found under {PROGRAMMER_DIR} or {PROGRAMMER_CMAKE_BUILD_DIR}. "
-        f"Build with: cd {PROGRAMMER_DIR} && make CC=g++ all"
+        f"Programmer binary not found (prog-gpc-g4, {PROGRAMMER_DIR}, or {PROGRAMMER_CMAKE_BUILD_DIR}). "
+        f"Dev build: cd programmer/g474 && make CXX=g++ all"
     )
 
 

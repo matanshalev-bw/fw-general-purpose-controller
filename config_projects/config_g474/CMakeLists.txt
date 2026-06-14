@@ -57,6 +57,11 @@ set(CMAKE_EXE_LINKER_FLAGS
 )
 
 # Include directories in exact IDE order (CRITICAL for correct header resolution)
+if(DEFINED GPC_EXPORT_CONFIG_DIR)
+    include_directories(BEFORE ${GPC_EXPORT_CONFIG_DIR})
+    message(STATUS "GPC export config dir: ${GPC_EXPORT_CONFIG_DIR}")
+endif()
+
 include_directories(
     Core/Inc
     Drivers/STM32G4xx_HAL_Driver/Inc

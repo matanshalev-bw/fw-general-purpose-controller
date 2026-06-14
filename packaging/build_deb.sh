@@ -1,6 +1,6 @@
 #!/bin/bash
-# Create a .deb that installs gpc_sequence_recorder, gpc_usb_bluelink, programmer,
-# build_all.sh, and the firmware tree needed for schema/codegen/config builds.
+# Create a .deb: gpc_sequence_recorder + firmware tree under /opt/gpc-recorder/repo,
+# host binaries (programmer, USB bridge) under /opt/gpc-recorder/bin.
 
 set -euo pipefail
 
@@ -104,13 +104,14 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 
 PKG_ROOT="${WORK_DIR}/${PKG_NAME}_${VERSION}_${DEB_ARCH}"
 INSTALL_ROOT="${PKG_ROOT}/opt/gpc-recorder/repo"
+INSTALL_BIN="${PKG_ROOT}/opt/gpc-recorder/bin"
 DEBIAN_DIR="${PKG_ROOT}/DEBIAN"
-VENDOR_COMMON="${INSTALL_ROOT}/vendor/fw-llc-common"
+LLC_COMMON="${FW_LLC_ROOT}/scripts/common"
 
 echo "Building ${PKG_NAME} ${VERSION} for ${DEB_ARCH}..."
 echo "  staging: ${INSTALL_ROOT}"
 
-mkdir -p "${INSTALL_ROOT}" "${DEBIAN_DIR}" "${PKG_ROOT}/usr/bin" "${VENDOR_COMMON}"
+mkdir -p "${INSTALL_ROOT}" "${INSTALL_BIN}" "${DEBIAN_DIR}" "${PKG_ROOT}/usr/bin"
 
 rsync_paths=(
     "build_all.sh"
@@ -122,8 +123,6 @@ rsync_paths=(
     "interfaces"
     "config_projects/config_g474"
     "tools/gpc_sequence_recorder"
-    "tools/gpc_usb_bluelink"
-    "programmer"
     "3rd_party/bluelink_sdk/bluelink_messages"
     "3rd_party/bluelink_sdk/bluelink_serializer"
     "3rd_party/bluelink_sdk/bluelink_version"
@@ -150,50 +149,58 @@ for rel in "${rsync_paths[@]}"; do
         "$src" "$dest_parent/"
 done
 
-cp -a "${FW_LLC_ROOT}/scripts/common/." "${VENDOR_COMMON}/"
-
 echo "Building programmer (g474)..."
 (
-    cd "${INSTALL_ROOT}/programmer/g474"
-    make CXX=g++ LLC_COMMON="${VENDOR_COMMON}" clean
-    make CXX=g++ LLC_COMMON="${VENDOR_COMMON}" all
+    cd "${REPO_ROOT}/programmer/g474"
+    make CXX=g++ LLC_COMMON="${LLC_COMMON}" clean
+    make CXX=g++ LLC_COMMON="${LLC_COMMON}" all
+    install -m 755 g474_x86_64 "${INSTALL_BIN}/"
     if command -v aarch64-linux-gnu-g++ >/dev/null 2>&1; then
-        make CXX=aarch64-linux-gnu-g++ LLC_COMMON="${VENDOR_COMMON}" all
+        make CXX=aarch64-linux-gnu-g++ LLC_COMMON="${LLC_COMMON}" all
+        install -m 755 g474_aarch64 "${INSTALL_BIN}/"
     fi
 )
 
 echo "Building gpc_usb_bluelink..."
 (
-    cd "${INSTALL_ROOT}/tools/gpc_usb_bluelink"
-    make CC=g++ LLC_COMMON="${VENDOR_COMMON}" clean
-    make CC=g++ LLC_COMMON="${VENDOR_COMMON}" all
+    cd "${REPO_ROOT}/tools/gpc_usb_bluelink"
+    make CC=g++ LLC_COMMON="${LLC_COMMON}" clean
+    make CC=g++ LLC_COMMON="${LLC_COMMON}" all
+    install -m 755 gpc_usb_bluelink_x86_64 "${INSTALL_BIN}/"
     if command -v aarch64-linux-gnu-g++ >/dev/null 2>&1; then
-        make CC=aarch64-linux-gnu-g++ LLC_COMMON="${VENDOR_COMMON}" all
+        make CC=aarch64-linux-gnu-g++ LLC_COMMON="${LLC_COMMON}" all
+        install -m 755 gpc_usb_bluelink_aarch64 "${INSTALL_BIN}/"
     fi
 )
 
+if [[ -f "${REPO_ROOT}/programmer/can_setup.sh" ]]; then
+    install -m 755 "${REPO_ROOT}/programmer/can_setup.sh" "${INSTALL_BIN}/"
+fi
+
 for wrapper in "${SCRIPT_DIR}/wrappers/"*; do
+    [[ "$(basename "$wrapper")" == "seed-exports.sh" ]] && continue
     install -m 755 "$wrapper" "${PKG_ROOT}/usr/bin/$(basename "$wrapper")"
 done
 
-HOST_PROG="${INSTALL_ROOT}/programmer/g474"
 if [[ "$DEB_ARCH" == "arm64" ]]; then
-    PROG_BIN="${HOST_PROG}/g474_aarch64"
-    USB_BIN="${INSTALL_ROOT}/tools/gpc_usb_bluelink/gpc_usb_bluelink_aarch64"
+    PROG_NAME="g474_aarch64"
+    USB_NAME="gpc_usb_bluelink_aarch64"
 else
-    PROG_BIN="${HOST_PROG}/g474_x86_64"
-    USB_BIN="${INSTALL_ROOT}/tools/gpc_usb_bluelink/gpc_usb_bluelink_x86_64"
+    PROG_NAME="g474_x86_64"
+    USB_NAME="gpc_usb_bluelink_x86_64"
 fi
 
-if [[ ! -f "$PROG_BIN" ]]; then
-  PROG_BIN="${HOST_PROG}/g474"
+if [[ ! -f "${INSTALL_BIN}/${PROG_NAME}" ]]; then
+    PROG_NAME="g474_x86_64"
 fi
-if [[ ! -f "$USB_BIN" ]]; then
-  USB_BIN="${INSTALL_ROOT}/tools/gpc_usb_bluelink/gpc_usb_bluelink_x86_64"
+if [[ ! -f "${INSTALL_BIN}/${USB_NAME}" ]]; then
+    USB_NAME="gpc_usb_bluelink_x86_64"
 fi
 
-ln -sf "$PROG_BIN" "${PKG_ROOT}/usr/bin/prog-gpc-g4"
-ln -sf "$USB_BIN" "${PKG_ROOT}/usr/bin/gpc-usb-bluelink"
+ln -sf "/opt/gpc-recorder/bin/${PROG_NAME}" "${PKG_ROOT}/usr/bin/prog-gpc-g4"
+ln -sf "/opt/gpc-recorder/bin/${USB_NAME}" "${PKG_ROOT}/usr/bin/gpc-usb-bluelink"
+
+install -m 755 "${SCRIPT_DIR}/wrappers/seed-exports.sh" "${PKG_ROOT}/opt/gpc-recorder/seed-exports.sh"
 
 cat > "${DEBIAN_DIR}/control" <<EOF
 Package: ${PKG_NAME}
@@ -210,26 +217,23 @@ Description: GPC sequence recorder and programming tools
  Commands: gpc-recorder, gpc-recorder-repl, gpc-recorder-build-config,
  prog-gpc-g4, gpc-usb-bluelink
  .
- Firmware tree is installed under /opt/gpc-recorder/repo. STM32CubeIDE bundled
- GNU Tools are auto-detected when newer than apt gcc-arm-none-eabi.
+ Firmware tree (schema, config CMake project) is under /opt/gpc-recorder/repo.
+ Host binaries are under /opt/gpc-recorder/bin (prog-gpc-g4, gpc-usb-bluelink).
+ Exports and CMake builds use ~/.cache/gpc-recorder (override with GPC_RECORDER_DATA).
+ .
+ STM32CubeIDE bundled GNU Tools are auto-detected when newer than apt
+ gcc-arm-none-eabi.
 EOF
 
 cat > "${DEBIAN_DIR}/postinst" <<'EOF'
 #!/bin/sh
 set -e
 
-TOOL_DIR=/opt/gpc-recorder/repo/tools/gpc_sequence_recorder
-VENV="${TOOL_DIR}/.venv"
-REQ="${TOOL_DIR}/requirements.txt"
-
-if command -v python3 >/dev/null 2>&1 && [[ -f "$REQ" ]]; then
-    if ! python3 -m venv "$VENV" 2>/dev/null; then
-        echo "gpc-recorder: could not create venv; install python3-full or python3-venv" >&2
-        exit 0
-    fi
-    if [[ -x "${VENV}/bin/pip" ]]; then
-        "${VENV}/bin/pip" install -q --upgrade pip
-        "${VENV}/bin/pip" install -q -r "$REQ"
+if [ -f /opt/gpc-recorder/seed-exports.sh ]; then
+    # shellcheck source=/opt/gpc-recorder/seed-exports.sh
+    . /opt/gpc-recorder/seed-exports.sh
+    if [ -n "${SUDO_USER:-}" ]; then
+        gpc_seed_exports_for_user "$SUDO_USER"
     fi
 fi
 
