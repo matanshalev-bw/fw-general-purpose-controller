@@ -224,6 +224,16 @@
     }
   });
 
+  document.getElementById("btn-reload").addEventListener("click", () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      statusEl.textContent = "Not connected — refresh to reconnect";
+      return;
+    }
+    term.write("\r\n" + prompt + "reload()\r\n");
+    ws.send("reload()");
+    lineBuffer = "";
+  });
+
   document.getElementById("btn-help").addEventListener("click", () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send("help()");
