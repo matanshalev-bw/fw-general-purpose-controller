@@ -10,6 +10,11 @@ void GpcController::setRawCanInterface(RawCanInterface* raw_can) {
   state_sequence_executor_.setRawCanInterface(raw_can);
 }
 
+void GpcController::setVarStore(MicroVarStore* var_store) {
+  main_tick_executor_.setVarStore(var_store);
+  state_sequence_executor_.setVarStore(var_store);
+}
+
 bool GpcController::sendSetStateRequest(bluelink::ControllerState req_state) {
   if (state_ == req_state ||
       (state_ == bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL &&

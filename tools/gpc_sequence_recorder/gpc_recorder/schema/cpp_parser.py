@@ -82,6 +82,37 @@ def _struct_name_to_payload_id(struct_name: str) -> Optional[str]:
     return f"{snake}_COMMAND"
 
 
+_TELEMETRY_STRUCT_TO_PAYLOAD_OVERRIDES: Dict[str, str] = {
+    "RawSensorTelemetries": "RAW_SENSORS_TELEMETRY",
+    "ControllerMetaData": "CONTROLLER_META_DATA_TELEMETRY",
+    "CalibrationTelemetryData": "CALIBRATION_TELEMETRY",
+    "ControlMetricsTelemetryData": "CONTROL_METRICS",
+    "AutotuneTelemetryData": "AUTOTUNE_TELEMETRY",
+    "LlcSystemStatusTelemetry": "LLC_SYSTEM_STATUS_TELEMETRY",
+    "LlcSystemConfigTelemetry": "LLC_SYSTEM_CONFIG_TELEMETRY",
+    "PowerPanelComponentTelemetry": "PPI_PP_TELEMETRY",
+}
+
+
+def _struct_name_to_telemetry_payload_id(
+    struct_name: str, payload_type_ids: Dict[str, int]
+) -> Optional[str]:
+    if struct_name in _TELEMETRY_STRUCT_TO_PAYLOAD_OVERRIDES:
+        pid = _TELEMETRY_STRUCT_TO_PAYLOAD_OVERRIDES[struct_name]
+        if pid in payload_type_ids:
+            return pid
+    snake = re.sub(r"(?<!^)(?=[A-Z])", "_", struct_name).upper()
+    if snake in payload_type_ids:
+        return snake
+    for suffix in ("Telemetries", "Telemetry", "Data"):
+        if struct_name.endswith(suffix):
+            base = struct_name[: -len(suffix)]
+            candidate = re.sub(r"(?<!^)(?=[A-Z])", "_", base).upper() + "_TELEMETRY"
+            if candidate in payload_type_ids:
+                return candidate
+    return None
+
+
 class Schema:
     default_component_id: str = "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER"
 
@@ -90,6 +121,9 @@ class Schema:
         self.payload_type_ids: Dict[str, int] = {}
         self.command_structs: Dict[str, StructDef] = {}
         self.payload_id_to_struct: Dict[str, str] = {}
+        self.telemetry_structs: Dict[str, StructDef] = {}
+        self.telemetry_payload_id_to_struct: Dict[str, str] = {}
+        self.telemetry_struct_sizes: Dict[str, int] = {}
         self.enums: Dict[str, EnumDef] = {}
         self.micro_ops: Dict[str, MicroOpDef] = {}
         self.component_ids: Dict[str, int] = {}
@@ -98,6 +132,7 @@ class Schema:
         self,
         payload_types_path: Path,
         commands_path: Path,
+        telemetry_path: Path,
         field_defs_path: Path,
         micro_ops_path: Path,
         component_id_path: Path,
@@ -105,6 +140,7 @@ class Schema:
         self._load_payload_types(payload_types_path.read_text(encoding="utf-8"))
         self._load_enums(field_defs_path.read_text(encoding="utf-8"))
         self._load_commands(commands_path.read_text(encoding="utf-8"))
+        self._load_telemetry(telemetry_path.read_text(encoding="utf-8"))
         self._load_micro_ops(micro_ops_path.read_text(encoding="utf-8"))
         self._load_component_ids(component_id_path.read_text(encoding="utf-8"))
 
@@ -146,6 +182,34 @@ class Schema:
             pid = _struct_name_to_payload_id(name)
             if pid and pid in self.payload_type_ids:
                 self.payload_id_to_struct[pid] = name
+
+    def _load_telemetry(self, content: str) -> None:
+        from gpc_recorder.dsl.pack import struct_packed_size
+
+        structs = self._converter.extract_structs_from_header(content, "TelemetryPayload")
+        for name, body in structs.items():
+            if "Union" in name:
+                continue
+            fields_raw = self._converter.parse_struct_fields(body, name)
+            fields = [
+                FieldDef(
+                    cpp_type=t,
+                    name=n,
+                    array_size=a,
+                    default_raw=_default_from_comment(c),
+                )
+                for t, n, c, a, _b in fields_raw
+            ]
+            struct_def = StructDef(name=name, fields=fields)
+            try:
+                size = struct_packed_size(self, struct_def)
+            except ValueError:
+                continue
+            self.telemetry_structs[name] = struct_def
+            self.telemetry_struct_sizes[name] = size
+            pid = _struct_name_to_telemetry_payload_id(name, self.payload_type_ids)
+            if pid:
+                self.telemetry_payload_id_to_struct[pid] = name
 
     def _load_micro_ops(self, content: str) -> None:
         content = self._converter.remove_c_comments(content)

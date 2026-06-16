@@ -98,6 +98,24 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
 {% endfor %}
         },
+        .telemetry_config = {
+            .binding_count = {{ telemetry_binding_count }},
+            .bindings = {
+{% for tb in telemetry_bindings %}
+            {
+                .payload_type = bluelink::PayloadTypeIds::{{ tb.payload_type }},
+                .payload_size = {{ tb.payload_size }},
+                .rate_hz = {{ tb.rate_hz }},
+                .field_count = {{ tb.field_count }},
+                .fields = {
+{% for field in tb.fields %}
+                    { {{ field.byte_offset }}, {{ field.byte_size }}, {{ field.var_index }} },
+{% endfor %}
+                },
+            },
+{% endfor %}
+            },
+        },
     },
 };
 

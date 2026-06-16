@@ -151,6 +151,10 @@ def fill_struct_fields(
     return merged
 
 
+def struct_packed_size(schema: Schema, struct_def: StructDef) -> int:
+    return sum(_field_size(schema, field) for field in struct_def.fields)
+
+
 def pack_struct(
     schema: Schema,
     struct_def: StructDef,

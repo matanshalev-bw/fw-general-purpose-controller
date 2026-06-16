@@ -2,6 +2,7 @@
 #define MICRO_SEQUENCE_EXECUTOR_HPP_
 
 #include <cstdint>
+#include "micro_var_store.hpp"
 #include "sequences_configs.hpp"
 
 class RawCanInterface;
@@ -19,6 +20,7 @@ class MicroSequenceExecutor {
   MicroSequenceExecutor();
 
   void setRawCanInterface(RawCanInterface* raw_can);
+  void setVarStore(MicroVarStore* var_store);
 
   bool isRunning() const;
   State getState() const;
@@ -44,11 +46,11 @@ class MicroSequenceExecutor {
   bool executeI2cWrite(const bluelink::MicroOpsPayload::MicroI2cWrite& op);
 
   RawCanInterface* raw_can_ = nullptr;
+  MicroVarStore* var_store_ = nullptr;
   const volatile MicroSequence* active_sequence_ = nullptr;
   uint8_t step_index_ = 0;
   bool loop_on_complete_ = false;
   State state_ = State::IDLE;
-  uint32_t vars_[MICRO_VAR_SLOT_COUNT] = {};
   uint32_t delay_start_ms_ = 0;
   uint32_t delay_duration_ms_ = 0;
 };

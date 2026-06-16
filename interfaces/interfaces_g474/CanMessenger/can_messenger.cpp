@@ -42,7 +42,7 @@ bool CanMessenger::enqueueTxMessage(const FDCAN_TxHeaderTypeDef& tx_header, cons
     const bluelink::J1939CanIdStruct* can_id = 
         reinterpret_cast<const bluelink::J1939CanIdStruct*>(&tx_header.Identifier);
     
-    enterCriticalSection();
+    //enterCriticalSection();
     
     if (isTxQueueFull()) {
         stats_.tx_queue_full_drops++;
@@ -63,7 +63,7 @@ bool CanMessenger::enqueueTxMessage(const FDCAN_TxHeaderTypeDef& tx_header, cons
     
     stats_.tx_messages_enqueued++;
     
-    exitCriticalSection();
+    //exitCriticalSection();
     return true;
 }
 

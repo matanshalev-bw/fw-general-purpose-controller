@@ -113,6 +113,41 @@ def test_schema_loads_drive_command(schema):
     assert "digital_gpio_write" in schema.micro_ops
 
 
+def test_schema_loads_horn_telemetry(schema):
+    assert "HORN_TELEMETRY" in schema.telemetry_payload_id_to_struct
+    assert schema.telemetry_payload_id_to_struct["HORN_TELEMETRY"] == "HornTelemetry"
+    assert schema.telemetry_struct_sizes["HornTelemetry"] == 8
+
+
+def test_bind_telemetry_emit(schema, tmp_path):
+    session = {
+        "config_name": "G474_GPC_CONFIG",
+        "component_id": "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER",
+        "powerup_steps": [],
+        "main_tick_steps": [],
+        "state_steps": {},
+        "state_tick_steps": {},
+        "bindings": [],
+        "telemetry_bindings": [
+            {
+                "payload_type": "HORN_TELEMETRY",
+                "struct_name": "HornTelemetry",
+                "rate_hz": 10,
+                "payload_size": 8,
+                "field_mappings": [
+                    {"field_name": "requested_horn_time", "byte_offset": 0, "byte_size": 4, "var_index": 1},
+                    {"field_name": "remaining_horn_time", "byte_offset": 4, "byte_size": 4, "var_index": 3},
+                ],
+            }
+        ],
+    }
+    generated = emit_config_hpp(session, schema, tmp_path / "horn.hpp", write=False)
+    assert "HORN_TELEMETRY" in generated
+    assert ".rate_hz = 10" in generated
+    assert "{ 0, 4, 1 }" in generated
+    assert "{ 4, 4, 3 }" in generated
+
+
 def test_schema_loads_component_ids(schema):
     assert "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER" in schema.component_ids
 

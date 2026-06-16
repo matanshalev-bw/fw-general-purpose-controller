@@ -163,3 +163,8 @@ bool BluewhiteCanComm::sendCanMessage(uint8_t destination_id, bluelink::PayloadT
 
   return can_messenger_->enqueueTxMessage(tx_header, reinterpret_cast<const uint8_t*>(data), data_size);
 }
+
+bool BluewhiteCanComm::sendTelemetry(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data,
+                                     size_t data_size) {
+  return sendCanMessage(destination_id, payload_type, data, data_size);
+}

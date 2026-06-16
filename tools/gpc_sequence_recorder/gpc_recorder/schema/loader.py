@@ -13,6 +13,7 @@ def get_schema() -> Schema:
         _schema.load(
             PAYLOAD_STRUCTS / "PayloadTypes.hpp",
             PAYLOAD_STRUCTS / "CommandsPayloadClasses.hpp",
+            PAYLOAD_STRUCTS / "TelemetryPayloadClasses.hpp",
             PAYLOAD_STRUCTS / "PayloadFieldDefinitions.hpp",
             PAYLOAD_STRUCTS / "MicroOpsPayloadClasses.hpp",
             BLUELINK_MSG / "distributed_can_id.hpp",

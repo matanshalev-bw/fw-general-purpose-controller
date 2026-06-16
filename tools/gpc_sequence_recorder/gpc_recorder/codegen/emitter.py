@@ -156,11 +156,25 @@ def emit_config_hpp(
             }
         )
 
+    telemetry_bindings_out = []
+    for tb in session.get("telemetry_bindings", []):
+        telemetry_bindings_out.append(
+            {
+                "payload_type": tb["payload_type"],
+                "payload_size": tb["payload_size"],
+                "rate_hz": tb["rate_hz"],
+                "field_count": len(tb["field_mappings"]),
+                "fields": tb["field_mappings"],
+            }
+        )
+
     ctx = {
         "config_name": session["config_name"],
         "component_id": session["component_id"],
         "binding_count": len(bindings_out),
         "bindings": bindings_out,
+        "telemetry_binding_count": len(telemetry_bindings_out),
+        "telemetry_bindings": telemetry_bindings_out,
         "powerup_step_count": len(powerup_steps_out),
         "powerup_steps": powerup_steps_out,
         "main_tick_step_count": len(main_tick_steps_out),

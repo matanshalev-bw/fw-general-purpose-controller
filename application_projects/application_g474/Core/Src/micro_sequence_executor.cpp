@@ -26,6 +26,8 @@ MicroSequenceExecutor::MicroSequenceExecutor() = default;
 
 void MicroSequenceExecutor::setRawCanInterface(RawCanInterface* raw_can) { raw_can_ = raw_can; }
 
+void MicroSequenceExecutor::setVarStore(MicroVarStore* var_store) { var_store_ = var_store; }
+
 bool MicroSequenceExecutor::isDelayDue() const {
   if (delay_duration_ms_ == 0) {
     return true;
@@ -72,7 +74,6 @@ bool MicroSequenceExecutor::start(const volatile MicroSequence& sequence, bool l
   step_index_ = 0;
   loop_on_complete_ = loop_on_complete;
   state_ = State::RUNNING;
-  memset(vars_, 0, sizeof(vars_));
   delay_start_ms_ = 0;
   delay_duration_ms_ = 0;
   return true;
@@ -175,18 +176,22 @@ bool MicroSequenceExecutor::executeDigitalGpioRead(const bluelink::MicroOpsPaylo
     return false;
   }
 
+  if (var_store_ == nullptr) {
+    return false;
+  }
+
   const GpioPin pin = GpioInterface::createDigitalGpio(::toGpioPort(op.port), ::toGpioPin(op.pin));
   GpioPinState state = GpioPinState::PIN_RESET;
   if (GpioInterface::digitalRead(pin, state) != InterfaceStatus::INTERFACE_OK) {
     return false;
   }
 
-  vars_[op.var_index] = state == GpioPinState::PIN_SET ? 1U : 0U;
+  var_store_->set(op.var_index, state == GpioPinState::PIN_SET ? 1U : 0U);
   return true;
 }
 
 bool MicroSequenceExecutor::executeAdcRead(const bluelink::MicroOpsPayload::MicroAdcRead& op) {
-  if (op.var_index >= MICRO_VAR_SLOT_COUNT) {
+  if (op.var_index >= MICRO_VAR_SLOT_COUNT || var_store_ == nullptr) {
     return false;
   }
 
@@ -202,13 +207,13 @@ bool MicroSequenceExecutor::executeAdcRead(const bluelink::MicroOpsPayload::Micr
   }
 
   if (op.store_raw != 0) {
-    vars_[op.var_index] = raw_value;
+    var_store_->set(op.var_index, raw_value);
   } else {
     float voltage = 0.0f;
     if (GpioInterface::analogReadDma(adc_instance, op.channel, voltage) != InterfaceStatus::INTERFACE_OK) {
-      vars_[op.var_index] = raw_value;
+      var_store_->set(op.var_index, raw_value);
     } else {
-      vars_[op.var_index] = static_cast<uint32_t>(voltage * 1000.0f);
+      var_store_->set(op.var_index, static_cast<uint32_t>(voltage * 1000.0f));
     }
   }
   return true;

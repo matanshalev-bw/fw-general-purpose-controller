@@ -19,6 +19,7 @@ class BluewhiteCanComm {
   void tick();
   MicroSequenceExecutor& getSequenceExecutor() { return *sequence_executor_; }
   CommCan* bootloaderComm() { return comm_can_.get(); }
+  bool sendTelemetry(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data, size_t data_size);
 
  private:
   static uint16_t can_receive_size_;

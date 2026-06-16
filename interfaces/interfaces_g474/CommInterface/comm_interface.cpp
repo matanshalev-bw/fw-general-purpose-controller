@@ -23,6 +23,10 @@ InterfaceStatus CommUsb::startReceiveInterrupt(uint8_t* data, const uint16_t siz
 }
 
 InterfaceStatus CommUsb::startTransmitInterrupt(const uint8_t* data, const uint16_t size) {
+  if (handler_->pClassData == nullptr) {
+    return InterfaceStatus::INTERFACE_BUSY;
+  }
+
   USBD_CDC_HandleTypeDef* hcdc = static_cast<USBD_CDC_HandleTypeDef*>(handler_->pClassData);
 
   if (hcdc->TxState != 0U) {

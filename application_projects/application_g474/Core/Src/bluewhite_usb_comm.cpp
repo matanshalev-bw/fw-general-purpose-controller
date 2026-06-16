@@ -52,6 +52,22 @@ void BluewhiteUsbComm::tick() {
   }
 }
 
+bool BluewhiteUsbComm::sendTelemetry(bluelink::PayloadTypeIds payload_type, const uint8_t* data, uint8_t size) {
+  if (bluelink_ == nullptr || data == nullptr || size == 0 || size > 8 ||
+      not UsbComm::instance().isHostConnected()) {
+    return false;
+  }
+
+  bluelink::Packet<uint8_t[8]> packet(payload_type, bluelink::HLC_ADDRESS);
+  memset(packet.payload_data, 0, sizeof(packet.payload_data));
+  memcpy(packet.payload_data, data, size);
+  bluelink::Serializer::serialize(packet);
+  packet.prefix.length = static_cast<uint8_t>(sizeof(bluelink::Header) + size);
+  packet.suffix.checksum = Checksum32::CalculateChecksum(reinterpret_cast<const uint8_t*>(&packet.header),
+                                                         packet.prefix.length);
+  return bluelink_->writeMessageNow(packet) > 0;
+}
+
 bool BluewhiteUsbComm::parsePayload(bluelink::PayloadTypeIds payload_type, const uint8_t* buffer) {
   if (instance_ == nullptr || buffer == nullptr) {
     return false;

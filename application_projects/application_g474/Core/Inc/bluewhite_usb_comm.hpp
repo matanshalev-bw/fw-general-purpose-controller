@@ -19,6 +19,7 @@ class BluewhiteUsbComm {
 
   void initialize();
   void tick();
+  bool sendTelemetry(bluelink::PayloadTypeIds payload_type, const uint8_t* data, uint8_t size);
 
   BluewhiteMessageHandler& messageHandler() { return message_handler_; }
 

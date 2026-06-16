@@ -482,6 +482,7 @@
   let controllerOneShotStates = [];
   let controllerTickStates = [];
   let bindableCommands = []; // from /api/schema/commands-dictionary
+  let bindableTelemetries = []; // from /api/schema/commands-dictionary (telemetries ≤8 bytes)
 
   function terminalInsert(text) {
     if (!text) return;
@@ -661,6 +662,103 @@
       return;
     }
 
+    if (cmd.name === "bind_telemetry") {
+      const rateWrap = document.createElement("div");
+      rateWrap.className = "field";
+      const rateLabel = document.createElement("label");
+      rateLabel.textContent = "rate";
+      rateLabel.htmlFor = "rec-telemetry-rate";
+      const rateInput = document.createElement("input");
+      rateInput.id = "rec-telemetry-rate";
+      rateInput.type = "number";
+      rateInput.min = "1";
+      rateInput.value = "10";
+      rateInput.dataset.param = "rate";
+      rateWrap.appendChild(rateLabel);
+      rateWrap.appendChild(rateInput);
+      recorderFieldsEl.appendChild(rateWrap);
+
+      const triggerWrap = document.createElement("div");
+      triggerWrap.className = "field";
+      const triggerLabel = document.createElement("label");
+      triggerLabel.textContent = "trigger";
+      triggerLabel.htmlFor = "rec-telemetry-trigger";
+      const triggerSelect = document.createElement("select");
+      triggerSelect.id = "rec-telemetry-trigger";
+      triggerSelect.dataset.param = "trigger";
+      triggerSelect.title = "Telemetry PayloadTypeIds (≤8 bytes)";
+
+      const bindables = (bindableTelemetries || []).filter((t) => !!t.payload_type);
+      if (!bindables.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "(no telemetry types available)";
+        triggerSelect.appendChild(opt);
+      } else {
+        bindables.forEach((t) => {
+          const opt = document.createElement("option");
+          opt.value = t.payload_type;
+          opt.textContent = `${t.payload_type} (${t.payload_size}B)`;
+          triggerSelect.appendChild(opt);
+        });
+      }
+
+      triggerWrap.appendChild(triggerLabel);
+      triggerWrap.appendChild(triggerSelect);
+      recorderFieldsEl.appendChild(triggerWrap);
+
+      const structFieldsWrap = document.createElement("div");
+      structFieldsWrap.className = "field";
+      const structLabel = document.createElement("label");
+      structLabel.textContent = "struct";
+      structLabel.htmlFor = "rec-telemetry-struct";
+      const structName = document.createElement("input");
+      structName.id = "rec-telemetry-struct";
+      structName.disabled = true;
+      structName.classList.add("wide");
+      structFieldsWrap.appendChild(structLabel);
+      structFieldsWrap.appendChild(structName);
+      recorderFieldsEl.appendChild(structFieldsWrap);
+
+      const fieldsContainer = document.createElement("div");
+      fieldsContainer.id = "rec-telemetry-fields";
+      fieldsContainer.style.display = "flex";
+      fieldsContainer.style.flexWrap = "wrap";
+      fieldsContainer.style.gap = "0.35rem 0.75rem";
+      fieldsContainer.style.alignItems = "center";
+      recorderFieldsEl.appendChild(fieldsContainer);
+
+      const renderTelemetryFields = () => {
+        fieldsContainer.innerHTML = "";
+        const selected = bindables.find((t) => t.payload_type === triggerSelect.value) || bindables[0];
+        if (!selected) return;
+        structName.value = selected.struct_name || "";
+        (selected.fields || []).forEach((f) => {
+          const wrap = document.createElement("div");
+          wrap.className = "field";
+          const label = document.createElement("label");
+          const paramName = `${f.name}_var_index`;
+          label.textContent = paramName;
+          label.htmlFor = `rec-telemetry-field-${f.name}`;
+          const input = document.createElement("input");
+          input.id = `rec-telemetry-field-${f.name}`;
+          input.type = "number";
+          input.min = "0";
+          input.max = "7";
+          input.value = "0";
+          input.dataset.field = f.name;
+          input.dataset.param = paramName;
+          wrap.appendChild(label);
+          wrap.appendChild(input);
+          fieldsContainer.appendChild(wrap);
+        });
+      };
+
+      triggerSelect.addEventListener("change", renderTelemetryFields);
+      renderTelemetryFields();
+      return;
+    }
+
     if (cmd.name === "bind_state" || cmd.name === "clear_state") {
       const stateWrap = document.createElement("div");
       stateWrap.className = "field";
@@ -783,6 +881,25 @@
       }
       return `bind_command(${kwargs.join(", ")})`;
     }
+    if (cmd.name === "bind_telemetry") {
+      const rate = document.getElementById("rec-telemetry-rate")?.value || "";
+      const trigger = document.getElementById("rec-telemetry-trigger")?.value || "";
+      if (!rate || !trigger) return "";
+      const kwargs = [`rate=${pythonLiteral(rate)}`, `trigger=${pythonLiteral(trigger)}`];
+
+      const bindables = (bindableTelemetries || []).filter((t) => !!t.payload_type);
+      const selected = bindables.find((t) => t.payload_type === trigger);
+      if (selected) {
+        (selected.fields || []).forEach((f) => {
+          const input = document.getElementById(`rec-telemetry-field-${f.name}`);
+          const raw = input ? input.value.trim() : "";
+          if (raw !== "") {
+            kwargs.push(`${f.name}_var_index=${pythonLiteral(raw)}`);
+          }
+        });
+      }
+      return `bind_telemetry(${kwargs.join(", ")})`;
+    }
     if (cmd.name === "bind_state" || cmd.name === "clear_state" ||
         cmd.name === "bind_state_tick" || cmd.name === "clear_state_tick") {
       const state = document.getElementById("rec-state-select")?.value || "";
@@ -846,8 +963,10 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       bindableCommands = data.commands || [];
+      bindableTelemetries = data.telemetries || [];
     } catch (_e) {
       bindableCommands = [];
+      bindableTelemetries = [];
     }
   }
 

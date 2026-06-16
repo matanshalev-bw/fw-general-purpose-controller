@@ -7,7 +7,7 @@ from gpc_recorder.codegen.config_loader import load_config_hpp
 from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
 from gpc_recorder.dsl.coerce import coerce_int_byte_list
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
-from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session
+from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session, TelemetryBindingState
 from gpc_recorder.paths import CONTROLLER_STATE_SEQUENCE_FIELDS, CONTROLLER_STATE_TICK_FIELDS, DEFAULT_EXPORT_BIN_PATH, DEFAULT_EXPORT_PATH
 from gpc_recorder.schema.loader import get_schema
 from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS
@@ -16,6 +16,7 @@ from gpc_recorder.validate import (
     validate_binding_step_count,
     validate_powerup_step_count,
     validate_tick_step_count,
+    validate_telemetry_binding_count,
     validate_var_index,
 )
 
@@ -58,6 +59,68 @@ class RecorderContext:
             data_size=data_size,
         )
         print(f"Binding started: {payload_type} ({struct_name}), {data_size} bytes packed")
+
+    def bind_telemetry(self, rate: int, trigger: str, **kwargs: Any) -> None:
+        self._ensure_not_recording("bind_telemetry()")
+        from gpc_recorder.dsl.pack import _field_size
+
+        payload_type = trigger.split("::")[-1] if isinstance(trigger, str) else str(trigger)
+        if payload_type not in self.schema.payload_type_ids:
+            raise ValueError(f"Unknown PayloadTypeIds::{payload_type}")
+
+        struct_name = self.schema.telemetry_payload_id_to_struct.get(payload_type)
+        if struct_name is None:
+            raise ValueError(f"No telemetry struct mapped for {payload_type}")
+
+        struct_def = self.schema.telemetry_structs[struct_name]
+        payload_size = self.schema.telemetry_struct_sizes[struct_name]
+        if payload_size > 8:
+            raise ValueError(f"{struct_name} is {payload_size} bytes, max telemetry size is 8")
+        if rate <= 0:
+            raise ValueError("rate must be > 0")
+
+        validate_telemetry_binding_count(len(self.session.telemetry_bindings) + 1)
+
+        field_mappings: List[Dict[str, Any]] = []
+        offset = 0
+        for field in struct_def.fields:
+            kw = f"{field.name}_var_index"
+            if kw not in kwargs:
+                raise ValueError(f"Missing {kw} for {struct_name}")
+            var_index = int(kwargs.pop(kw))
+            validate_var_index(var_index)
+            byte_size = _field_size(self.schema, field)
+            field_mappings.append(
+                {
+                    "field_name": field.name,
+                    "byte_offset": offset,
+                    "byte_size": byte_size,
+                    "var_index": var_index,
+                }
+            )
+            offset += byte_size
+
+        if kwargs:
+            raise ValueError(f"Unknown kwargs: {sorted(kwargs.keys())}")
+
+        self.session.telemetry_bindings.append(
+            TelemetryBindingState(
+                payload_type=payload_type,
+                struct_name=struct_name,
+                rate_hz=int(rate),
+                payload_size=payload_size,
+                field_mappings=field_mappings,
+            )
+        )
+        print(
+            f"Telemetry binding saved: {payload_type} ({struct_name}), "
+            f"{payload_size} bytes at {rate} Hz. "
+            f"Total telemetry bindings: {len(self.session.telemetry_bindings)}"
+        )
+
+    def clear_telemetry(self) -> None:
+        self.session.telemetry_bindings = []
+        print("Telemetry bindings cleared.")
 
     def end_binding(self) -> None:
         if self.session.recording_powerup:
@@ -374,8 +437,19 @@ class RecorderContext:
         for b in summary:
             tag = " (recording)" if b["in_progress"] else ""
             lines.append(f"  [{b['index']}] {b['payload_type']}: {b['step_count']} steps{tag}")
-        if pu == 0 and mt == 0 and not self.session.state_steps and not self.session.state_tick_steps and not summary:
-            return "No powerup, tick sequences, or bindings yet."
+        for i, tb in enumerate(self.session.telemetry_bindings):
+            lines.append(
+                f"  telemetry[{i}] {tb.payload_type}: {tb.payload_size} bytes at {tb.rate_hz} Hz"
+            )
+        if (
+            pu == 0
+            and mt == 0
+            and not self.session.state_steps
+            and not self.session.state_tick_steps
+            and not summary
+            and not self.session.telemetry_bindings
+        ):
+            return "No powerup, tick sequences, bindings, or telemetry yet."
         return "\n".join(lines)
 
     def preview(self) -> str:
@@ -386,8 +460,9 @@ class RecorderContext:
             and not self.session.main_tick_steps
             and not self.session.state_steps
             and not self.session.state_tick_steps
+            and not self.session.telemetry_bindings
         ):
-            return "// No powerup, tick sequences, or bindings to preview"
+            return "// No powerup, tick sequences, bindings, or telemetry to preview"
         return emit_config_hpp(self.session.to_dict(), self.schema, write=False)
 
     def reload(self, path: str = "") -> str:
@@ -409,8 +484,9 @@ class RecorderContext:
             and not self.session.main_tick_steps
             and not self.session.state_steps
             and not self.session.state_tick_steps
+            and not self.session.telemetry_bindings
         ):
-            raise RuntimeError("No powerup, tick sequences, or bindings to export")
+            raise RuntimeError("No powerup, tick sequences, bindings, or telemetry to export")
         if self.session.is_recording():
             raise RuntimeError("Call end_binding() before export")
         session = self.session.to_dict()
@@ -426,8 +502,8 @@ class RecorderContext:
     def help(self, name: str = "") -> str:
         if not name:
             return (
-                "Commands: reload(), show(), bind_command(), end_binding(), "
-                "preview(), export(), config(), clear_command(), "
+                "Commands: reload(), show(), bind_command(), bind_telemetry(), end_binding(), "
+                "preview(), export(), config(), clear_command(), clear_telemetry(), "
                 "bind_powerup(), clear_powerup(), "
                 "bind_main_tick(), clear_main_tick(), "
                 "bind_state(state), clear_state(state), "
@@ -442,6 +518,14 @@ class RecorderContext:
             lines = [f"{name}({', '.join(f.name for f in op.fields)})"]
             for f in op.fields:
                 lines.append(f"  {f.cpp_type} {f.name}")
+            return "\n".join(lines)
+        if name in self.schema.telemetry_payload_id_to_struct:
+            sn = self.schema.telemetry_payload_id_to_struct[name]
+            st = self.schema.telemetry_structs[sn]
+            size = self.schema.telemetry_struct_sizes[sn]
+            lines = [f"{sn} for PayloadTypeIds::{name} ({size} bytes)"]
+            for f in st.fields:
+                lines.append(f"  {f.cpp_type} {f.name} -> {f.name}_var_index")
             return "\n".join(lines)
         if name in self.schema.payload_id_to_struct:
             sn = self.schema.payload_id_to_struct[name]
@@ -493,6 +577,8 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "reload": ctx.reload,
         "show": ctx.show,
         "bind_command": ctx.bind_command,
+        "bind_telemetry": ctx.bind_telemetry,
+        "clear_telemetry": ctx.clear_telemetry,
         "end_binding": ctx.end_binding,
         "preview": ctx.preview,
         "export": ctx.export,

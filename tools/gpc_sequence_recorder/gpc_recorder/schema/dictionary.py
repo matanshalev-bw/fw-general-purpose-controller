@@ -93,4 +93,20 @@ def bluelink_commands_dictionary() -> Dict[str, List[Dict[str, Any]]]:
             }
         )
 
-    return {"commands": commands, "micro_ops": micro_ops}
+    telemetries: List[Dict[str, Any]] = []
+    for payload_type, struct_name in sorted(schema.telemetry_payload_id_to_struct.items()):
+        payload_size = schema.telemetry_struct_sizes.get(struct_name)
+        if payload_size is None or payload_size > 8:
+            continue
+        struct_def = schema.telemetry_structs[struct_name]
+        telemetries.append(
+            {
+                "struct_name": struct_name,
+                "payload_type": payload_type,
+                "payload_type_id": schema.payload_type_ids.get(payload_type),
+                "payload_size": payload_size,
+                "fields": [_field_entry(f, schema) for f in struct_def.fields],
+            }
+        )
+
+    return {"commands": commands, "micro_ops": micro_ops, "telemetries": telemetries}

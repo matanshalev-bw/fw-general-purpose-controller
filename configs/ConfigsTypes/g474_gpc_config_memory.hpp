@@ -181,6 +181,21 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                 },
             },
         },
+        .telemetry_config = {
+            .binding_count = 1,
+            .bindings = {
+            {
+                .payload_type = bluelink::PayloadTypeIds::HORN_TELEMETRY,
+                .payload_size = 8,
+                .rate_hz = 1,
+                .field_count = 2,
+                .fields = {
+                    { 0, 4, 1 },
+                    { 4, 4, 2 },
+                },
+            },
+            },
+        },
     },
 };
 

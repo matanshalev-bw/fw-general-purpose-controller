@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from gpc_recorder.dsl.pack import _field_size, _normalize_type, unpack_trigger_data
-from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session
+from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session, TelemetryBindingState
 from gpc_recorder.paths import (
     CONTROLLER_STATE_SEQUENCE_FIELDS,
     CONTROLLER_STATE_TICK_FIELDS,
@@ -224,6 +224,46 @@ def _parse_bindings(block: str, schema: Schema) -> List[BindingState]:
     return bindings
 
 
+def _parse_telemetry_bindings(block: str, schema: Schema) -> List[TelemetryBindingState]:
+    bindings: List[TelemetryBindingState] = []
+    for binding_match in re.finditer(r"\{\s*\.payload_type\s*=\s*bluelink::PayloadTypeIds::", block):
+        binding_inner, _ = _find_braced_block(block, binding_match.start())
+        payload_match = re.search(
+            r"\.payload_type\s*=\s*bluelink::PayloadTypeIds::(\w+)",
+            binding_inner,
+        )
+        size_match = re.search(r"\.payload_size\s*=\s*(\d+)", binding_inner)
+        rate_match = re.search(r"\.rate_hz\s*=\s*(\d+)", binding_inner)
+        field_count_match = re.search(r"\.field_count\s*=\s*(\d+)", binding_inner)
+        fields_match = re.search(r"\.fields\s*=\s*\{", binding_inner)
+        if not payload_match or not size_match or not rate_match or not fields_match:
+            raise ValueError("Malformed telemetry binding block")
+        payload_type = payload_match.group(1)
+        struct_name = schema.telemetry_payload_id_to_struct.get(payload_type)
+        if struct_name is None:
+            raise ValueError(f"No telemetry struct mapped for {payload_type}")
+        fields_inner, _ = _find_braced_block(binding_inner, fields_match.end() - 1)
+        field_mappings: List[Dict[str, Any]] = []
+        for field_match in re.finditer(r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}", fields_inner):
+            field_mappings.append(
+                {
+                    "byte_offset": int(field_match.group(1)),
+                    "byte_size": int(field_match.group(2)),
+                    "var_index": int(field_match.group(3)),
+                }
+            )
+        bindings.append(
+            TelemetryBindingState(
+                payload_type=payload_type,
+                struct_name=struct_name,
+                rate_hz=int(rate_match.group(1)),
+                payload_size=int(size_match.group(1)),
+                field_mappings=field_mappings,
+            )
+        )
+    return bindings
+
+
 def load_config_hpp(path: Path, schema: Schema) -> Session:
     """Parse g474_gpc_config_memory.hpp into a Session."""
     text = _strip_comments(path.read_text(encoding="utf-8"))
@@ -268,6 +308,12 @@ def load_config_hpp(path: Path, schema: Schema) -> Session:
     bindings_block = _find_field_block(sequences_block, "bindings")
     if bindings_block:
         session.bindings = _parse_bindings(bindings_block, schema)
+
+    telemetry_block = _find_field_block(sequences_block, "telemetry_config")
+    if telemetry_block:
+        telemetry_bindings_block = _find_field_block(telemetry_block, "bindings")
+        if telemetry_bindings_block:
+            session.telemetry_bindings = _parse_telemetry_bindings(telemetry_bindings_block, schema)
 
     return session
 

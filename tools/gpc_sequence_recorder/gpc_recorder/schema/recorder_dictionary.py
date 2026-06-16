@@ -27,8 +27,13 @@ _EXAMPLES: Dict[str, str] = {
     "bind_state_tick": "bind_state_tick(CONTROLLER_STATE_OPERATIONAL)",
     "clear_state_tick": "clear_state_tick(CONTROLLER_STATE_OPERATIONAL)",
     "bind_command": "bind_command(trigger=DRIVE_COMMAND, require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL)",
+    "bind_telemetry": (
+        "bind_telemetry(rate=10, trigger=HORN_TELEMETRY, "
+        "requested_horn_time_var_index=1, remaining_horn_time_var_index=3)"
+    ),
     "end_binding": "end_binding()",
     "clear_command": "clear_command()",
+    "clear_telemetry": "clear_telemetry()",
     "undo": "undo()",
     "gpio_write": "gpio_write(port=1, pin=5, value=1)",
     "gpio_read": "gpio_read(port=1, pin=5, var_index=0)",
@@ -58,8 +63,13 @@ _DESCRIPTIONS: Dict[str, str] = {
     "bind_state_tick": "Start a looping tick sequence for MANUAL, ENGAGED, or OPERATIONAL.",
     "clear_state_tick": "Remove the saved tick sequence for the given state.",
     "bind_command": "Start a trigger binding: choose payload type and command fields, then append micro-op steps.",
+    "bind_telemetry": (
+        "Bind periodic telemetry (max 3, payload ≤8 bytes): set rate Hz, telemetry type, "
+        "and {field}_var_index for each struct field. Saves immediately (no end_binding)."
+    ),
     "end_binding": "Save the active recording (power-up, main tick, state, state tick, or trigger binding).",
     "clear_command": "Discard the in-progress trigger binding; saved bindings are not changed.",
+    "clear_telemetry": "Remove all saved telemetry bindings.",
     "undo": "Remove the last micro-op step from the active recording, or peel back the last saved binding.",
     "gpio_write": "Append a digital GPIO write step to the active recording.",
     "gpio_read": "Append a digital GPIO read step; stores the pin value in var_index (0–7).",
@@ -83,11 +93,13 @@ _RECORDER_PUBLIC_COMMANDS = [
     "reload",
     "show",
     "bind_command",
+    "bind_telemetry",
     "end_binding",
     "preview",
     "export",
     "config",
     "clear_command",
+    "clear_telemetry",
     "bind_powerup",
     "clear_powerup",
     "bind_main_tick",

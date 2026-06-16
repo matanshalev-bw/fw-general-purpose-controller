@@ -10,6 +10,7 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "config": ["name=", "component="],
     "bind_powerup": [],
     "bind_command": ["trigger=", "command_struct="],
+    "bind_telemetry": ["rate=", "trigger="],
     "bind_state": ["state="],
     "clear_state": ["state="],
     "bind_state_tick": ["state="],

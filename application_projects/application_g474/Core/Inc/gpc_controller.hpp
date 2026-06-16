@@ -4,6 +4,7 @@
 #include "PayloadFieldDefinitions.hpp"
 #include "bluelink_messages.hpp"
 #include "micro_sequence_executor.hpp"
+#include "micro_var_store.hpp"
 #include "sequences_configs.hpp"
 
 class RawCanInterface;
@@ -13,6 +14,7 @@ class GpcController {
   GpcController();
 
   void setRawCanInterface(RawCanInterface* raw_can);
+  void setVarStore(MicroVarStore* var_store);
 
   bluelink::ControllerState getState() const { return state_; }
 

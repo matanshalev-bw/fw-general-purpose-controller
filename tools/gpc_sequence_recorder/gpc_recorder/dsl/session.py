@@ -12,6 +12,15 @@ class MicroOpStepState:
 
 
 @dataclass
+class TelemetryBindingState:
+    payload_type: str
+    struct_name: str
+    rate_hz: int
+    payload_size: int
+    field_mappings: List[Dict[str, Any]]
+
+
+@dataclass
 class BindingState:
     payload_type: str
     struct_name: str
@@ -37,6 +46,7 @@ class Session:
     config_name: str = "G474_GPC_CONFIG"
     component_id: str = "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER"
     bindings: List[BindingState] = field(default_factory=list)
+    telemetry_bindings: List[TelemetryBindingState] = field(default_factory=list)
     current_binding: Optional[BindingState] = None
     powerup_steps: List[MicroOpStepState] = field(default_factory=list)
     recording_powerup: bool = False
@@ -84,6 +94,16 @@ class Session:
             "state_tick_steps": {
                 state: _steps_to_dict(steps) for state, steps in self.state_tick_steps.items()
             },
+            "telemetry_bindings": [
+                {
+                    "payload_type": tb.payload_type,
+                    "struct_name": tb.struct_name,
+                    "rate_hz": tb.rate_hz,
+                    "payload_size": tb.payload_size,
+                    "field_mappings": tb.field_mappings,
+                }
+                for tb in self.telemetry_bindings
+            ],
         }
 
     def is_recording(self) -> bool:
