@@ -89,38 +89,58 @@ _DESCRIPTIONS: Dict[str, str] = {
 }
 
 
-_RECORDER_PUBLIC_COMMANDS = [
-    "reload",
-    "show",
-    "bind_command",
-    "bind_telemetry",
-    "end_binding",
-    "preview",
-    "export",
-    "config",
-    "clear_command",
-    "clear_telemetry",
-    "bind_powerup",
-    "clear_powerup",
-    "bind_main_tick",
-    "clear_main_tick",
-    "bind_state",
-    "clear_state",
-    "bind_state_tick",
-    "clear_state_tick",
-    "undo",
-    "gpio_write",
-    "gpio_read",
-    "adc_read",
-    "dac_write",
-    "delay_ms",
-    "can_transmit",
-    "pwm_set",
-    "uart_transmit",
-    "spi_transfer",
-    "i2c_write",
-    "help",
+_RECORDER_COMMAND_GROUPS: List[tuple[str, List[str]]] = [
+    ("", ["reload"]),
+    (
+        "bind commands",
+        [
+            "bind_powerup",
+            "clear_powerup",
+            "bind_main_tick",
+            "clear_main_tick",
+            "bind_state",
+            "clear_state",
+            "bind_state_tick",
+            "clear_state_tick",
+            "bind_command",
+            "clear_command",
+            "bind_telemetry",
+            "clear_telemetry",
+            "end_binding",
+        ],
+    ),
+    (
+        "micro commands",
+        [
+            "gpio_write",
+            "gpio_read",
+            "adc_read",
+            "dac_write",
+            "delay_ms",
+            "can_transmit",
+            "pwm_set",
+            "uart_transmit",
+            "spi_transfer",
+            "i2c_write",
+            "undo",
+        ],
+    ),
+    (
+        "config utils",
+        [
+            "config",
+            "show",
+            "preview",
+            "export",
+            "help",
+        ],
+    ),
 ]
+
+_RECORDER_PUBLIC_COMMANDS = [name for _, names in _RECORDER_COMMAND_GROUPS for name in names]
+_RECORDER_COMMAND_GROUP_BY_NAME = {
+    name: group for group, names in _RECORDER_COMMAND_GROUPS for name in names
+}
 
 
 def _resolve_recorder_method(ctx: RecorderContext, name: str):
@@ -182,6 +202,7 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
         out.append(
             {
                 "name": name,
+                "group": _RECORDER_COMMAND_GROUP_BY_NAME.get(name, ""),
                 "signature": sig,
                 "description": _DESCRIPTIONS.get(name, ""),
                 "doc": doc,

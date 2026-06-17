@@ -538,13 +538,26 @@
   function setRecorderCmdSelect(cmds) {
     if (!recorderCmdEl) return;
     recorderCmdEl.innerHTML = "";
+    let currentGroup = null;
+    let groupEl = null;
     cmds.forEach((c) => {
+      const group = c.group || "";
+      if (group !== currentGroup) {
+        currentGroup = group;
+        if (group) {
+          groupEl = document.createElement("optgroup");
+          groupEl.label = group;
+          recorderCmdEl.appendChild(groupEl);
+        } else {
+          groupEl = null;
+        }
+      }
       const opt = document.createElement("option");
       opt.value = c.name;
       opt.textContent = c.name;
       opt.title = c.description || "";
       opt.dataset.description = c.description || "";
-      recorderCmdEl.appendChild(opt);
+      (groupEl || recorderCmdEl).appendChild(opt);
     });
   }
 
