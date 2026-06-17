@@ -261,9 +261,13 @@
   const dictFilter = document.getElementById("dict-filter");
   const btnDictTabBluelink = document.getElementById("btn-dict-tab-bluelink");
   const btnDictTabRecorder = document.getElementById("btn-dict-tab-recorder");
+  const btnDictTabLlcStates = document.getElementById("btn-dict-tab-llc-states");
   let dictBluelinkData = null;
   let dictRecorderData = null;
-  let dictMode = "bluelink"; // 'bluelink' | 'recorder'
+  let dictMode = "bluelink"; // 'bluelink' | 'recorder' | 'llc-states'
+
+  const LLC_STATE_MACHINE_DOC_URL =
+    "https://bw-robotics.atlassian.net/wiki/spaces/EmbTeam/pages/1019772976/Gen+4.0+State+Machine+Architecture+Document";
 
   function formatFieldLine(field) {
     let line = `<span class="type">${field.type}</span> ${field.name}`;
@@ -293,6 +297,18 @@
       });
     }
     return text;
+  }
+
+  function renderStateMachineDictionary() {
+    if (!dictBody) return;
+    dictBody.innerHTML = `<div class="dict-section dict-state-machine">
+      <h3>Gen 4.0 LLC state machine (bluelink::LlcStates)</h3>
+      <img src="/assets/gen4_llc_state_machine.png" alt="Gen 4.0 LLC System bluelink::LlcStates state machine diagram" />
+      <div class="caption">
+        Reference for bind_state / bind_state_tick controller states and LLC transitions.<br />
+        <a href="${LLC_STATE_MACHINE_DOC_URL}" target="_blank" rel="noopener noreferrer">Gen 4.0 State Machine Architecture Document</a>
+      </div>
+    </div>`;
   }
 
   function renderDictEntry(title, meta, fields) {
@@ -402,8 +418,14 @@
     dictMode = mode;
     btnDictTabBluelink?.classList.toggle("active", mode === "bluelink");
     btnDictTabRecorder?.classList.toggle("active", mode === "recorder");
+    btnDictTabLlcStates?.classList.toggle("active", mode === "llc-states");
+    if (dictFilter) {
+      dictFilter.style.display = mode === "llc-states" ? "none" : "";
+    }
     const filter = dictFilter ? dictFilter.value : "";
-    if (mode === "recorder") {
+    if (mode === "llc-states") {
+      renderStateMachineDictionary();
+    } else if (mode === "recorder") {
       if (dictRecorderData) renderRecorderDictionary(dictRecorderData, filter);
       else loadRecorderDictionary();
     } else {
@@ -470,6 +492,7 @@
   document.getElementById("btn-dict-close")?.addEventListener("click", closeDictionary);
   btnDictTabBluelink?.addEventListener("click", () => setDictMode("bluelink"));
   btnDictTabRecorder?.addEventListener("click", () => setDictMode("recorder"));
+  btnDictTabLlcStates?.addEventListener("click", () => setDictMode("llc-states"));
   dictOverlay?.addEventListener("click", (e) => {
     if (e.target === dictOverlay) closeDictionary();
   });
@@ -477,7 +500,7 @@
     const filter = dictFilter.value;
     if (dictMode === "recorder") {
       if (dictRecorderData) renderRecorderDictionary(dictRecorderData, filter);
-    } else {
+    } else if (dictMode === "bluelink") {
       if (dictBluelinkData) renderDictionary(dictBluelinkData, filter);
     }
   });

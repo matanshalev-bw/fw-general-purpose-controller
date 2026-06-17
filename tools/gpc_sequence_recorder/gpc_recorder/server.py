@@ -34,6 +34,7 @@ from gpc_recorder.paths import (
 WEB_DIR = TOOL_DIR / "web"
 _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 _APP_JS = WEB_DIR / "app.js"
+_LLC_STATE_MACHINE_PNG = WEB_DIR / "gen4_llc_state_machine.png"
 _ASSET_VERSION = str(int(_APP_JS.stat().st_mtime)) if _APP_JS.is_file() else "0"
 
 app = FastAPI(title="GPC Sequence Recorder")
@@ -50,6 +51,11 @@ async def index() -> HTMLResponse:
 @app.get("/app.js")
 async def app_js() -> FileResponse:
     return FileResponse(_APP_JS, media_type="application/javascript", headers=_NO_CACHE)
+
+
+@app.get("/assets/gen4_llc_state_machine.png")
+async def gen4_llc_state_machine_png() -> FileResponse:
+    return FileResponse(_LLC_STATE_MACHINE_PNG, media_type="image/png", headers=_NO_CACHE)
 
 
 @app.get("/api/preview")
