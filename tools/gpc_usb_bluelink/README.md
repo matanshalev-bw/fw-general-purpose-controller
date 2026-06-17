@@ -35,6 +35,15 @@ make CC=g++ all
 | `-q, --qos` | `none` or `ack` |
 | `-r, --retries` | ACK retransmit count (default 5) |
 | `--timeout-ms` | ACK wait timeout (default 2000) |
+| `--log` | Listen and print incoming bluelink packets (stdout, one line per packet) |
+
+### Log mode
+
+```bash
+./gpc_usb_bluelink_x86_64 --log -p /dev/ttyACM0
+```
+
+Prints human-readable lines for telemetry, connectivity `LOG`, ACK/NACK, and other packets. Used by the GPC Sequence Recorder **USB Bluelink Log** panel.
 
 ### Python example
 

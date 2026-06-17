@@ -19,6 +19,8 @@ from gpc_recorder.usb_bridge import (
     micro_ops_catalog,
     send_controller_command,
     send_micro_command,
+    stop_usb_log,
+    usb_log_stream,
 )
 from gpc_recorder.schema.dictionary import bluelink_commands_dictionary
 from gpc_recorder.schema.recorder_dictionary import recorder_commands_dictionary
@@ -102,6 +104,7 @@ async def usb_open(body: dict) -> dict:
 
 @app.post("/api/usb/close")
 async def usb_close() -> dict:
+    stop_usb_log()
     get_usb_session().close()
     return {"ok": True, **get_usb_session().status()}
 
@@ -177,6 +180,26 @@ async def flash_ws(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     except ProgrammerFlashError as e:
+        await websocket.send_json({"type": "error", "message": str(e)})
+
+
+@app.websocket("/ws/usb-log")
+async def usb_log_ws(websocket: WebSocket) -> None:
+    await websocket.accept()
+    try:
+        body = await websocket.receive_json()
+        port = body.get("port")
+        if not port:
+            await websocket.send_json({"type": "error", "message": "Missing port"})
+            return
+
+        async for event in usb_log_stream(str(port)):
+            await websocket.send_json(event)
+            if event["type"] in {"done", "error"}:
+                break
+    except WebSocketDisconnect:
+        stop_usb_log()
+    except UsbBridgeError as e:
         await websocket.send_json({"type": "error", "message": str(e)})
 
 

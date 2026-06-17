@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import glob
 import platform
+import select
 import shutil
 import subprocess
+import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_struct
-from gpc_recorder.paths import REPO_ROOT, TOOL_DIR, _INSTALLED_BIN_DIR
+from gpc_recorder.paths import REPO_ROOT, TOOL_DIR, _INSTALLED_BIN_DIR, _repo_is_installed_read_only
 from gpc_recorder.schema.cpp_parser import StructDef
 from gpc_recorder.schema.loader import get_schema
 
@@ -111,14 +114,68 @@ class UsbSession:
         self.opened = True
 
     def close(self) -> None:
+        stop_usb_log()
         self.port = None
         self.opened = False
 
     def status(self) -> Dict[str, Any]:
-        return {"opened": self.opened, "port": self.port}
+        return {"opened": self.opened, "port": self.port, "log_running": is_usb_log_running()}
 
 
 _usb_session = UsbSession()
+_usb_log_proc: Optional[subprocess.Popen] = None
+_log_io_lock = threading.Lock()
+
+
+def is_usb_log_running() -> bool:
+    global _usb_log_proc
+    return _usb_log_proc is not None and _usb_log_proc.poll() is None
+
+
+def stop_usb_log() -> None:
+    global _usb_log_proc
+    if _usb_log_proc is None:
+        return
+    _usb_log_proc.terminate()
+    try:
+        _usb_log_proc.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        _usb_log_proc.kill()
+        _usb_log_proc.wait(timeout=1)
+    _usb_log_proc = None
+
+
+def send_via_log_process(
+    *,
+    type_id: int,
+    dst: int,
+    src: int,
+    qos: str,
+    payload_hex: str,
+    timeout_s: float = 5.0,
+) -> str:
+    with _log_io_lock:
+        proc = _usb_log_proc
+        if proc is None or proc.poll() is not None:
+            raise UsbBridgeError("USB log is not running")
+        if proc.stdin is None or proc.stderr is None:
+            raise UsbBridgeError("USB log process has no stdin/stderr")
+
+        qos_val = 1 if qos == "ack" else 0
+        cmd_line = f"SEND {type_id} {dst} {src} {qos_val} {payload_hex}\n"
+        proc.stdin.write(cmd_line.encode())
+        proc.stdin.flush()
+
+        ready, _, _ = select.select([proc.stderr], [], [], timeout_s)
+        if not ready:
+            raise UsbBridgeError("USB send timed out")
+        response = proc.stderr.readline().decode(errors="replace").strip()
+        if response == ">>SENT ok":
+            return "Sent via active log session"
+        if response.startswith(">>SENT err"):
+            detail = response[len(">>SENT err") :].strip()
+            raise UsbBridgeError(detail or "send failed")
+        raise UsbBridgeError(f"Unexpected log process response: {response}")
 
 
 def get_usb_session() -> UsbSession:
@@ -126,19 +183,25 @@ def get_usb_session() -> UsbSession:
 
 
 def usb_bluelink_binary() -> Path:
-    resolved = shutil.which("gpc-usb-bluelink")
-    if resolved:
-        return Path(resolved)
-
     name = (
         "gpc_usb_bluelink_aarch64"
         if platform.machine().lower() in ("aarch64", "arm64")
         else "gpc_usb_bluelink_x86_64"
     )
-    for base in (_INSTALLED_BIN_DIR, USB_TOOL_DIR):
+
+    # Prefer a freshly built binary in the repo over an older system-wide install.
+    search_bases: List[Path] = []
+    if not _repo_is_installed_read_only():
+        search_bases.append(USB_TOOL_DIR)
+    search_bases.append(_INSTALLED_BIN_DIR)
+    for base in search_bases:
         path = base / name
         if path.is_file():
             return path
+
+    resolved = shutil.which("gpc-usb-bluelink")
+    if resolved:
+        return Path(resolved)
 
     raise UsbBridgeError(
         f"USB bridge binary not found ({name}). "
@@ -157,6 +220,55 @@ def list_serial_ports() -> List[str]:
     for pattern in patterns:
         ports.extend(glob.glob(pattern))
     return sorted(set(ports))
+
+
+def build_usb_log_command(port: str) -> List[str]:
+    port = str(port).strip()
+    if not port:
+        raise UsbBridgeError("Select a USB port first")
+    binary = usb_bluelink_binary()
+    cmd = [str(binary), "--log", "-p", port]
+    if shutil.which("stdbuf"):
+        return ["stdbuf", "-oL", *cmd]
+    return cmd
+
+
+async def usb_log_stream(port: str) -> AsyncIterator[Dict[str, Any]]:
+    global _usb_log_proc
+    stop_usb_log()
+    cmd = build_usb_log_command(port)
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0,
+            cwd=str(REPO_ROOT),
+        )
+    except OSError as exc:
+        raise UsbBridgeError(f"Failed to run USB log: {exc}") from exc
+
+    _usb_log_proc = proc
+    try:
+        assert proc.stdout is not None
+        while True:
+            line = await asyncio.to_thread(proc.stdout.readline)
+            if not line:
+                break
+            yield {"type": "output", "text": line.decode(errors="replace")}
+        return_code = proc.wait()
+        if return_code not in (0, -15, -9):
+            yield {"type": "error", "message": f"USB log exited with code {return_code}"}
+            return
+        yield {"type": "done", "ok": True}
+    finally:
+        if _usb_log_proc is proc:
+            _usb_log_proc = None
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
 
 
 def micro_ops_catalog() -> List[Dict[str, Any]]:
@@ -284,36 +396,37 @@ def pack_controller_command_hex(payload_type: str, values: Dict[str, Any]) -> st
     return "".join(f"{b:02x}" for b in raw)
 
 
-def send_micro_command(
-    union_member: str,
-    values: Dict[str, Any],
+def _run_usb_send(
     *,
-    port: Optional[str] = None,
-    destination_component_id: Optional[int] = None,
-    destination_component: Optional[str] = None,
-    qos: str = "none",
-    retries: int = 5,
-    timeout_ms: int = 2000,
+    use_port: str,
+    type_id: int,
+    payload_type_name: str,
+    payload_hex: str,
+    dest_id: int,
+    qos: str,
+    retries: int,
+    timeout_ms: int,
 ) -> Dict[str, Any]:
-    session = get_usb_session()
-    use_port = port or session.port
-    if not use_port:
-        raise UsbBridgeError("USB port not open — select a port and click Open")
-    if port is None and not session.opened:
-        raise UsbBridgeError("USB port not open — click Open first")
+    if is_usb_log_running():
+        output = send_via_log_process(
+            type_id=type_id,
+            dst=dest_id,
+            src=DEFAULT_SOURCE_ID,
+            qos=qos,
+            payload_hex=payload_hex,
+            timeout_s=max(5.0, timeout_ms / 1000 + 3),
+        )
+        return {
+            "ok": True,
+            "port": use_port,
+            "destination_component_id": dest_id,
+            "payload_type": payload_type_name,
+            "payload_type_id": type_id,
+            "payload_hex": payload_hex,
+            "output": output,
+        }
 
-    payload_type_name = MICRO_OP_TO_PAYLOAD_TYPE.get(union_member)
-    if payload_type_name is None:
-        raise UsbBridgeError(f"No bluelink payload type for micro-op {union_member}")
-
-    type_id = payload_type_id(payload_type_name)
-    payload_hex = pack_micro_op_hex(union_member, values)
     binary = usb_bluelink_binary()
-    dest_id = resolve_destination_component_id(
-        name=destination_component,
-        value=destination_component_id,
-    )
-
     cmd = [
         str(binary),
         "-p",
@@ -362,6 +475,46 @@ def send_micro_command(
     }
 
 
+def send_micro_command(
+    union_member: str,
+    values: Dict[str, Any],
+    *,
+    port: Optional[str] = None,
+    destination_component_id: Optional[int] = None,
+    destination_component: Optional[str] = None,
+    qos: str = "none",
+    retries: int = 5,
+    timeout_ms: int = 2000,
+) -> Dict[str, Any]:
+    session = get_usb_session()
+    use_port = port or session.port
+    if not use_port:
+        raise UsbBridgeError("USB port not open — select a port and click Open")
+    if port is None and not session.opened:
+        raise UsbBridgeError("USB port not open — click Open first")
+
+    payload_type_name = MICRO_OP_TO_PAYLOAD_TYPE.get(union_member)
+    if payload_type_name is None:
+        raise UsbBridgeError(f"No bluelink payload type for micro-op {union_member}")
+
+    type_id = payload_type_id(payload_type_name)
+    payload_hex = pack_micro_op_hex(union_member, values)
+    dest_id = resolve_destination_component_id(
+        name=destination_component,
+        value=destination_component_id,
+    )
+    return _run_usb_send(
+        use_port=use_port,
+        type_id=type_id,
+        payload_type_name=payload_type_name,
+        payload_hex=payload_hex,
+        dest_id=dest_id,
+        qos=qos,
+        retries=retries,
+        timeout_ms=timeout_ms,
+    )
+
+
 def send_controller_command(
     payload_type: str,
     values: Dict[str, Any],
@@ -382,55 +535,17 @@ def send_controller_command(
 
     type_id = payload_type_id(payload_type)
     payload_hex = pack_controller_command_hex(payload_type, values)
-    binary = usb_bluelink_binary()
     dest_id = resolve_destination_component_id(
         name=destination_component,
         value=destination_component_id,
     )
-
-    cmd = [
-        str(binary),
-        "-p",
-        use_port,
-        "-d",
-        str(dest_id),
-        "-s",
-        str(DEFAULT_SOURCE_ID),
-        "-t",
-        str(type_id),
-        "-P",
-        payload_hex,
-        "-q",
-        qos,
-    ]
-    if qos == "ack":
-        cmd.extend(["-r", str(retries), "--timeout-ms", str(timeout_ms)])
-
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=max(5, timeout_ms / 1000 + 3),
-            cwd=str(REPO_ROOT),
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise UsbBridgeError("USB send timed out") from exc
-    except OSError as exc:
-        raise UsbBridgeError(f"Failed to run USB bridge: {exc}") from exc
-
-    stdout = (result.stdout or "").strip()
-    stderr = (result.stderr or "").strip()
-    if result.returncode != 0:
-        detail = stderr or stdout or f"exit code {result.returncode}"
-        raise UsbBridgeError(detail)
-
-    return {
-        "ok": True,
-        "port": use_port,
-        "destination_component_id": dest_id,
-        "payload_type": payload_type,
-        "payload_type_id": type_id,
-        "payload_hex": payload_hex,
-        "output": stdout,
-    }
+    return _run_usb_send(
+        use_port=use_port,
+        type_id=type_id,
+        payload_type_name=payload_type,
+        payload_hex=payload_hex,
+        dest_id=dest_id,
+        qos=qos,
+        retries=retries,
+        timeout_ms=timeout_ms,
+    )

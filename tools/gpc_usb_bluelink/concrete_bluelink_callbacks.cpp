@@ -1,9 +1,12 @@
 #include "concrete_bluelink_callbacks.hpp"
 
 ConcreteBluelinkCallbacks::ConcreteBluelinkCallbacks(serial::Serial* serial,
-                                                     HandlePayloadParsinMethodFunctionType parse_payload)
+                                                     HandlePayloadParsinMethodFunctionType parse_payload,
+                                                     bool open_serial)
     : BluelinkCallbacks(parse_payload), serial_(serial) {
-  serial_->open();
+  if (open_serial) {
+    serial_->open();
+  }
 }
 
 size_t ConcreteBluelinkCallbacks::write(const uint8_t* data, const size_t& size) {

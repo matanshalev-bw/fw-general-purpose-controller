@@ -8,7 +8,8 @@ constexpr size_t kCommBufferSize = 255;
 
 class ConcreteBluelinkCallbacks : public BluelinkCallbacks {
  public:
-  ConcreteBluelinkCallbacks(serial::Serial* serial, HandlePayloadParsinMethodFunctionType parse_payload);
+  ConcreteBluelinkCallbacks(serial::Serial* serial, HandlePayloadParsinMethodFunctionType parse_payload,
+                          bool open_serial = true);
   ~ConcreteBluelinkCallbacks() override = default;
 
   size_t write(const uint8_t* data, const size_t& size) override;

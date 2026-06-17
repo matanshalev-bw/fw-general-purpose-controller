@@ -10,6 +10,18 @@
   term.open(document.getElementById("terminal"));
   fitAddon.fit();
 
+  const usbLogTerm = new Terminal({
+    theme: { background: "#1a1d1e", foreground: "#cccccc", cursor: "#666666" },
+    fontFamily: "Consolas, Monaco, monospace",
+    fontSize: 12,
+    cursorBlink: false,
+    disableStdin: true,
+  });
+  const usbLogFitAddon = new FitAddon.FitAddon();
+  usbLogTerm.loadAddon(usbLogFitAddon);
+  usbLogTerm.open(document.getElementById("usb-log-terminal"));
+  usbLogFitAddon.fit();
+
   const previewEl = document.getElementById("preview");
   const statusEl = document.getElementById("status");
   const bindingsEl = document.getElementById("bindings-list");
@@ -124,7 +136,10 @@
     }
   });
 
-  window.addEventListener("resize", () => fitAddon.fit());
+  window.addEventListener("resize", () => {
+    fitAddon.fit();
+    usbLogFitAddon.fit();
+  });
 
   function flashConfigViaUsb(port) {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -1005,6 +1020,9 @@
   const btnUsbClose = document.getElementById("btn-usb-close");
   const btnUsbSend = document.getElementById("btn-usb-send");
   const btnUsbSendController = document.getElementById("btn-usb-send-controller");
+  const btnUsbLogStart = document.getElementById("btn-usb-log-start");
+  const btnUsbLogStop = document.getElementById("btn-usb-log-stop");
+  const btnUsbLogClear = document.getElementById("btn-usb-log-clear");
 
   /** Built-in catalog so the destination dropdown works before/without API. */
   const FALLBACK_DESTINATION_COMPONENTS = [
@@ -1079,6 +1097,73 @@
   let usbMicroOps = [];
   let usbControllerCmds = [...FALLBACK_CONTROLLER_COMMANDS];
   let usbOpened = false;
+  let usbLogRunning = false;
+  let usbLogWs = null;
+
+  function writeUsbLogOutput(text) {
+    usbLogTerm.write(text.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n"));
+  }
+
+  function updateUsbLogButtons() {
+    if (btnUsbLogStart) btnUsbLogStart.disabled = !usbOpened || usbLogRunning;
+    if (btnUsbLogStop) btnUsbLogStop.disabled = !usbLogRunning;
+    if (btnUsbSend) btnUsbSend.disabled = !usbOpened;
+    if (btnUsbSendController) btnUsbSendController.disabled = !usbOpened;
+  }
+
+  function stopUsbLogStream() {
+    if (usbLogWs) {
+      try {
+        usbLogWs.close();
+      } catch (_e) {
+        /* ignore */
+      }
+      usbLogWs = null;
+    }
+    usbLogRunning = false;
+    updateUsbLogButtons();
+  }
+
+  async function startUsbLogStream() {
+    if (!usbOpened || usbLogRunning) return;
+    const port = usbPortEl?.value || "";
+    if (!port) {
+      usbLogTerm.writeln("[log] Select a USB port first.");
+      return;
+    }
+
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    usbLogWs = new WebSocket(`${proto}//${location.host}/ws/usb-log`);
+    usbLogRunning = true;
+    updateUsbLogButtons();
+    usbLogTerm.writeln(`[log] Listening on ${port}...`);
+
+    usbLogWs.onopen = () => {
+      usbLogWs.send(JSON.stringify({ port }));
+    };
+    usbLogWs.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "output" && msg.text) {
+        writeUsbLogOutput(msg.text);
+      } else if (msg.type === "error") {
+        usbLogTerm.writeln(`\r\n[log] Error: ${msg.message || "unknown"}`);
+        stopUsbLogStream();
+      } else if (msg.type === "done") {
+        usbLogTerm.writeln("\r\n[log] Stopped.");
+        stopUsbLogStream();
+      }
+    };
+    usbLogWs.onclose = () => {
+      if (usbLogRunning) {
+        usbLogTerm.writeln("\r\n[log] Connection closed.");
+      }
+      stopUsbLogStream();
+    };
+    usbLogWs.onerror = () => {
+      usbLogTerm.writeln("\r\n[log] WebSocket error.");
+      stopUsbLogStream();
+    };
+  }
 
   function setUsbDestinationLocked(locked) {
     if (usbDestComponentEl) usbDestComponentEl.disabled = locked;
@@ -1118,11 +1203,10 @@
   }
 
   function setUsbUi() {
-    if (btnUsbOpen) btnUsbOpen.disabled = usbOpened;
-    if (btnUsbClose) btnUsbClose.disabled = !usbOpened;
-    if (btnUsbSend) btnUsbSend.disabled = !usbOpened;
-    if (btnUsbSendController) btnUsbSendController.disabled = !usbOpened;
-    if (usbPortEl) usbPortEl.disabled = usbOpened;
+    if (btnUsbOpen) btnUsbOpen.disabled = usbOpened || usbLogRunning;
+    if (btnUsbClose) btnUsbClose.disabled = !usbOpened && !usbLogRunning;
+    if (usbPortEl) usbPortEl.disabled = usbOpened || usbLogRunning;
+    updateUsbLogButtons();
     if (usbOpened) {
       usbStatusEl.textContent = `Open: ${usbPortEl.value}`;
       usbStatusEl.classList.add("open");
@@ -1394,6 +1478,7 @@
   });
 
   btnUsbClose.addEventListener("click", async () => {
+    stopUsbLogStream();
     const res = await fetch("/api/usb/close", { method: "POST" });
     const data = await res.json();
     if (data.ok) usbOpened = false;
@@ -1457,6 +1542,18 @@
     }
   });
 
+  btnUsbLogStart?.addEventListener("click", () => {
+    startUsbLogStream();
+  });
+
+  btnUsbLogStop?.addEventListener("click", () => {
+    stopUsbLogStream();
+  });
+
+  btnUsbLogClear?.addEventListener("click", () => {
+    usbLogTerm.clear();
+  });
+
   (async function initUsb() {
     loadBindableCommandsForRecorder();
     loadRecorderCommandsForBar();
@@ -1472,6 +1569,7 @@
       const st = await fetch("/api/usb/status");
       const stData = await st.json();
       usbOpened = !!stData.opened;
+      usbLogRunning = !!stData.log_running;
       if (stData.port && usbPortEl) usbPortEl.value = stData.port;
     } catch (_e) {
       usbOpened = false;

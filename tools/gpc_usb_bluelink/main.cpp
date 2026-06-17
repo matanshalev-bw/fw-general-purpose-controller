@@ -1,14 +1,18 @@
 #include <unistd.h>
 
+#include <poll.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "bluelink_communication_handler.hpp"
+#include "bluelink_packet_log.hpp"
 #include "concrete_bluelink_callbacks.hpp"
 #include "serial.h"
 
@@ -38,10 +42,12 @@ void printUsage(const char* prog) {
       << "  -q, --qos none|ack        QoS (default none)\n"
       << "  -r, --retries N           ACK retries when qos=ack (default 5)\n"
       << "  --timeout-ms MS           ACK wait timeout (default 2000)\n"
+      << "  --log                     Listen and print incoming bluelink packets\n"
       << "  -h, --help                Show this help\n\n"
       << "Example:\n"
       << "  " << prog << " -p /dev/ttyACM0 -t 99 -P 010501 -q ack\n"
-      << "  " << prog << " -t 7 -d 17 -q none\n";
+      << "  " << prog << " -t 7 -d 17 -q none\n"
+      << "  " << prog << " --log -p /dev/ttyACM0\n";
 }
 
 bool parseUint(const std::string& text, uint32_t& out) {
@@ -130,6 +136,8 @@ struct CliOptions {
   uint8_t retries = 5;
   unsigned timeout_ms = 2000;
   bool payload_type_set = false;
+  bool log_mode = false;
+  bool quiet = false;
 };
 
 bool parseArgs(int argc, char* argv[], CliOptions& opts) {
@@ -191,12 +199,17 @@ bool parseArgs(int argc, char* argv[], CliOptions& opts) {
         return false;
       }
       opts.timeout_ms = v;
+    } else if (arg == "--log") {
+      opts.log_mode = true;
     } else if (!arg.empty() && arg[0] != '-') {
       opts.port = arg;
     } else {
       std::cerr << "Unknown option: " << arg << '\n';
       return false;
     }
+  }
+  if (opts.log_mode) {
+    return true;
   }
   return opts.payload_type_set;
 }
@@ -225,7 +238,9 @@ bool sendAndWait(bluelink::BluelinkCommunicationHandler& bluelink, bluelink::Pac
                             ? bluelink.writeMessageNow(packet, opts.retries)
                             : bluelink.writeMessageNow(packet);
   if (wire_size <= 0) {
-    std::cerr << "Failed to send packet\n";
+    if (not opts.quiet) {
+      std::cerr << "Failed to send packet\n";
+    }
     return false;
   }
 
@@ -242,19 +257,25 @@ bool sendAndWait(bluelink::BluelinkCommunicationHandler& bluelink, bluelink::Pac
     }
 
     if (bluelink.getLeftRetries(packet) != AckVector::MESSAGE_RECEIVED) {
-      if (bluelink.getLeftRetries(packet) == AckVector::MESSAGE_NACK) {
-        std::cerr << "NACK received\n";
-      } else {
-        std::cerr << "ACK timeout after " << opts.timeout_ms << " ms\n";
+      if (not opts.quiet) {
+        if (bluelink.getLeftRetries(packet) == AckVector::MESSAGE_NACK) {
+          std::cerr << "NACK received\n";
+        } else {
+          std::cerr << "ACK timeout after " << opts.timeout_ms << " ms\n";
+        }
       }
       return false;
     }
-    std::cout << "ACK received\n";
+    if (not opts.quiet) {
+      std::cout << "ACK received\n";
+    }
   }
 
-  std::cout << "Sent " << wireSizeForPayloadType(opts.payload_type) << " bytes to " << opts.port
-            << " (dst=" << static_cast<int>(opts.dst) << " type=" << static_cast<int>(opts.payload_type)
-            << " payload=" << bluelink::Serializer::GetSizeOfPayload(packet.header) << ")\n";
+  if (not opts.quiet) {
+    std::cout << "Sent " << wireSizeForPayloadType(opts.payload_type) << " bytes to " << opts.port
+              << " (dst=" << static_cast<int>(opts.dst) << " type=" << static_cast<int>(opts.payload_type)
+              << " payload=" << bluelink::Serializer::GetSizeOfPayload(packet.header) << ")\n";
+  }
   return true;
 }
 
@@ -356,6 +377,114 @@ bool dispatchSend(bluelink::BluelinkCommunicationHandler& bluelink, const CliOpt
 
 #undef BL_SEND_CASE
 
+bool prepareSendOptions(CliOptions& opts, std::string& error) {
+  bluelink::Header size_probe{};
+  size_probe.payload_type = opts.payload_type;
+  const size_t expected_payload_size = bluelink::Serializer::GetSizeOfPayload(size_probe);
+  if (opts.payload.empty()) {
+    opts.payload.assign(expected_payload_size, 0);
+  } else if (opts.payload.size() != expected_payload_size) {
+    error = "payload size mismatch";
+    return false;
+  }
+  return true;
+}
+
+void reportSendResult(bool ok, const std::string& error = {}) {
+  if (ok) {
+    std::cerr << ">>SENT ok\n" << std::flush;
+  } else {
+    std::cerr << ">>SENT err " << (error.empty() ? "send failed" : error) << '\n' << std::flush;
+  }
+}
+
+bool handleStdinSend(const std::string& line, bluelink::BluelinkCommunicationHandler& bluelink) {
+  if (line.rfind("SEND ", 0) != 0) {
+    return false;
+  }
+
+  std::istringstream iss(line.substr(5));
+  uint32_t type_id = 0;
+  uint32_t dst = 0;
+  uint32_t src = bluelink::HLC_ADDRESS;
+  uint32_t qos_val = 0;
+  std::string hex;
+  if (not(iss >> type_id >> dst >> src >> qos_val >> hex)) {
+    reportSendResult(false, "bad SEND command");
+    return true;
+  }
+
+  CliOptions opts;
+  opts.dst = static_cast<uint8_t>(dst);
+  opts.src = static_cast<uint8_t>(src);
+  opts.payload_type = static_cast<bluelink::PayloadTypeIds>(type_id);
+  opts.qos = qos_val != 0U ? bluelink::QosTypes::REQUIRE_ACK : bluelink::QosTypes::NONE;
+  opts.quiet = true;
+  if (not parseHexPayload(hex, opts.payload)) {
+    reportSendResult(false, "invalid payload hex");
+    return true;
+  }
+
+  std::string error;
+  if (not prepareSendOptions(opts, error)) {
+    reportSendResult(false, error);
+    return true;
+  }
+
+  reportSendResult(dispatchSend(bluelink, opts));
+  return true;
+}
+
+void pollStdinSends(bluelink::BluelinkCommunicationHandler& bluelink) {
+  struct pollfd pfd {};
+  pfd.fd = STDIN_FILENO;
+  pfd.events = POLLIN;
+  if (poll(&pfd, 1, 0) <= 0) {
+    return;
+  }
+
+  std::string line;
+  if (not std::getline(std::cin, line)) {
+    return;
+  }
+  handleStdinSend(line, bluelink);
+}
+
+bool runLogMode(const CliOptions& opts) {
+  g_serial.setPort(opts.port);
+  g_serial.setBaudrate(kDefaultBaud);
+  g_serial.setParity(serial::parity_none);
+  serial::Timeout timeout = serial::Timeout::simpleTimeout(kSerialTimeoutMs);
+  g_serial.setTimeout(timeout);
+  try {
+    g_serial.open();
+  } catch (const std::exception& e) {
+    std::cerr << "Cannot open port " << opts.port << ": " << e.what() << '\n';
+    return false;
+  }
+
+  std::cout << "Listening on " << opts.port << " (bluelink log)\n" << std::flush;
+
+  ConcreteBluelinkCallbacks callbacks(&g_serial, parseInbound, false);
+  bluelink::BluelinkCommunicationHandler bluelink(opts.src, &callbacks);
+  BluelinkPacketLog parser;
+  uint8_t chunk[kCommBufferSize]{};
+  while (true) {
+    pollStdinSends(bluelink);
+
+    const size_t available = g_serial.available();
+    if (available > 0) {
+      const size_t to_read = std::min(available, sizeof(chunk));
+      const size_t read_count = g_serial.read(chunk, to_read);
+      if (read_count > 0) {
+        parser.feed(chunk, read_count);
+      }
+    } else {
+      delayMs(10);
+    }
+  }
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -365,18 +494,19 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  if (opts.log_mode) {
+    return runLogMode(opts) ? 0 : 1;
+  }
+
   if (not openSerial(opts.port)) {
     return 1;
   }
 
   bluelink::Header size_probe{};
   size_probe.payload_type = opts.payload_type;
-  const size_t expected_payload_size = bluelink::Serializer::GetSizeOfPayload(size_probe);
-  if (opts.payload.empty()) {
-    opts.payload.assign(expected_payload_size, 0);
-  } else if (opts.payload.size() != expected_payload_size) {
-    std::cerr << "Payload size mismatch: got " << opts.payload.size() << " bytes, expected "
-              << expected_payload_size << " for payload type " << static_cast<int>(opts.payload_type) << '\n';
+  std::string error;
+  if (not prepareSendOptions(opts, error)) {
+    std::cerr << "Payload size mismatch: " << error << '\n';
     return 1;
   }
 
