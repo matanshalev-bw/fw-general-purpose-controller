@@ -28,7 +28,7 @@ _EXAMPLES: Dict[str, str] = {
     "clear_state_tick": "clear_state_tick(CONTROLLER_STATE_OPERATIONAL)",
     "bind_command": "bind_command(trigger=DRIVE_COMMAND, require_autonomous=False, desired_drive_mode=DRIVE_MODE_BRAKE_NEUTRAL)",
     "bind_telemetry": (
-        "bind_telemetry(rate=10, trigger=HORN_TELEMETRY, "
+        "bind_telemetry(rate=1, trigger=HORN_TELEMETRY, "
         "requested_horn_time_var_index=1, remaining_horn_time_var_index=3)"
     ),
     "end_binding": "end_binding()",

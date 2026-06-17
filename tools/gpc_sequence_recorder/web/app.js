@@ -687,7 +687,7 @@
       rateInput.id = "rec-telemetry-rate";
       rateInput.type = "number";
       rateInput.min = "1";
-      rateInput.value = "10";
+      rateInput.value = "1";
       rateInput.dataset.param = "rate";
       rateWrap.appendChild(rateLabel);
       rateWrap.appendChild(rateInput);
