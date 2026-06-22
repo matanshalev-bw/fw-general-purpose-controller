@@ -58,7 +58,27 @@ std::string formatVersionTriplet(const uint8_t* version, size_t count) {
   return oss.str();
 }
 
+template <typename T>
+bool copyPayloadStruct(const uint8_t* payload, size_t payload_len, T& out) {
+  if (payload_len < sizeof(T)) {
+    return false;
+  }
+  std::memcpy(&out, payload, sizeof(T));
+  return true;
+}
+
+template <typename T, typename Formatter>
+bool tryFormatTelemetryPayload(const uint8_t* payload, size_t payload_len, std::ostringstream& oss, Formatter formatter) {
+  T value{};
+  if (not copyPayloadStruct(payload, payload_len, value)) {
+    return false;
+  }
+  formatter(value, oss);
+  return true;
+}
+
 std::string formatPayloadDetails(bluelink::PayloadTypeIds type, const uint8_t* payload, size_t payload_len) {
+  std::ostringstream oss;
   switch (type) {
     case bluelink::PayloadTypeIds::LOG: {
       if (payload_len < sizeof(bluelink::ConnectivityPayload::Log)) {
@@ -95,24 +115,31 @@ std::string formatPayloadDetails(bluelink::PayloadTypeIds type, const uint8_t* p
           << payloadTypeName(ack.type) << ')';
       return oss.str();
     }
-    case bluelink::PayloadTypeIds::HORN_TELEMETRY: {
-      if (payload_len < sizeof(float)) {
-        break;
+    case bluelink::PayloadTypeIds::HORN_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::HornTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::HornTelemetry& horn, std::ostringstream& out) {
+                out << "horn requested=" << horn.requested_horn_time << " remaining=" << horn.remaining_horn_time;
+              })) {
+        return oss.str();
       }
-      bluelink::TelemetryPayload::HornTelemetry horn{};
-      const size_t copy_len = std::min(payload_len, sizeof(horn));
-      std::memcpy(&horn, payload, copy_len);
-      std::ostringstream oss;
-      oss << "horn requested=" << horn.requested_horn_time << " remaining=" << horn.remaining_horn_time;
-      return oss.str();
-    }
+      break;
+    case bluelink::PayloadTypeIds::POWER_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::PowerTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::PowerTelemetry& power, std::ostringstream& out) {
+                out << "power battery_mv=" << power.battery_voltage_mv << " vehicle_battery_percent="
+                    << static_cast<unsigned>(power.vehicle_battery_level_percent);
+              })) {
+        return oss.str();
+      }
+      break;
     case bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY: {
       if (payload_len < sizeof(bluelink::TelemetryPayload::ControllerMetaData)) {
         break;
       }
       bluelink::TelemetryPayload::ControllerMetaData meta{};
       std::memcpy(&meta, payload, sizeof(meta));
-      std::ostringstream oss;
       oss << "meta component=0x" << std::hex << static_cast<unsigned>(meta.component_id) << std::dec
           << " boot=" << formatVersionTriplet(meta.bootloader_version, 2)
           << " app=" << formatVersionTriplet(meta.app_version, 2)
@@ -126,11 +153,267 @@ std::string formatPayloadDetails(bluelink::PayloadTypeIds type, const uint8_t* p
       }
       bluelink::TelemetryPayload::BluelinkVersionTelemetry version{};
       std::memcpy(&version, payload, sizeof(version));
-      std::ostringstream oss;
       oss << "bluelink_version " << static_cast<unsigned>(version.major) << '.'
           << static_cast<unsigned>(version.minor) << '.' << static_cast<unsigned>(version.patch);
       return oss.str();
     }
+    case bluelink::PayloadTypeIds::DRIVE_CONTROL_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::DriveControlTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::DriveControlTelemetry& v, std::ostringstream& out) {
+                out << "drive autonomous_desired=" << static_cast<unsigned>(v.is_autonomous_desired)
+                    << " autonomous=" << static_cast<unsigned>(v.is_autonomous)
+                    << " desired_mode=" << static_cast<unsigned>(v.desired_drive_mode)
+                    << " actual_mode=" << static_cast<unsigned>(v.actual_drive_mode);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::FOUR_WHEEL_DRIVE_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::FourWheelDriveTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::FourWheelDriveTelemetry& v, std::ostringstream& out) {
+                out << "4wd desired=" << static_cast<unsigned>(v.desired_four_wheel_drive_mode)
+                    << " actual=" << static_cast<unsigned>(v.actual_four_wheel_drive_mode);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::LLC_STATE_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::LlcStateTelemetry>(
+              payload, payload_len, oss, [](const bluelink::TelemetryPayload::LlcStateTelemetry& v,
+                                            std::ostringstream& out) {
+                out << "llc_state=" << static_cast<unsigned>(v.llc_state);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::LLC_SYSTEM_CONFIG_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::LlcSystemConfigTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::LlcSystemConfigTelemetry& v, std::ostringstream& out) {
+                out << "llc_config safety_bumper=" << static_cast<unsigned>(v.safety_bumper_enabled)
+                    << " component_version=" << formatVersionTriplet(
+                           reinterpret_cast<const uint8_t*>(v.component_version), sizeof(v.component_version))
+                    << " tractor_type=" << static_cast<unsigned>(v.tractor_type);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::PPI_PP_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::PowerPanelComponentTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::PowerPanelComponentTelemetry& v, std::ostringstream& out) {
+                out << "ppi component_type=" << static_cast<unsigned>(v.component_type)
+                    << " efuse_enabled=" << static_cast<unsigned>(v.is_efuse_enabled)
+                    << " efuse_faulted=" << static_cast<unsigned>(v.is_efuse_faulted)
+                    << " current_sense=" << v.current_sense;
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::PTO_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::PtoTelemetry>(
+              payload, payload_len, oss, [](const bluelink::TelemetryPayload::PtoTelemetry& v, std::ostringstream& out) {
+                out << "pto desired_mode=" << static_cast<unsigned>(v.desired_pto_mode)
+                    << " actual_mode=" << static_cast<unsigned>(v.actual_pto_mode)
+                    << " desired_rpm=" << v.desired_rpm << " actual_rpm=" << v.actual_rpm;
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::RAW_SENSORS_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::RawSensorTelemetries>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::RawSensorTelemetries& v, std::ostringstream& out) {
+                out << "raw_sensors emergency=" << static_cast<unsigned>(v.emergency_button_pressed)
+                    << " bumper_l=" << static_cast<unsigned>(v.bumper_left_pressed)
+                    << " bumper_r=" << static_cast<unsigned>(v.bumper_right_pressed)
+                    << " system_switch=" << static_cast<unsigned>(v.system_switch_mode);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::REVERSER_ANALOG_CHANNEL_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::ReverserAnalogChannelTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::ReverserAnalogChannelTelemetry& v, std::ostringstream& out) {
+                out << "reverser_analog mask=" << static_cast<unsigned>(v.active_channel_mask)
+                    << " seq=" << static_cast<unsigned>(v.message_sequence) << " ch_mv=["
+                    << v.channel_values_mv[0] << ',' << v.channel_values_mv[1] << ','
+                    << v.channel_values_mv[2] << ']';
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::REVERSER_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::ReverserTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::ReverserTelemetry& v, std::ostringstream& out) {
+                out << "reverser desired_gear=" << static_cast<unsigned>(v.desired_reverser_gear_mode)
+                    << " actual_gear=" << static_cast<unsigned>(v.actual_reverser_gear_mode)
+                    << " driver_state=" << static_cast<unsigned>(v.actual_driver_state)
+                    << " status_flags=" << v.status_flags
+                    << " active_channels=" << static_cast<unsigned>(v.active_channels)
+                    << " shuttle_ch=" << static_cast<unsigned>(v.shuttle_lever_channel);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::SEAT_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::SeatTelemetry>(
+              payload, payload_len, oss, [](const bluelink::TelemetryPayload::SeatTelemetry& v, std::ostringstream& out) {
+                out << "seat desired=" << static_cast<unsigned>(v.desired_seat_mode)
+                    << " actual=" << static_cast<unsigned>(v.actual_seat_mode);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::SPRAYERS_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::SprayersTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::SprayersTelemetry& v, std::ostringstream& out) {
+                out << "sprayers left=" << static_cast<unsigned>(v.left_is_activated) << '/'
+                    << static_cast<unsigned>(v.left_desired_activated) << " right="
+                    << static_cast<unsigned>(v.right_is_activated) << '/'
+                    << static_cast<unsigned>(v.right_desired_activated) << " power="
+                    << static_cast<unsigned>(v.power_is_activated) << '/'
+                    << static_cast<unsigned>(v.power_desired_activated) << " master="
+                    << static_cast<unsigned>(v.master_is_activated) << '/'
+                    << static_cast<unsigned>(v.master_desired_activated);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::STROBE_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::StrobeTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::StrobeTelemetry& v, std::ostringstream& out) {
+                out << "strobe desired=" << static_cast<unsigned>(v.desired_strobe_mode)
+                    << " actual=" << static_cast<unsigned>(v.actual_strobe_mode);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::THREE_POINT_HITCH_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::ThreePointHitchTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::ThreePointHitchTelemetry& v, std::ostringstream& out) {
+                out << "3pt desired_pos=" << v.desired_position << " actual_pos=" << v.actual_position;
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TRANSM_OUT_SPD_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TransmOutSpdTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TransmOutSpdTelemetry& v, std::ostringstream& out) {
+                out << "transm_out_spd=" << v.transm_out_spd;
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_HEARTBEAT_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestHeartbeatResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestHeartbeatResponse& v, std::ostringstream& out) {
+                out << "test_heartbeat success=" << static_cast<unsigned>(v.success)
+                    << " hlc_comm=" << static_cast<unsigned>(v.hlc_comm_status)
+                    << " can_comm=" << static_cast<unsigned>(v.can_comm_status)
+                    << " sbus_failsafe=" << static_cast<unsigned>(v.sbus_failsafe);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_FW_VERSION_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestFwVersionResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestFwVersionResponse& v, std::ostringstream& out) {
+                out << "test_fw_version success=" << static_cast<unsigned>(v.success) << " version="
+                    << static_cast<unsigned>(v.major) << '.' << static_cast<unsigned>(v.minor) << '.'
+                    << static_cast<unsigned>(v.patch);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_DIGITAL_WRITE_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestDigitalWriteResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestDigitalWriteResponse& v, std::ostringstream& out) {
+                out << "test_digital_write success=" << static_cast<unsigned>(v.success)
+                    << " value_written=" << static_cast<unsigned>(v.value_written)
+                    << " error_code=" << static_cast<unsigned>(v.error_code);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_DIGITAL_READ_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestDigitalReadResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestDigitalReadResponse& v, std::ostringstream& out) {
+                out << "test_digital_read success=" << static_cast<unsigned>(v.success)
+                    << " value_read=" << static_cast<unsigned>(v.value_read)
+                    << " error_code=" << static_cast<unsigned>(v.error_code);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_ANALOG_READ_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestAnalogReadResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestAnalogReadResponse& v, std::ostringstream& out) {
+                out << "test_analog_read success=" << static_cast<unsigned>(v.success)
+                    << " error_code=" << static_cast<unsigned>(v.error_code) << " voltage=" << v.voltage;
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_EFUSE_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestEfuseResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestEfuseResponse& v, std::ostringstream& out) {
+                out << "test_efuse success=" << static_cast<unsigned>(v.success)
+                    << " component_type=" << static_cast<unsigned>(v.component_type)
+                    << " enable=" << static_cast<unsigned>(v.enable)
+                    << " error_code=" << static_cast<unsigned>(v.error_code);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_ESTOP_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestEstopResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestEstopResponse& v, std::ostringstream& out) {
+                out << "test_estop success=" << static_cast<unsigned>(v.success)
+                    << " error_code=" << static_cast<unsigned>(v.error_code);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_IO_EXPANDER_READ_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestIoExpanderReadResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestIoExpanderReadResponse& v, std::ostringstream& out) {
+                out << "test_io_read success=" << static_cast<unsigned>(v.success)
+                    << " input_index=" << static_cast<unsigned>(v.input_index)
+                    << " value_read=" << static_cast<unsigned>(v.value_read)
+                    << " error_code=" << static_cast<unsigned>(v.error_code);
+              })) {
+        return oss.str();
+      }
+      break;
+    case bluelink::PayloadTypeIds::TEST_IO_EXPANDER_WRITE_RESPONSE:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::TestIoExpanderWriteResponse>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::TestIoExpanderWriteResponse& v, std::ostringstream& out) {
+                out << "test_io_write success=" << static_cast<unsigned>(v.success)
+                    << " output_index=" << static_cast<unsigned>(v.output_index)
+                    << " value_written=" << static_cast<unsigned>(v.value_written)
+                    << " error_code=" << static_cast<unsigned>(v.error_code);
+              })) {
+        return oss.str();
+      }
+      break;
     default:
       break;
   }
@@ -155,6 +438,54 @@ std::string payloadTypeName(bluelink::PayloadTypeIds type) {
       return "LOG";
     case bluelink::PayloadTypeIds::HORN_TELEMETRY:
       return "HORN_TELEMETRY";
+    case bluelink::PayloadTypeIds::POWER_TELEMETRY:
+      return "POWER_TELEMETRY";
+    case bluelink::PayloadTypeIds::DRIVE_CONTROL_TELEMETRY:
+      return "DRIVE_CONTROL_TELEMETRY";
+    case bluelink::PayloadTypeIds::PTO_TELEMETRY:
+      return "PTO_TELEMETRY";
+    case bluelink::PayloadTypeIds::FOUR_WHEEL_DRIVE_TELEMETRY:
+      return "FOUR_WHEEL_DRIVE_TELEMETRY";
+    case bluelink::PayloadTypeIds::THREE_POINT_HITCH_TELEMETRY:
+      return "THREE_POINT_HITCH_TELEMETRY";
+    case bluelink::PayloadTypeIds::SPRAYERS_TELEMETRY:
+      return "SPRAYERS_TELEMETRY";
+    case bluelink::PayloadTypeIds::RAW_SENSORS_TELEMETRY:
+      return "RAW_SENSORS_TELEMETRY";
+    case bluelink::PayloadTypeIds::LLC_SYSTEM_CONFIG_TELEMETRY:
+      return "LLC_SYSTEM_CONFIG_TELEMETRY";
+    case bluelink::PayloadTypeIds::REVERSER_TELEMETRY:
+      return "REVERSER_TELEMETRY";
+    case bluelink::PayloadTypeIds::STROBE_TELEMETRY:
+      return "STROBE_TELEMETRY";
+    case bluelink::PayloadTypeIds::SEAT_TELEMETRY:
+      return "SEAT_TELEMETRY";
+    case bluelink::PayloadTypeIds::REVERSER_ANALOG_CHANNEL_TELEMETRY:
+      return "REVERSER_ANALOG_CHANNEL_TELEMETRY";
+    case bluelink::PayloadTypeIds::LLC_STATE_TELEMETRY:
+      return "LLC_STATE_TELEMETRY";
+    case bluelink::PayloadTypeIds::TRANSM_OUT_SPD_TELEMETRY:
+      return "TRANSM_OUT_SPD_TELEMETRY";
+    case bluelink::PayloadTypeIds::PPI_PP_TELEMETRY:
+      return "PPI_PP_TELEMETRY";
+    case bluelink::PayloadTypeIds::TEST_HEARTBEAT_RESPONSE:
+      return "TEST_HEARTBEAT_RESPONSE";
+    case bluelink::PayloadTypeIds::TEST_FW_VERSION_RESPONSE:
+      return "TEST_FW_VERSION_RESPONSE";
+    case bluelink::PayloadTypeIds::TEST_DIGITAL_WRITE_RESPONSE:
+      return "TEST_DIGITAL_WRITE_RESPONSE";
+    case bluelink::PayloadTypeIds::TEST_DIGITAL_READ_RESPONSE:
+      return "TEST_DIGITAL_READ_RESPONSE";
+    case bluelink::PayloadTypeIds::TEST_ANALOG_READ_RESPONSE:
+      return "TEST_ANALOG_READ_RESPONSE";
+    case bluelink::PayloadTypeIds::TEST_EFUSE_RESPONSE:
+      return "TEST_EFUSE_RESPONSE";
+    case bluelink::PayloadTypeIds::TEST_ESTOP_RESPONSE:
+      return "TEST_ESTOP_RESPONSE";
+    case bluelink::PayloadTypeIds::TEST_IO_EXPANDER_READ_RESPONSE:
+      return "TEST_IO_EXPANDER_READ_RESPONSE";
+    case bluelink::PayloadTypeIds::TEST_IO_EXPANDER_WRITE_RESPONSE:
+      return "TEST_IO_EXPANDER_WRITE_RESPONSE";
     case bluelink::PayloadTypeIds::CONTROLLER_META_DATA_TELEMETRY:
       return "CONTROLLER_META_DATA_TELEMETRY";
     case bluelink::PayloadTypeIds::BLUELINK_VERSION_TELEMETRY:

@@ -20,8 +20,16 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .main_tick_sequence = {
-            .step_count = 0,
+            .step_count = 2,
             .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_READ,
+                            .digital_gpio_read = {2, 15, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {500},
+                        },
             },
         },
         .init_state_sequence = {
@@ -185,13 +193,17 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             .binding_count = 1,
             .bindings = {
             {
-                .payload_type = bluelink::PayloadTypeIds::HORN_TELEMETRY,
-                .payload_size = 8,
+                .payload_type = bluelink::PayloadTypeIds::REVERSER_TELEMETRY,
+                .payload_size = 7,
                 .rate_hz = 1,
-                .field_count = 2,
+                .field_count = 6,
                 .fields = {
-                    { 0, 4, 1 },
-                    { 4, 4, 2 },
+                    { 0, 1, 1 },
+                    { 1, 1, 0 },
+                    { 2, 1, 0 },
+                    { 3, 2, 0 },
+                    { 5, 1, 0 },
+                    { 6, 1, 0 },
                 },
             },
             },
