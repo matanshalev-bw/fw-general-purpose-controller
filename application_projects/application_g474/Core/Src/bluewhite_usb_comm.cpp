@@ -4,6 +4,7 @@
 
 #include "bluelink_messages.hpp"
 #include "bluelink_serializer.hpp"
+#include "distributed_can_id.hpp"
 #include "non_volatile_memory_interface.hpp"
 #include "usb_comm.hpp"
 
@@ -58,7 +59,7 @@ bool BluewhiteUsbComm::sendTelemetry(bluelink::PayloadTypeIds payload_type, cons
     return false;
   }
 
-  bluelink::Packet<uint8_t[8]> packet(payload_type, bluelink::HLC_ADDRESS);
+  bluelink::Packet<uint8_t[8]> packet(payload_type, bluelink::ComponentId::COMPONENT_ID_BROADCAST);
   memset(packet.payload_data, 0, sizeof(packet.payload_data));
   memcpy(packet.payload_data, data, size);
   bluelink::Serializer::serialize(packet);

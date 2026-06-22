@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "distributed_can_id.hpp"
 #include "main.h"
 #include "non_volatile_memory_interface.hpp"
 
@@ -86,6 +87,21 @@ InterfaceStatus BluewhiteCanComm::configureCanFilter() {
   if (status != InterfaceStatus::INTERFACE_OK) {
     return status;
   }
+  filter_index++;
+
+  status = comm_can_->configHighPriorityFilters(bluelink::ComponentId::COMPONENT_ID_BROADCAST, high_priority_payloads,
+                                                sizeof(high_priority_payloads) / sizeof(high_priority_payloads[0]),
+                                                filter_index);
+  if (status != InterfaceStatus::INTERFACE_OK) {
+    return status;
+  }
+
+  filter_index += sizeof(high_priority_payloads) / sizeof(high_priority_payloads[0]);
+
+  status = comm_can_->configDefaultDestinationFilter(bluelink::ComponentId::COMPONENT_ID_BROADCAST, filter_index);
+  if (status != InterfaceStatus::INTERFACE_OK) {
+    return status;
+  }
 
   return comm_can_->configGlobalFilter();
 }
@@ -103,7 +119,8 @@ void BluewhiteCanComm::directEnqueueRxFromInterrupt(const FDCAN_RxHeaderTypeDef&
   const bluelink::J1939CanIdStruct* rx_id = reinterpret_cast<const bluelink::J1939CanIdStruct*>(&header.Identifier);
   const uint8_t component_id = NonVolatileMemoryInterface::CONFIG_MEMORY_.bluelink_identity_config.component_id;
 
-  if (rx_id->destination_id != component_id) {
+  if (rx_id->destination_id != component_id &&
+      rx_id->destination_id != bluelink::ComponentId::COMPONENT_ID_BROADCAST) {
     return;
   }
 

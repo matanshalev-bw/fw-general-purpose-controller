@@ -4,6 +4,7 @@
 
 #include "bluewhite_can_comm.hpp"
 #include "bluewhite_usb_comm.hpp"
+#include "distributed_can_id.hpp"
 #include "micro_var_store.hpp"
 #include "non_volatile_memory_interface.hpp"
 
@@ -66,7 +67,9 @@ bool GpcTelemetrySender::sendBinding(const volatile TelemetryBinding& binding, c
   }
 
   const auto payload_type = static_cast<bluelink::PayloadTypeIds>(binding.payload_type);
-  //const bool can_sent = can_comm_->sendTelemetry(bluelink::HLC_ADDRESS, payload_type, payload, binding.payload_size); //TODO: fix when it be connected
+  const uint8_t broadcast_dest = bluelink::ComponentId::COMPONENT_ID_BROADCAST;
+  // const bool can_sent =
+  //     can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, binding.payload_size);
   const bool usb_sent = usb_comm_->sendTelemetry(payload_type, payload, binding.payload_size);
   //return can_sent && usb_sent;
   return true;

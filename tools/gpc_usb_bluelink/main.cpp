@@ -13,6 +13,7 @@
 
 #include "bluelink_communication_handler.hpp"
 #include "bluelink_packet_log.hpp"
+#include "distributed_can_id.hpp"
 #include "concrete_bluelink_callbacks.hpp"
 #include "serial.h"
 
@@ -128,7 +129,7 @@ bool openSerial(const std::string& port) {
 
 struct CliOptions {
   std::string port = kDefaultPort;
-  uint8_t dst = 0x11;  // COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER
+  uint8_t dst = bluelink::ComponentId::COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER;
   uint8_t src = bluelink::HLC_ADDRESS;
   bluelink::PayloadTypeIds payload_type = bluelink::PayloadTypeIds::UNKNOWN;
   std::vector<uint8_t> payload{};
