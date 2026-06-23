@@ -10,6 +10,7 @@
 #include "ConnectivityPayloadClasses.hpp"
 #include "TelemetryPayloadClasses.hpp"
 #include "checksum_32.hpp"
+#include "distributed_can_id.hpp"
 #include "packet_struct.hpp"
 
 namespace {
@@ -21,6 +22,46 @@ std::string qosName(bluelink::QosTypes qos) {
     default:
       return "none";
   }
+}
+
+std::string componentIdName(uint8_t component_id) {
+  switch (static_cast<bluelink::ComponentId>(component_id)) {
+    case bluelink::ComponentId::COMPONENT_ID_BOOTLOADER:
+      return "BOOTLOADER";
+    case bluelink::ComponentId::COMPONENT_ID_HLC:
+      return "HLC";
+    case bluelink::ComponentId::COMPONENT_ID_LLC:
+      return "LLC";
+    case bluelink::ComponentId::COMPONENT_ID_REVERSER_DRIVER:
+      return "REVERSER_DRIVER";
+    case bluelink::ComponentId::COMPONENT_ID_IMPLEMENT_DRIVER:
+      return "IMPLEMENT_DRIVER";
+    case bluelink::ComponentId::COMPONENT_ID_POWER_PANEL_DRIVER:
+      return "POWER_PANEL_DRIVER";
+    case bluelink::ComponentId::COMPONENT_ID_STEERING_DRIVER:
+      return "STEERING_DRIVER";
+    case bluelink::ComponentId::COMPONENT_ID_REVERSER_AUX:
+      return "REVERSER_AUX";
+    case bluelink::ComponentId::COMPONENT_ID_POWER_PANEL_AUX:
+      return "POWER_PANEL_AUX";
+    case bluelink::ComponentId::COMPONENT_ID_POWER_PANEL_TESTER:
+      return "POWER_PANEL_TESTER";
+    case bluelink::ComponentId::COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER:
+      return "GENERAL_PURPOSE_CONTROLLER";
+    case bluelink::ComponentId::COMPONENT_ID_BROADCAST:
+      return "BROADCAST";
+    default:
+      break;
+  }
+  std::ostringstream oss;
+  oss << "UNKNOWN_0x" << std::hex << static_cast<unsigned>(component_id);
+  return oss.str();
+}
+
+std::string formatComponentEndpoint(uint8_t component_id) {
+  std::ostringstream oss;
+  oss << componentIdName(component_id) << "(0x" << std::hex << static_cast<unsigned>(component_id) << ')';
+  return oss.str();
 }
 
 std::string toHex(const uint8_t* data, size_t len) {
@@ -555,8 +596,8 @@ void BluelinkPacketLog::emitPacket(const uint8_t* packet, size_t total_len) {
   std::ostringstream line;
   line << '[' << timestampNow() << "] RX "
        << payloadTypeName(header->payload_type) << '(' << static_cast<int>(header->payload_type) << ") "
-       << "0x" << std::hex << static_cast<unsigned>(header->source_id) << "->0x"
-       << static_cast<unsigned>(header->destination_id) << std::dec << " qos=" << qosName(header->qos_type)
+       << "from " << formatComponentEndpoint(header->source_id) << " to "
+       << formatComponentEndpoint(header->destination_id) << std::dec << " qos=" << qosName(header->qos_type)
        << " seq=" << header->packet_sequence_id;
   if (not checksum_ok) {
     line << " CRC_BAD";
