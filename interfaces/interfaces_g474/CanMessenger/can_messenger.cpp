@@ -34,7 +34,7 @@ CanMessenger::CanMessenger(CommCan* comm_can, bluelink::ComponentId source_compo
     resetStatistics();
 }
 
-bool CanMessenger::enqueueTxMessage(const FDCAN_TxHeaderTypeDef& tx_header, const uint8_t* data, uint8_t length) {
+bool CanMessenger::enqueueTxMessage(const CommCanTxHeader& tx_header, const uint8_t* data, uint8_t length) {
     if (data == nullptr or length == 0 or length > 64) {
         return false;
     }
@@ -67,7 +67,7 @@ bool CanMessenger::enqueueTxMessage(const FDCAN_TxHeaderTypeDef& tx_header, cons
     return true;
 }
 
-bool CanMessenger::enqueueRxMessage(const FDCAN_RxHeaderTypeDef& rx_header, const uint8_t* data, uint8_t length) {
+bool CanMessenger::enqueueRxMessage(const CommCanRxHeader& rx_header, const uint8_t* data, uint8_t length) {
     if (data == nullptr or length == 0 or length > 64) {
         return false;
     }
@@ -102,7 +102,7 @@ bool CanMessenger::enqueueRxMessage(const FDCAN_RxHeaderTypeDef& rx_header, cons
     return true;
 }
 
-bool CanMessenger::enqueueRxMessageFromInterrupt(const FDCAN_RxHeaderTypeDef& rx_header, const uint8_t* data, uint8_t length) {
+bool CanMessenger::enqueueRxMessageFromInterrupt(const CommCanRxHeader& rx_header, const uint8_t* data, uint8_t length) {
     // Optimized for interrupt context - minimal processing, no complex validation
     if (data == nullptr or length == 0 or length > 64) {
         return false;

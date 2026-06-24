@@ -10,7 +10,7 @@ uint16_t BluewhiteCanComm::can_receive_size_ = 0;
 bool BluewhiteCanComm::can_transmit_flag_ = true;
 BluewhiteCanComm* BluewhiteCanComm::interrupt_instance_ = nullptr;
 
-BluewhiteCanComm::BluewhiteCanComm(FDCAN_HandleTypeDef* bluelink_fdcan, MicroSequenceExecutor* sequence_executor,
+BluewhiteCanComm::BluewhiteCanComm(CommCanHandle* bluelink_fdcan, MicroSequenceExecutor* sequence_executor,
                                    GpcController* gpc_controller)
     : sequence_executor_(sequence_executor),
       comm_can_(std::make_unique<CommCan>(bluelink_fdcan, &can_receive_size_, &can_transmit_flag_)),
@@ -50,7 +50,7 @@ InterfaceStatus BluewhiteCanComm::initializeCanInterface() {
     }
   });
 
-  comm_can_->setRxMessageCallback([](const FDCAN_RxHeaderTypeDef& header, const uint8_t* data, uint8_t length) {
+  comm_can_->setRxMessageCallback([](const CommCanRxHeader& header, const uint8_t* data, uint8_t length) {
     if (interrupt_instance_ != nullptr && interrupt_instance_->can_messenger_) {
       interrupt_instance_->directEnqueueRxFromInterrupt(header, data, length);
     }
@@ -114,7 +114,7 @@ void BluewhiteCanComm::tick() {
   }
 }
 
-void BluewhiteCanComm::directEnqueueRxFromInterrupt(const FDCAN_RxHeaderTypeDef& header, const uint8_t* data,
+void BluewhiteCanComm::directEnqueueRxFromInterrupt(const CommCanRxHeader& header, const uint8_t* data,
                                                      uint8_t length) {
   const bluelink::J1939CanIdStruct* rx_id = reinterpret_cast<const bluelink::J1939CanIdStruct*>(&header.Identifier);
   const uint8_t component_id = NonVolatileMemoryInterface::CONFIG_MEMORY_.bluelink_identity_config.component_id;
@@ -172,7 +172,7 @@ void BluewhiteCanComm::processTxQueue() {
 
 bool BluewhiteCanComm::sendCanMessage(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data,
                                       size_t data_size) {
-  FDCAN_TxHeaderTypeDef tx_header;
+  CommCanTxHeader tx_header;
   const uint8_t component_id = NonVolatileMemoryInterface::CONFIG_MEMORY_.bluelink_identity_config.component_id;
   const bluelink::J1939CanIdStruct can_id(static_cast<bluelink::ComponentId>(component_id), destination_id,
                                             payload_type);

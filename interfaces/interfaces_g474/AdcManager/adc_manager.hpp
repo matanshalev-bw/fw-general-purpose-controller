@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include "adc_buffer_defines.hpp"
+#include "comm_defines.hpp"
 #include "interface_status.hpp"
 #include "stm32g4xx_hal.h"
 #ifdef HAL_ADC_MODULE_ENABLED
@@ -45,14 +46,14 @@ private:
     InterfaceStatus configureAdcChannels(AdcInstance adc_instance);
     void processDmaData(AdcInstance adc_instance);
     
-    static AdcInstance getAdcIndexFromHandle(ADC_HandleTypeDef* hadc);
+    static AdcInstance getAdcIndexFromHandle(CommAdcHandle* hadc);
     static void setBit(uint32_t& flags, uint32_t bit);
 
 public:
     static AdcManager* getInstance();
     
-    InterfaceStatus initialize(ADC_HandleTypeDef* hadc1, ADC_HandleTypeDef* hadc2, ADC_HandleTypeDef* hadc3,
-                              DMA_HandleTypeDef* hdma_adc1, DMA_HandleTypeDef* hdma_adc2, DMA_HandleTypeDef* hdma_adc3);
+    InterfaceStatus initialize(CommAdcHandle* hadc1, CommAdcHandle* hadc2, CommAdcHandle* hadc3,
+                              CommDmaHandle* hdma_adc1, CommDmaHandle* hdma_adc2, CommDmaHandle* hdma_adc3);
     InterfaceStatus startAllAdcs();
     InterfaceStatus stopAllAdcs();
     
@@ -62,8 +63,8 @@ public:
     
     void handleDmaComplete(AdcInstance adc_instance);
     void handleDmaError(AdcInstance adc_instance);
-    static void interruptContextHandler(ADC_HandleTypeDef* hadc);
-    ADC_HandleTypeDef* getAdcHandle(AdcInstance adc_instance) const;
+    static void interruptContextHandler(CommAdcHandle* hadc);
+    CommAdcHandle* getAdcHandle(AdcInstance adc_instance) const;
     static void processInterruptFlags();
 };
 

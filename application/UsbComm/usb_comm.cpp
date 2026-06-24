@@ -2,7 +2,7 @@
 
 #include "usb_device.h"
 
-extern USBD_HandleTypeDef hUsbDeviceFS;
+extern CommUsbHandle hUsbDeviceFS;
 
 UsbComm& UsbComm::instance() {
   static UsbComm usb_comm;

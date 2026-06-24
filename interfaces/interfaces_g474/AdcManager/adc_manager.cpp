@@ -55,8 +55,8 @@ AdcManager* AdcManager::getInstance() {
     return instance_;
 }
 
-InterfaceStatus AdcManager::initialize(ADC_HandleTypeDef* hadc1, ADC_HandleTypeDef* hadc2, ADC_HandleTypeDef* hadc3,
-                                           DMA_HandleTypeDef* hdma_adc1, DMA_HandleTypeDef* hdma_adc2, DMA_HandleTypeDef* hdma_adc3) {
+InterfaceStatus AdcManager::initialize(CommAdcHandle* hadc1, CommAdcHandle* hadc2, CommAdcHandle* hadc3,
+                                           CommDmaHandle* hdma_adc1, CommDmaHandle* hdma_adc2, CommDmaHandle* hdma_adc3) {
     if (is_initialized_) {
         return InterfaceStatus::INTERFACE_OK;
     }
@@ -258,20 +258,20 @@ void AdcManager::processDmaData(AdcInstance adc_instance) {
     adc_data.timestamp = HAL_GetTick();
 }
 
-ADC_HandleTypeDef* AdcManager::getAdcHandle(AdcInstance adc_instance) const {
+CommAdcHandle* AdcManager::getAdcHandle(AdcInstance adc_instance) const {
     if (static_cast<uint8_t>(adc_instance) >= static_cast<uint8_t>(AdcInstance::ADC_COUNT)) {
         return nullptr;
     }
     return adc_configs_[static_cast<uint8_t>(adc_instance)].adc_handle;
 }
 
-void AdcManager::interruptContextHandler(ADC_HandleTypeDef* hadc) {
+void AdcManager::interruptContextHandler(CommAdcHandle* hadc) {
     uint8_t adc_index = static_cast<uint8_t>(getAdcIndexFromHandle(hadc));
     uint32_t bitmask = 1 << adc_index;
     setBit(adc_interrupt_flags_, bitmask);
 }
 
-AdcInstance AdcManager::getAdcIndexFromHandle(ADC_HandleTypeDef* hadc) {
+AdcInstance AdcManager::getAdcIndexFromHandle(CommAdcHandle* hadc) {
     if (hadc->Instance == ADC1) {
         return AdcInstance::ADC_1;
     } else if (hadc->Instance == ADC2) {

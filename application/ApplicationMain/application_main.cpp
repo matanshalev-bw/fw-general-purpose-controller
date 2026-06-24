@@ -14,10 +14,11 @@
 
 #ifdef HAL_ADC_MODULE_ENABLED
 #include "adc_manager.hpp"
+#include "comm_defines.hpp"
 #endif
 
-extern FDCAN_HandleTypeDef hfdcan2;
-extern FDCAN_HandleTypeDef hfdcan3;
+extern CommCanHandle hfdcan2;
+extern CommCanHandle hfdcan3;
 
 namespace {
 std::unique_ptr<MicroVarStore> g_var_store;
@@ -53,10 +54,10 @@ void applicationInit(void) {
   }
 
 #ifdef HAL_ADC_MODULE_ENABLED
-  extern ADC_HandleTypeDef hadc1;
-  extern ADC_HandleTypeDef hadc2;
-  extern DMA_HandleTypeDef hdma_adc1;
-  extern DMA_HandleTypeDef hdma_adc2;
+  extern CommAdcHandle hadc1;
+  extern CommAdcHandle hadc2;
+  extern CommDmaHandle hdma_adc1;
+  extern CommDmaHandle hdma_adc2;
   if (AdcManager::getInstance()->initialize(&hadc1, &hadc2, nullptr, &hdma_adc1, &hdma_adc2, nullptr) ==
       InterfaceStatus::INTERFACE_OK) {
     AdcManager::getInstance()->startAllAdcs();

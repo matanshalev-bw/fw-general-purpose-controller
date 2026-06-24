@@ -9,11 +9,10 @@
 #include "comm_interface.hpp"
 #include "gpc_controller.hpp"
 #include "micro_sequence_executor.hpp"
-#include "stm32g4xx_hal.h"
 
 class BluewhiteCanComm {
  public:
-  explicit BluewhiteCanComm(FDCAN_HandleTypeDef* bluelink_fdcan, MicroSequenceExecutor* sequence_executor,
+  explicit BluewhiteCanComm(CommCanHandle* bluelink_fdcan, MicroSequenceExecutor* sequence_executor,
                             GpcController* gpc_controller = nullptr);
 
   void tick();
@@ -36,7 +35,7 @@ class BluewhiteCanComm {
   InterfaceStatus configureCanFilter();
   void processRxQueuedMessage();
   void processTxQueue();
-  void directEnqueueRxFromInterrupt(const FDCAN_RxHeaderTypeDef& header, const uint8_t* data, uint8_t length);
+  void directEnqueueRxFromInterrupt(const CommCanRxHeader& header, const uint8_t* data, uint8_t length);
 
   bool sendCanMessage(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data, size_t data_size);
 };

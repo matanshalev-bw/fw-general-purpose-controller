@@ -10,7 +10,7 @@
 
 #include <cstdint>
 #include <cstring>
-#include "stm32g4xx_hal.h"
+#include "comm_defines.hpp"
 #include "interface_status.hpp"
 #include "distributed_can_id.hpp"
 #include "bluelink_messages.hpp"
@@ -93,9 +93,9 @@ class CanMessenger {
 
   CanMessenger(CommCan* comm_can, bluelink::ComponentId source_component_id);
 
-  bool enqueueTxMessage(const FDCAN_TxHeaderTypeDef& tx_header, const uint8_t* data, uint8_t length);
-  bool enqueueRxMessage(const FDCAN_RxHeaderTypeDef& rx_header, const uint8_t* data, uint8_t length);
-  bool enqueueRxMessageFromInterrupt(const FDCAN_RxHeaderTypeDef& rx_header, const uint8_t* data, uint8_t length);  // Optimized for interrupt context
+  bool enqueueTxMessage(const CommCanTxHeader& tx_header, const uint8_t* data, uint8_t length);
+  bool enqueueRxMessage(const CommCanRxHeader& rx_header, const uint8_t* data, uint8_t length);
+  bool enqueueRxMessageFromInterrupt(const CommCanRxHeader& rx_header, const uint8_t* data, uint8_t length);  // Optimized for interrupt context
   bool getNextRxMessage(RxQueueItem& item);
   
   void processQueueFromTick();

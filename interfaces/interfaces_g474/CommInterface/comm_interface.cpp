@@ -384,7 +384,7 @@ bool CommSpi::isErrorThresholdExceeded() const {
 
 ///////////////////////////////// CAN  /////////////////////////////////
 
-FDCAN_RxHeaderTypeDef CommCan::interrupt_rx_header_{};
+CommCanRxHeader CommCan::interrupt_rx_header_{};
 uint8_t CommCan::interrupt_rx_buffer_[CAN_RX_BUFFER_SIZE_] = {0};
 
 CommCan::CanState CommCan::can_state_ = CanState::INIT;
@@ -396,7 +396,7 @@ bool CommCan::tx_fifo_ready_ = true;
 uint32_t CommCan::tx_timeout_start_ = 0;
 
 void (*CommCan::tx_complete_callback_)() = nullptr;
-void (*CommCan::rx_message_callback_)(const FDCAN_RxHeaderTypeDef&, const uint8_t*, uint8_t) = nullptr;
+void (*CommCan::rx_message_callback_)(const CommCanRxHeader&, const uint8_t*, uint8_t) = nullptr;
 
 InterfaceStatus CommCan::initCanPeripheral(bool perform_reset) {
     if (fdcan_handler_ == nullptr) {
@@ -443,7 +443,7 @@ InterfaceStatus CommCan::configGlobalFilter() {
     return InterfaceStatus::INTERFACE_OK;
 }
 
-InterfaceStatus CommCan::startPeripheral(FDCAN_HandleTypeDef* handler) {
+InterfaceStatus CommCan::startPeripheral(CommCanHandle* handler) {
     if (handler == nullptr) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
@@ -459,13 +459,13 @@ InterfaceStatus CommCan::startPeripheral(FDCAN_HandleTypeDef* handler) {
     return static_cast<InterfaceStatus>(HAL_FDCAN_Start(handler));
 }
 
-InterfaceStatus CommCan::transmitStandard(FDCAN_HandleTypeDef* handler, uint32_t id, const uint8_t* data,
+InterfaceStatus CommCan::transmitStandard(CommCanHandle* handler, uint32_t id, const uint8_t* data,
                                           uint8_t dlc) {
     if (handler == nullptr || data == nullptr || dlc == 0 || dlc > 8) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
 
-    FDCAN_TxHeaderTypeDef tx_header{};
+    CommCanTxHeader tx_header{};
     tx_header.Identifier = id & 0x7FFU;
     tx_header.IdType = FDCAN_STANDARD_ID;
     tx_header.TxFrameType = FDCAN_DATA_FRAME;
@@ -513,7 +513,7 @@ InterfaceStatus CommCan::startCanPeripheral() {
     return InterfaceStatus::INTERFACE_OK;
 }
 
-InterfaceStatus CommCan::copyInterruptRxData(uint8_t* app_buffer, FDCAN_RxHeaderTypeDef& app_header) {
+InterfaceStatus CommCan::copyInterruptRxData(uint8_t* app_buffer, CommCanRxHeader& app_header) {
     if (not isDataReceived() or app_buffer == nullptr) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
@@ -735,7 +735,7 @@ bool CommCan::isErrorThresholdExceeded() const {
     return consecutive_error_count_ >= MAX_CONSECUTIVE_ERRORS_;
 }
 
-CommCan* CommCan::getInstance(FDCAN_HandleTypeDef* handle) {
+CommCan* CommCan::getInstance(CommCanHandle* handle) {
     (void)handle;
     return can_instance_;
 }
@@ -847,7 +847,7 @@ void CommCan::processRxFifo(uint32_t fifo_number) {
 
 
 
-void CommCan::setupTxHeader(FDCAN_TxHeaderTypeDef& tx_header, const bluelink::J1939CanIdStruct& can_id, uint8_t data_size) {
+void CommCan::setupTxHeader(CommCanTxHeader& tx_header, const bluelink::J1939CanIdStruct& can_id, uint8_t data_size) {
     tx_header.Identifier = CONVERT_CAN_ID_TO_UINT32(can_id);
     tx_header.IdType = FDCAN_EXTENDED_ID;
     tx_header.TxFrameType = FDCAN_DATA_FRAME;

@@ -12,11 +12,8 @@
 
 #include "interface_status.hpp"
 #include "stm32g4xx_hal.h"
+#include "comm_defines.hpp"
 #include "usbd_def.h"
-#include "stm32g4xx_hal_fdcan.h"
-#include "stm32g4xx_hal_spi.h"
-#include "stm32g4xx_hal_uart.h"
-#include "stm32g4xx_hal_i2c.h"
 #include "distributed_can_id.hpp"
 
 using CommUartHandle = UART_HandleTypeDef;
@@ -60,10 +57,10 @@ class CommInterface {
 ///////////////////////////////// USB  /////////////////////////////////
 
 class CommUsb : public CommInterface {
-  USBD_HandleTypeDef* handler_;
+  CommUsbHandle* handler_;
 
  public:
-  CommUsb(USBD_HandleTypeDef* handler, uint16_t* receive_size, bool* transmit_flag)
+  CommUsb(CommUsbHandle* handler, uint16_t* receive_size, bool* transmit_flag)
       : CommInterface(receive_size, transmit_flag), handler_(handler) {}
 
   InterfaceStatus write(const uint8_t* data, const uint16_t size) override;
@@ -192,10 +189,10 @@ class CommCan : public CommInterface {
   static constexpr uint8_t MAX_CONSECUTIVE_ERRORS_ = 10U;
   static constexpr uint8_t CAN_RX_BUFFER_SIZE_ = 64U;
 
-  FDCAN_HandleTypeDef* fdcan_handler_;
-  FDCAN_TxHeaderTypeDef tx_header_{};
+  CommCanHandle* fdcan_handler_;
+  CommCanTxHeader tx_header_{};
 
-  static FDCAN_RxHeaderTypeDef interrupt_rx_header_;
+  static CommCanRxHeader interrupt_rx_header_;
   static uint8_t interrupt_rx_buffer_[CAN_RX_BUFFER_SIZE_];
 
   static CanState can_state_;
@@ -241,11 +238,11 @@ class CommCan : public CommInterface {
     CAN_RTR_REMOTE_TYPE = FDCAN_REMOTE_FRAME
   };
 
-  static InterfaceStatus startPeripheral(FDCAN_HandleTypeDef* handler);
-  static InterfaceStatus transmitStandard(FDCAN_HandleTypeDef* handler, uint32_t id, const uint8_t* data,
+  static InterfaceStatus startPeripheral(CommCanHandle* handler);
+  static InterfaceStatus transmitStandard(CommCanHandle* handler, uint32_t id, const uint8_t* data,
                                           uint8_t dlc);
 
-  CommCan(FDCAN_HandleTypeDef* handler, uint16_t* receive_size, bool* transmit_flag, bool perform_reset = true)
+  CommCan(CommCanHandle* handler, uint16_t* receive_size, bool* transmit_flag, bool perform_reset = true)
       : CommInterface(receive_size, transmit_flag), fdcan_handler_(handler) {
     tx_header_.IdType = CanIdType::CAN_ID_TYPE_STD;
     tx_header_.TxFrameType = CanRtrType::CAN_RTR_DATA_TYPE;
@@ -265,7 +262,7 @@ class CommCan : public CommInterface {
   inline uint32_t getLastErrorTime() const { return last_error_time_; }
 
   InterfaceStatus startTransmitInterrupt(const uint8_t* data, const uint16_t size) override;
-  InterfaceStatus copyInterruptRxData(uint8_t* app_buffer, FDCAN_RxHeaderTypeDef& app_header);
+  InterfaceStatus copyInterruptRxData(uint8_t* app_buffer, CommCanRxHeader& app_header);
   InterfaceStatus deInit() override;
 
   InterfaceStatus configCustomFilter(uint32_t filter_index, CanFilterMode mode, CanFilterScale scale,
@@ -289,9 +286,9 @@ class CommCan : public CommInterface {
   InterfaceStatus abortAllTransmissions();
   InterfaceStatus prepareForBootloader();
   
-  void setupTxHeader(FDCAN_TxHeaderTypeDef& tx_header, const bluelink::J1939CanIdStruct& can_id, uint8_t data_size);
+  void setupTxHeader(CommCanTxHeader& tx_header, const bluelink::J1939CanIdStruct& can_id, uint8_t data_size);
 
-  static CommCan* getInstance(FDCAN_HandleTypeDef* handle);
+  static CommCan* getInstance(CommCanHandle* handle);
 
   void handleInterruptRxMessage();
   void setTransmitComplete();
@@ -300,8 +297,8 @@ class CommCan : public CommInterface {
   static void (*tx_complete_callback_)();
   void setTxCompleteCallback(void (*callback)()) { tx_complete_callback_ = callback; }
   
-  static void (*rx_message_callback_)(const FDCAN_RxHeaderTypeDef&, const uint8_t*, uint8_t);
-  void setRxMessageCallback(void (*callback)(const FDCAN_RxHeaderTypeDef&, const uint8_t*, uint8_t)) { rx_message_callback_ = callback; }
+  static void (*rx_message_callback_)(const CommCanRxHeader&, const uint8_t*, uint8_t);
+  void setRxMessageCallback(void (*callback)(const CommCanRxHeader&, const uint8_t*, uint8_t)) { rx_message_callback_ = callback; }
 
  private:
   InterfaceStatus initCanPeripheral(bool perform_reset = true);
