@@ -84,7 +84,19 @@ sudo apt install ./packaging/out/gpc-recorder_*_amd64.deb
 
 Installed commands: `gpc-recorder`, `gpc-recorder-repl`, `gpc-recorder-build-config`, `prog-gpc-g4`, `gpc-usb-bluelink`.
 
-Installed layout:
+### Windows zip (.exe)
+
+On a Windows machine with Python 3.10+:
+
+```powershell
+.\packaging\build_windows.ps1
+```
+
+Output: `packaging\out\gpc-recorder_<version>_win64.zip`. Unzip and run `gpc-recorder.exe` (opens http://127.0.0.1:8765/). User data lives under `%LOCALAPPDATA%\gpc-recorder\`.
+
+Bundled: web UI, REPL, firmware tree under `repo\`, and host tools in `bin\` (`g474.exe`, `gpc_usb_bluelink.exe`). Default USB port is `COM3`; CAN flashing is not available on Windows.
+
+Installed layout (Debian):
 
 - `/opt/gpc-recorder/bin/` — `g474_x86_64`, `gpc_usb_bluelink_x86_64` (+ aarch64 when built), `can_setup.sh`
 - `/opt/gpc-recorder/repo/` — sequence recorder, config CMake project, schema headers (no programmer/USB source)

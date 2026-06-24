@@ -1,11 +1,28 @@
 import os
+import sys
 from pathlib import Path
 
-TOOL_DIR = Path(__file__).resolve().parent.parent  # tools/gpc_sequence_recorder
-REPO_ROOT = TOOL_DIR.parent.parent  # fw-general-purpose-controller repo root
+from gpc_recorder.seed_exports import seed_exports_if_missing
 
-_INSTALLED_REPO = Path("/opt/gpc-recorder/repo")
-_INSTALLED_BIN_DIR = Path("/opt/gpc-recorder/bin")
+TOOL_DIR = Path(__file__).resolve().parent.parent  # tools/gpc_sequence_recorder
+
+
+def _frozen_exe_dir() -> Path | None:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return None
+
+
+_FROZEN_EXE_DIR = _frozen_exe_dir()
+
+if _FROZEN_EXE_DIR is not None:
+    REPO_ROOT = _FROZEN_EXE_DIR / "repo"
+    _INSTALLED_REPO = REPO_ROOT
+    _INSTALLED_BIN_DIR = _FROZEN_EXE_DIR / "bin"
+else:
+    REPO_ROOT = TOOL_DIR.parent.parent
+    _INSTALLED_REPO = Path("/opt/gpc-recorder/repo")
+    _INSTALLED_BIN_DIR = Path("/opt/gpc-recorder/bin")
 
 BLUELINK_MSG = REPO_ROOT / "3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include"
 PAYLOAD_STRUCTS = BLUELINK_MSG / "PayloadStructs"
@@ -15,6 +32,10 @@ def _user_data_root() -> Path:
     env = os.environ.get("GPC_RECORDER_DATA", "").strip()
     if env:
         return Path(env)
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA", "").strip()
+        if local:
+            return Path(local) / "gpc-recorder"
     xdg = os.environ.get("XDG_CACHE_HOME", "").strip()
     if xdg:
         return Path(xdg) / "gpc-recorder"
@@ -22,6 +43,8 @@ def _user_data_root() -> Path:
 
 
 def _repo_is_installed_read_only() -> bool:
+    if _FROZEN_EXE_DIR is not None:
+        return True
     try:
         return REPO_ROOT.resolve().is_relative_to(_INSTALLED_REPO.resolve())
     except AttributeError:
@@ -33,6 +56,8 @@ def _repo_is_installed_read_only() -> bool:
 def _use_user_data_paths() -> bool:
     if os.environ.get("GPC_RECORDER_USE_REPO_PATHS", "").strip().lower() in ("1", "true", "yes"):
         return False
+    if _FROZEN_EXE_DIR is not None:
+        return True
     if os.environ.get("GPC_RECORDER_DATA", "").strip():
         return True
     if _repo_is_installed_read_only():
@@ -59,6 +84,11 @@ if USE_USER_DATA_PATHS:
     VENV_DIR = USER_DATA_ROOT / "venv"
     STM32CUBEIDE_WORKSPACE = USER_DATA_ROOT / "stm32cubeide-ws"
     STM32CUBEIDE_ECLIPSE_CONFIG = USER_DATA_ROOT / "stm32cubeide-eclipse-config"
+
+    seed_exports_if_missing(
+        USER_DATA_ROOT,
+        REPO_ROOT / "configs/ConfigsTypes/g474_gpc_config_memory.hpp",
+    )
 else:
     DEFAULT_EXPORT_PATH = REPO_ROOT / "configs/ConfigsTypes/g474_gpc_config_memory.hpp"
     DEFAULT_EXPORT_BIN_PATH = REPO_ROOT / "config_projects/config_g474/Debug/config_g474.bin"

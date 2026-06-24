@@ -6,6 +6,7 @@ import asyncio
 import glob
 import platform
 import select
+import sys
 import shutil
 import subprocess
 import threading
@@ -183,11 +184,12 @@ def get_usb_session() -> UsbSession:
 
 
 def usb_bluelink_binary() -> Path:
-    name = (
-        "gpc_usb_bluelink_aarch64"
-        if platform.machine().lower() in ("aarch64", "arm64")
-        else "gpc_usb_bluelink_x86_64"
-    )
+    if sys.platform == "win32":
+        names = ("gpc_usb_bluelink.exe", "gpc-usb-bluelink.exe", "gpc_usb_bluelink_x86_64.exe")
+    elif platform.machine().lower() in ("aarch64", "arm64"):
+        names = ("gpc_usb_bluelink_aarch64",)
+    else:
+        names = ("gpc_usb_bluelink_x86_64",)
 
     # Prefer a freshly built binary in the repo over an older system-wide install.
     search_bases: List[Path] = []
@@ -195,22 +197,32 @@ def usb_bluelink_binary() -> Path:
         search_bases.append(USB_TOOL_DIR)
     search_bases.append(_INSTALLED_BIN_DIR)
     for base in search_bases:
-        path = base / name
-        if path.is_file():
-            return path
+        for name in names:
+            path = base / name
+            if path.is_file():
+                return path
 
-    resolved = shutil.which("gpc-usb-bluelink")
-    if resolved:
-        return Path(resolved)
+    for cmd in ("gpc-usb-bluelink", "gpc_usb_bluelink"):
+        resolved = shutil.which(cmd)
+        if resolved:
+            return Path(resolved)
 
     raise UsbBridgeError(
-        f"USB bridge binary not found ({name}). "
+        f"USB bridge binary not found ({', '.join(names)}). "
         f"Installed package: gpc-usb-bluelink. "
         f"Dev build: cd tools/gpc_usb_bluelink && make CC=g++ all"
     )
 
 
 def list_serial_ports() -> List[str]:
+    if sys.platform == "win32":
+        try:
+            import serial.tools.list_ports
+
+            return sorted({port.device for port in serial.tools.list_ports.comports()})
+        except ImportError:
+            return []
+
     patterns = [
         "/dev/ttyACM*",
         "/dev/ttyUSB*",

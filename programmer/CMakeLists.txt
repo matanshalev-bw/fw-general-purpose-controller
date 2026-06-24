@@ -36,7 +36,6 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
 set(PROGRAMMER_SOURCES
     g474/programmer.cpp
-    g474/can_transport.cpp
     g474/usb_transport.cpp
     g474/concrete_bluelink_callbacks.cpp
     ${BLUELINK_SER}/Communicator/AckVector/ack_vector.cpp
@@ -46,8 +45,17 @@ set(PROGRAMMER_SOURCES
     ${BLUELINK_SER}/Serialization/Deserializer/deserializer.cpp
     ${BLUELINK_SER}/Serialization/Serializer/serializer.cpp
     ${LLC_COMMON}/serial.cpp
-    ${LLC_COMMON}/unix.cpp
+    ${LLC_COMMON}/host_platform.cpp
 )
+
+if(WIN32)
+    list(APPEND PROGRAMMER_SOURCES ${LLC_COMMON}/win.cpp)
+else()
+    list(APPEND PROGRAMMER_SOURCES
+        g474/can_transport.cpp
+        ${LLC_COMMON}/unix.cpp
+    )
+endif()
 
 add_executable(prog-gpc-g4 ${PROGRAMMER_SOURCES})
 
@@ -59,7 +67,9 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(prog-gpc-g4 pthread)
 endif()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if(WIN32)
+    set_target_properties(prog-gpc-g4 PROPERTIES OUTPUT_NAME "g474")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     if(CMAKE_CXX_COMPILER MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
         set_target_properties(prog-gpc-g4 PROPERTIES OUTPUT_NAME "prog-gpc-g4_aarch64")
         message(STATUS "Building for ARM64 (aarch64)")

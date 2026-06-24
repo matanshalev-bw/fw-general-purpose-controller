@@ -1,4 +1,6 @@
 out/
+dist/
 cmake/toolchain-paths.cmake
 config_projects/.metadata/
 packaging/out/
+packaging/.build-venv-win/

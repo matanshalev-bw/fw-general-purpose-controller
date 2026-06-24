@@ -33,64 +33,8 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .init_state_sequence = {
-            .step_count = 14,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
             },
         },
         .manual_state_tick_sequence = {

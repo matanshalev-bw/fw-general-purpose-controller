@@ -6,6 +6,7 @@ import asyncio
 import platform
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -29,12 +30,16 @@ def programmer_binary() -> Path:
         if resolved:
             return Path(resolved)
 
-    is_arm = platform.machine().lower() in ("aarch64", "arm64")
-    makefile_names = ("g474_aarch64", "g474_x86_64") if is_arm else ("g474_x86_64", "g474_aarch64")
-    cmake_names = ("prog-gpc-g4_aarch64", "prog-gpc-g4_x86_64") if is_arm else (
-        "prog-gpc-g4_x86_64",
-        "prog-gpc-g4_aarch64",
-    )
+    if sys.platform == "win32":
+        makefile_names = ("g474.exe", "prog-gpc-g4.exe")
+        cmake_names = ("prog-gpc-g4.exe",)
+    else:
+        is_arm = platform.machine().lower() in ("aarch64", "arm64")
+        makefile_names = ("g474_aarch64", "g474_x86_64") if is_arm else ("g474_x86_64", "g474_aarch64")
+        cmake_names = ("prog-gpc-g4_aarch64", "prog-gpc-g4_x86_64") if is_arm else (
+            "prog-gpc-g4_x86_64",
+            "prog-gpc-g4_aarch64",
+        )
 
     for name in makefile_names:
         path = PROGRAMMER_DIR / name

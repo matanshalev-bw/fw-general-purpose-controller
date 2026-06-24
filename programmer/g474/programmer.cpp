@@ -1,4 +1,4 @@
-#include <unistd.h>
+#include "host_platform.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -11,18 +11,24 @@
 #include <string>
 #include <vector>
 
-#define delay(milis) usleep(milis * 1000)
+#define delay(milis) host_delay_ms(static_cast<unsigned>(milis))
 
 #include "../../3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include/bluelink_messages.hpp"
 #include "../../3rd_party/bluelink_sdk/bluelink_messages/bluelink_messages_include/distributed_can_id.hpp"
 #include "../../interfaces/interfaces_g474/MemoryMap/memory_map.hpp"
 #include "../../versions.hpp"
 #include "bluelink_transport.hpp"
+#ifndef _WIN32
 #include "can_transport.hpp"
+#endif
 #include "usb_transport.hpp"
 
 const std::string DEFAULT_CAN_INTERFACE = "can1";
+#ifdef _WIN32
+const std::string DEFAULT_USB_PORT = "COM3";
+#else
 const std::string DEFAULT_USB_PORT = "/dev/ttyACM0";
+#endif
 const std::string DEFAULT_APP_BIN = "../../application_projects/application_g474/Debug/application_g474.bin";
 const std::string DEFAULT_CONFIG_BIN = "../../config_projects/config_g474/Debug/config_g474.bin";
 const bluelink::ComponentId DEFAULT_FLASHED_CONTROLLER =
@@ -61,7 +67,11 @@ const std::map<uint8_t, std::string> CONFIG_TYPE_TO_BIN_MAP = {
 };
 
 struct ProgrammerOptions {
+#ifdef _WIN32
+  TransportType transport = TransportType::USB;
+#else
   TransportType transport = TransportType::CAN;
+#endif
   std::string can_interface = DEFAULT_CAN_INTERFACE;
   std::string usb_port = DEFAULT_USB_PORT;
   std::string controller_type = "gpc";
@@ -412,7 +422,11 @@ bool parseOptions(int argc, char* argv[], ProgrammerOptions& opts) {
     if (transport == "usb") {
       opts.transport = TransportType::USB;
     } else if (transport == "can") {
+#ifndef _WIN32
       opts.transport = TransportType::CAN;
+#else
+      return false;
+#endif
     } else {
       return false;
     }
@@ -474,8 +488,13 @@ int main(int argc, char* argv[]) {
     std::cout << "Using USB transport on " << opts.usb_port << std::endl;
     transport = std::make_unique<UsbTransport>(opts.usb_port);
   } else {
+#ifndef _WIN32
     std::cout << "Using CAN transport on " << opts.can_interface << std::endl;
     transport = std::make_unique<CanTransport>(opts.can_interface);
+#else
+    std::cout << "CAN transport is not available on Windows (use --transport usb)\n";
+    return -1;
+#endif
   }
 
   g_transport = transport.get();

@@ -2,9 +2,9 @@
 #include "usb_transport.hpp"
 
 #include <cstring>
-#include <unistd.h>
 
 #include "bluelink_communication_handler.hpp"
+#include "host_platform.h"
 #include "serial.h"
 
 namespace {
@@ -14,7 +14,7 @@ constexpr int kDefaultBaud = 115200;
 constexpr int kReopenWaitMs = 3500;
 constexpr int kPostAppStartDelayMs = 400;
 
-void delayMs(unsigned ms) { usleep(ms * 1000); }
+void delayMs(unsigned ms) { host_delay_ms(ms); }
 
 struct UsbReceivedMessage {
   bool has_programming = false;

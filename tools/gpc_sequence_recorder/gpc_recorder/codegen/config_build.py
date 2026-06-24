@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
@@ -38,6 +39,26 @@ class ConfigBuildError(RuntimeError):
 
 
 def _stm32_cube_gcc_candidates() -> list[Path]:
+    candidates: list[Path] = []
+
+    if sys.platform == "win32":
+        for env_name in ("ProgramFiles", "ProgramFiles(x86)"):
+            root = os.environ.get(env_name, "").strip()
+            if not root:
+                continue
+            base = Path(root) / "STMicroelectronics" / "STM32Cube" / "STM32CubeIDE"
+            if base.is_dir():
+                candidates.extend(
+                    sorted(
+                        base.glob(
+                            "plugins/com.st.stm32cube.ide.mcu.externaltools."
+                            "gnu-tools-for-stm32.*/tools/bin/arm-none-eabi-gcc.exe"
+                        ),
+                        reverse=True,
+                    )
+                )
+        return candidates
+
     opt_st = Path("/opt/st")
     if not opt_st.is_dir():
         return []
@@ -73,12 +94,31 @@ def arm_toolchain_available() -> bool:
 
 
 def find_stm32cubeide_headless() -> Path:
-    """Resolve headless-build.sh (STM32CUBEIDE env or /opt/st/stm32cubeide_*)."""
+    """Resolve STM32CubeIDE headless build script (headless-build.sh or .bat)."""
     env_root = os.environ.get("STM32CUBEIDE", "").strip()
     if env_root:
-        candidate = Path(env_root) / "headless-build.sh"
-        if candidate.is_file():
-            return candidate
+        root = Path(env_root)
+        for name in ("headless-build.bat", "headless-build.sh"):
+            candidate = root / name
+            if candidate.is_file():
+                return candidate
+
+    if sys.platform == "win32":
+        for env_name in ("ProgramFiles", "ProgramFiles(x86)"):
+            root = os.environ.get(env_name, "").strip()
+            if not root:
+                continue
+            base = Path(root) / "STMicroelectronics" / "STM32Cube" / "STM32CubeIDE"
+            if not base.is_dir():
+                continue
+            installs = sorted(base.glob("STM32CubeIDE_*/headless-build.bat"), reverse=True)
+            for script in installs:
+                if script.is_file():
+                    return script
+
+        raise ConfigBuildError(
+            "STM32CubeIDE not found. Install STM32CubeIDE or set STM32CUBEIDE to the install directory."
+        )
 
     opt_st = Path("/opt/st")
     if opt_st.is_dir():

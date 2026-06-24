@@ -36,12 +36,18 @@ def _ensure_port_available(host: str, port: int) -> None:
             sock.bind((host, port))
         except OSError as exc:
             if exc.errno == errno.EADDRINUSE:
-                print(
-                    f"Port {port} is already in use (another gpc-recorder may be running).\n"
-                    f"  Stop it: pkill -f 'gpc_recorder'  or  kill the process on :{port}\n"
-                    f"  Or use another port: gpc-recorder --port 8766",
-                    file=sys.stderr,
-                )
+                if sys.platform == "win32":
+                    hint = (
+                        f"Port {port} is already in use (another gpc-recorder may be running).\n"
+                        f"  Close the other process or use another port: gpc-recorder --port 8766"
+                    )
+                else:
+                    hint = (
+                        f"Port {port} is already in use (another gpc-recorder may be running).\n"
+                        f"  Stop it: pkill -f 'gpc_recorder'  or  kill the process on :{port}\n"
+                        f"  Or use another port: gpc-recorder --port 8766"
+                    )
+                print(hint, file=sys.stderr)
                 sys.exit(1)
             raise
 

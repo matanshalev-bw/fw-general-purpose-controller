@@ -2,20 +2,30 @@
 # make
 # make CXX=g++ all
 # make CXX=aarch64-linux-gnu-g++ all
+# Windows (MinGW): make OS=Windows_NT
 
 CXX ?= g++
-ifeq ($(CXX),aarch64-linux-gnu-g++)
-	ifeq ($(shell which $(CXX) 2>/dev/null),)
-		$(warning WARNING: aarch64-linux-gnu-g++ not found, falling back to g++)
-		CXX := g++
-		OUTPUT := g474
-	else
-		OUTPUT := g474_aarch64
-	endif
-else ifeq ($(CXX),g++)
-	OUTPUT := g474_x86_64
+
+ifeq ($(OS),Windows_NT)
+	OUTPUT := g474.exe
+	PLATFORM_SRC := win.cpp
+	EXTRA_LDFLAGS :=
 else
-	OUTPUT := g474
+	ifeq ($(CXX),aarch64-linux-gnu-g++)
+		ifeq ($(shell which $(CXX) 2>/dev/null),)
+			$(warning WARNING: aarch64-linux-gnu-g++ not found, falling back to g++)
+			CXX := g++
+			OUTPUT := g474
+		else
+			OUTPUT := g474_aarch64
+		endif
+	else ifeq ($(CXX),g++)
+		OUTPUT := g474_x86_64
+	else
+		OUTPUT := g474
+	endif
+	PLATFORM_SRC := unix.cpp
+	EXTRA_LDFLAGS := -lpthread
 endif
 
 REPO_ROOT := ../..
@@ -41,23 +51,27 @@ CPPFLAGS := \
 	-I$(LLC_COMMON) \
 	-I$(REPO_ROOT)/interfaces/interfaces_g474
 
-LDFLAGS := -lstdc++ -lpthread
+LDFLAGS := -lstdc++ $(EXTRA_LDFLAGS)
 
 VPATH := .:$(LLC_COMMON):$(BLUELINK_SER)/Communicator/AckVector:$(BLUELINK_SER)/Communicator:$(BLUELINK_SER)/Serialization/CRC32:$(BLUELINK_SER)/Serialization/Deserializer:$(BLUELINK_SER)/Serialization/Serializer:$(BLUELINK_SER)/Communicator/BluelinkCommHandler
 
 SRC_FILES := \
 	programmer.cpp \
-	can_transport.cpp \
 	usb_transport.cpp \
 	concrete_bluelink_callbacks.cpp \
 	serial.cpp \
-	unix.cpp \
+	host_platform.cpp \
+	$(PLATFORM_SRC) \
 	ack_vector.cpp \
 	bluelink_callbacks.cpp \
 	checksum_32.cpp \
 	deserializer.cpp \
 	serializer.cpp \
 	bluelink_communication_handler.cpp
+
+ifneq ($(OS),Windows_NT)
+SRC_FILES += can_transport.cpp
+endif
 
 OBJ_FILES := $(addprefix $(OBJ_DIR)/,$(notdir $(SRC_FILES:.cpp=.o)))
 
@@ -76,6 +90,6 @@ run: $(OUTPUT)
 	./$(OUTPUT)
 
 clean:
-	rm -rf $(OBJ_DIR) g474 g474_*
+	rm -rf $(OBJ_DIR) g474 g474_* g474.exe
 
 .PHONY: all run clean

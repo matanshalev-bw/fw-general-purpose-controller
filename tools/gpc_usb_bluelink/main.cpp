@@ -1,6 +1,4 @@
-#include <unistd.h>
-
-#include <poll.h>
+#include "host_platform.h"
 
 #include <algorithm>
 #include <cctype>
@@ -19,14 +17,18 @@
 
 namespace {
 
+#ifdef _WIN32
+constexpr const char* kDefaultPort = "COM3";
+#else
 constexpr const char* kDefaultPort = "/dev/ttyACM0";
+#endif
 constexpr int kDefaultBaud = 115200;
 constexpr int kSerialTimeoutMs = 700;
 
 serial::Serial g_serial;
 uint8_t g_rx_buffer[kCommBufferSize]{};
 
-void delayMs(unsigned ms) { usleep(ms * 1000); }
+void delayMs(unsigned ms) { host_delay_ms(static_cast<unsigned>(ms)); }
 
 bool parseInbound(bluelink::PayloadTypeIds /*payload_type*/, const uint8_t* /*buffer*/) { return true; }
 
@@ -437,10 +439,7 @@ bool handleStdinSend(const std::string& line, bluelink::BluelinkCommunicationHan
 }
 
 void pollStdinSends(bluelink::BluelinkCommunicationHandler& bluelink) {
-  struct pollfd pfd {};
-  pfd.fd = STDIN_FILENO;
-  pfd.events = POLLIN;
-  if (poll(&pfd, 1, 0) <= 0) {
+  if (!host_stdin_readable()) {
     return;
   }
 
