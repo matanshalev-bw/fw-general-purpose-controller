@@ -241,6 +241,10 @@ class CommCan : public CommInterface {
     CAN_RTR_REMOTE_TYPE = FDCAN_REMOTE_FRAME
   };
 
+  static InterfaceStatus startPeripheral(FDCAN_HandleTypeDef* handler);
+  static InterfaceStatus transmitStandard(FDCAN_HandleTypeDef* handler, uint32_t id, const uint8_t* data,
+                                          uint8_t dlc);
+
   CommCan(FDCAN_HandleTypeDef* handler, uint16_t* receive_size, bool* transmit_flag, bool perform_reset = true)
       : CommInterface(receive_size, transmit_flag), fdcan_handler_(handler) {
     tx_header_.IdType = CanIdType::CAN_ID_TYPE_STD;

@@ -15,7 +15,9 @@ namespace {
   static CommI2c i2c(&HardwareMap::i2c_main);
 
 GpioPortType toGpioPort(uint8_t port) { return static_cast<GpioPortType>(port); }
-GpioPinNumber toGpioPin(uint8_t pin) { return static_cast<GpioPinNumber>(GPIO_PIN_0 << pin); }
+GpioPinNumber toGpioPin(uint8_t pin) {
+  return static_cast<GpioPinNumber>(static_cast<uint16_t>(GpioPinNumber::PIN_0) << pin);
+}
 
 
 }  // namespace
