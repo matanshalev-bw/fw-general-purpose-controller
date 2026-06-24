@@ -40,6 +40,32 @@ InterfaceStatus CommUsb::startTransmitInterrupt(const uint8_t* data, const uint1
 
 InterfaceStatus CommUsb::deInit() { return static_cast<InterfaceStatus>(USBD_Stop(handler_)); }
 
+///////////////////////////////// UART  /////////////////////////////////
+
+InterfaceStatus CommUart::write(const uint8_t* data, const uint16_t size) {
+  if (handler_ == nullptr || data == nullptr || size == 0) {
+    return InterfaceStatus::INTERFACE_ERROR;
+  }
+
+  return static_cast<InterfaceStatus>(HAL_UART_Transmit(handler_, const_cast<uint8_t*>(data), size, TIMEOUT_));
+}
+
+///////////////////////////////// I2C  /////////////////////////////////
+
+InterfaceStatus CommI2c::setDeviceAddr(const uint16_t device_addr) {
+  device_addr_ = device_addr;
+  return InterfaceStatus::INTERFACE_OK;
+}
+
+InterfaceStatus CommI2c::write(const uint8_t* data, const uint16_t size) {
+  if (handler_ == nullptr || device_addr_ == 0 || data == nullptr || size == 0) {
+    return InterfaceStatus::INTERFACE_ERROR;
+  }
+
+  return static_cast<InterfaceStatus>(
+      HAL_I2C_Master_Transmit(handler_, device_addr_, const_cast<uint8_t*>(data), size, TIMEOUT_));
+}
+
 ///////////////////////////////// SPI  /////////////////////////////////
 
 CommSpi* CommSpi::spi_instance_ = nullptr;
@@ -93,25 +119,16 @@ InterfaceStatus CommSpi::read(uint8_t* data, const uint16_t size) {
 }
 
 InterfaceStatus CommSpi::write(const uint8_t* data, const uint16_t size) {
-    if (not isMasterMode() or data == nullptr or size == 0) {
+    if (not isMasterMode() or handler_ == nullptr or data == nullptr or size == 0) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
 
-    uint8_t oc = opcode_ | 0x80U;
-
-    InterfaceStatus status = static_cast<InterfaceStatus>(HAL_SPI_Transmit(handler_, &oc, sizeof(opcode_), TIMEOUT_));
-    if (status != InterfaceStatus::INTERFACE_OK) {
-        return handleSpiError(status);
+    uint8_t rx_data[64];
+    if (size > sizeof(rx_data)) {
+        return InterfaceStatus::INTERFACE_ERROR;
     }
 
-    status = static_cast<InterfaceStatus>(HAL_SPI_Transmit(handler_, const_cast<uint8_t*>(data), size, TIMEOUT_));
-
-    if (status == InterfaceStatus::INTERFACE_OK) {
-        resetErrorCount();
-        return InterfaceStatus::INTERFACE_OK;
-    }
-
-    return handleSpiError(status);
+    return transmitReceive(data, rx_data, size);
 }
 
 InterfaceStatus CommSpi::transmitReceive(const uint8_t* tx_data, uint8_t* rx_data, const uint16_t size) {

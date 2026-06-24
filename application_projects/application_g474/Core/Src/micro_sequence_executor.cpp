@@ -2,23 +2,21 @@
 
 #include <cstring>
 
+#include "comm_interface.hpp"
 #include "gpio_interface.hpp"
+#include "hardware_map.hpp"
 #include "raw_can_interface.hpp"
 #include "system_interface.hpp"
 
-#ifdef HAL_ADC_MODULE_ENABLED
-#include "adc_manager.hpp"
-#endif
-
-extern UART_HandleTypeDef huart2;
-extern SPI_HandleTypeDef hspi1;
-extern I2C_HandleTypeDef hi2c1;
-
 namespace {
 
-GpioPortType toGpioPort(uint8_t port) { return static_cast<GpioPortType>(port); }
+  static CommUart uart(&HardwareMap::uart_main);
+  static CommSpi spi(&HardwareMap::spi_main);
+  static CommI2c i2c(&HardwareMap::i2c_main);
 
+GpioPortType toGpioPort(uint8_t port) { return static_cast<GpioPortType>(port); }
 GpioPinNumber toGpioPin(uint8_t pin) { return static_cast<GpioPinNumber>(GPIO_PIN_0 << pin); }
+
 
 }  // namespace
 
@@ -32,11 +30,11 @@ bool MicroSequenceExecutor::isDelayDue() const {
   if (delay_duration_ms_ == 0) {
     return true;
   }
-  return (HAL_GetTick() - delay_start_ms_) >= delay_duration_ms_;
+  return (SystemInterface::getTick() - delay_start_ms_) >= delay_duration_ms_;
 }
 
 void MicroSequenceExecutor::startDelay(uint32_t delay_ms) {
-  delay_start_ms_ = HAL_GetTick();
+  delay_start_ms_ = SystemInterface::getTick();
   delay_duration_ms_ = delay_ms;
   state_ = State::WAITING_DELAY;
 }
@@ -248,27 +246,30 @@ bool MicroSequenceExecutor::executeCanTransmit(const bluelink::MicroOpsPayload::
 }
 
 bool MicroSequenceExecutor::executeUartTransmit(const bluelink::MicroOpsPayload::MicroUartTransmit& op) {
-  if (op.uart_instance != 2 || op.length == 0 || op.length > 8) {
-    return false;
-  }
+  // if (op.uart_instance != HardwareMap::MICRO_SEQUENCE_UART_INSTANCE || op.length == 0 || op.length > 8) {
+  //   return false;
+  // }
 
-  return HAL_UART_Transmit(&huart2, const_cast<uint8_t*>(op.data), op.length, 100) == HAL_OK;
+  return uart.write(op.data, op.length) == InterfaceStatus::INTERFACE_OK;
 }
 
 bool MicroSequenceExecutor::executeSpiTransfer(const bluelink::MicroOpsPayload::MicroSpiTransfer& op) {
-  if (op.spi_instance != 2 || op.tx_len == 0 || op.tx_len > 8) {
+  if (
+    //op.spi_instance != HardwareMap::MICRO_SEQUENCE_SPI_INSTANCE ||
+     op.tx_len == 0 || op.tx_len > 8) {
     return false;
   }
 
-  uint8_t rx_data[8] = {};
-  return HAL_SPI_TransmitReceive(&hspi1, const_cast<uint8_t*>(op.tx_data), rx_data, op.tx_len, 100) == HAL_OK;
+  return spi.write(op.tx_data, op.tx_len) == InterfaceStatus::INTERFACE_OK;
 }
 
 bool MicroSequenceExecutor::executeI2cWrite(const bluelink::MicroOpsPayload::MicroI2cWrite& op) {
-  if (op.i2c_instance != 1 || op.length == 0 || op.length > 8) {
+  if (
+    //op.i2c_instance != HardwareMap::MICRO_SEQUENCE_I2C_INSTANCE || 
+    op.length == 0 || op.length > 8) {
     return false;
   }
 
-  return HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(op.device_addr << 1), const_cast<uint8_t*>(op.data),
-                                 op.length, 100) == HAL_OK;
+  i2c.setDeviceAddr(static_cast<uint16_t>(op.device_addr << 1));
+  return i2c.write(op.data, op.length) == InterfaceStatus::INTERFACE_OK;
 }

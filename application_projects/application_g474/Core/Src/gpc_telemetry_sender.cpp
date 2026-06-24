@@ -67,12 +67,12 @@ bool GpcTelemetrySender::sendBinding(const volatile TelemetryBinding& binding, c
   }
 
   const auto payload_type = static_cast<bluelink::PayloadTypeIds>(binding.payload_type);
-  const uint8_t broadcast_dest = bluelink::ComponentId::COMPONENT_ID_BROADCAST;
+  //const uint8_t broadcast_dest = bluelink::ComponentId::COMPONENT_ID_BROADCAST;
   // const bool can_sent =
   //     can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, binding.payload_size);
   const bool usb_sent = usb_comm_->sendTelemetry(payload_type, payload, binding.payload_size);
   //return can_sent && usb_sent;
-  return true;
+  return usb_sent;
 }
 
 void GpcTelemetrySender::tick() {

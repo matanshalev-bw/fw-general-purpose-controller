@@ -15,7 +15,13 @@
 #include "usbd_def.h"
 #include "stm32g4xx_hal_fdcan.h"
 #include "stm32g4xx_hal_spi.h"
+#include "stm32g4xx_hal_uart.h"
+#include "stm32g4xx_hal_i2c.h"
 #include "distributed_can_id.hpp"
+
+using CommUartHandle = UART_HandleTypeDef;
+using CommSpiHandle = SPI_HandleTypeDef;
+using CommI2cHandle = I2C_HandleTypeDef;
 
 class CommInterface {
  protected:
@@ -86,7 +92,7 @@ class CommSpi : public CommInterface {
   static constexpr uint32_t SPI_SLAVE_TIMEOUT_MS_ = 1000U;
   static constexpr uint8_t MAX_CONSECUTIVE_ERRORS_ = 3U;
 
-  SPI_HandleTypeDef* handler_;
+  CommSpiHandle* handler_;
   uint8_t opcode_ = 0;
 
   SpiMode spi_mode_;
@@ -102,13 +108,16 @@ class CommSpi : public CommInterface {
   uint16_t slave_receive_size_buffer_ = 0;
 
  public:
-  CommSpi(SPI_HandleTypeDef* handler, uint16_t* receive_size, bool* transmit_flag, bool is_slave,
+  CommSpi(CommSpiHandle* handler, uint16_t* receive_size, bool* transmit_flag, bool is_slave,
           const uint32_t timeout = TIMEOUT_DEFAULT_)
       : CommInterface(receive_size, transmit_flag), handler_(handler),
         spi_mode_(is_slave ? SpiMode::SLAVE : SpiMode::MASTER) {
     (void)timeout; // timeout kept for API symmetry if needed later
     initializeSpiInstance();
   }
+
+  CommSpi(CommSpiHandle* handler, const uint32_t timeout = TIMEOUT_DEFAULT_)
+      : CommInterface(timeout), handler_(handler), spi_mode_(SpiMode::MASTER) {}
 
   inline bool isMasterMode() const { return spi_mode_ == SpiMode::MASTER; }
   inline bool isSlaveMode() const { return spi_mode_ == SpiMode::SLAVE; }
@@ -145,6 +154,32 @@ class CommSpi : public CommInterface {
 
   void prepareSlaveForNextTransaction();
   InterfaceStatus validateSlaveBuffers();
+};
+
+///////////////////////////////// UART /////////////////////////////////
+
+class CommUart : public CommInterface {
+  CommUartHandle* handler_;
+
+ public:
+  CommUart(CommUartHandle* handler, const uint32_t timeout = TIMEOUT_DEFAULT_)
+      : CommInterface(timeout), handler_(handler) {}
+
+  InterfaceStatus write(const uint8_t* data, const uint16_t size) override;
+};
+
+///////////////////////////////// I2C  /////////////////////////////////
+
+class CommI2c : public CommInterface {
+  CommI2cHandle* handler_;
+  uint16_t device_addr_ = 0;
+
+ public:
+  CommI2c(CommI2cHandle* handler, const uint32_t timeout = TIMEOUT_DEFAULT_)
+      : CommInterface(timeout), handler_(handler) {}
+
+  InterfaceStatus setDeviceAddr(const uint16_t device_addr);
+  InterfaceStatus write(const uint8_t* data, const uint16_t size) override;
 };
 
 ///////////////////////////////// CAN  /////////////////////////////////

@@ -25,6 +25,7 @@ extern volatile uint32_t g_pfnVectors[VECTOR_TABLE_SIZE];
 
 class SystemInterface {
  public:
+  static uint32_t getTick();
   static void delay(const uint32_t delay_ms);
   static InterfaceStatus resetController();
   static InterfaceStatus setVectorTable();
