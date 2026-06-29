@@ -18,6 +18,8 @@ class GpcController {
 
   bluelink::ControllerState getState() const { return state_; }
 
+  void moveToErrorState();
+  void moveToEmergencyState();
   bool sendSetStateRequest(bluelink::ControllerState req_state);
   bool handleControllerStateCommand(const bluelink::CommandsPayload::ControllerStateCommand& cmd);
 

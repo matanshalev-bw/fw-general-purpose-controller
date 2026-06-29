@@ -76,6 +76,11 @@ def _format_union_init(member: str, values: Dict[str, Any], schema=None) -> str:
                 parts.append(_format_array_field(v, size, hex_bytes=use_hex))
             elif member == "can_transmit" and field.name == "id":
                 parts.append(f"0x{int(v):X}")
+            elif member == "if_condition" and field.name == "compare_type":
+                enum_name = v.split("::")[-1] if isinstance(v, str) else str(v)
+                parts.append(
+                    f"static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::{enum_name})"
+                )
             else:
                 parts.append(_format_scalar(v))
         return "{" + ", ".join(parts) + "}"

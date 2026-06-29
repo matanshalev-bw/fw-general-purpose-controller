@@ -32,6 +32,10 @@ _OP_TYPE_TO_MEMBER = {
     "UART_TRANSMIT": "uart_transmit",
     "SPI_TRANSFER": "spi_transfer",
     "I2C_WRITE": "i2c_write",
+    "VAR_SET": "var_set",
+    "IF_CONDITION": "if_condition",
+    "MOVE_TO_ERROR_STATE": "move_to_error_state",
+    "MOVE_TO_EMERGENCY_STATE": "move_to_emergency_state",
 }
 
 
@@ -70,6 +74,12 @@ def _parse_scalar(token: str) -> Any:
     token = token.strip()
     if not token:
         raise ValueError("Empty scalar token")
+    compare_cast = re.match(
+        r"static_cast<uint8_t>\(\s*bluelink::MicroOpsPayload::MicroCompareType::(\w+)\s*\)",
+        token,
+    )
+    if compare_cast:
+        return compare_cast.group(1)
     if token.startswith("0x") or token.startswith("0X"):
         return int(token, 16)
     if token in ("true", "false"):
@@ -139,9 +149,20 @@ def _parse_step_values(
         if field.array_size:
             size_str = field.array_size.strip()
             size = int(size_str) if size_str.isdigit() else 8
-            arr = [_parse_scalar(tokens[ti + i]) for i in range(size)]
+            if ti >= len(tokens):
+                raise ValueError(f"Missing value for {field.name} in {union_member}")
+            token = tokens[ti].strip()
+            if token.startswith("{"):
+                inner = token[1:-1].strip()
+                arr_tokens = _split_init_list(inner)
+                arr = [_parse_scalar(t) for t in arr_tokens[:size]]
+                while len(arr) < size:
+                    arr.append(0)
+                ti += 1
+            else:
+                arr = [_parse_scalar(tokens[ti + i]) for i in range(size)]
+                ti += size
             values[field.name] = arr
-            ti += size
         else:
             if ti >= len(tokens):
                 raise ValueError(f"Missing value for {field.name} in {union_member}")
@@ -152,14 +173,19 @@ def _parse_step_values(
 
 def _parse_steps_block(steps_inner: str, schema: Schema) -> List[MicroOpStepState]:
     steps: List[MicroOpStepState] = []
-    for match in re.finditer(
-        r"\.op_type\s*=\s*bluelink::MicroOpsPayload::MicroOpType::(\w+),\s*"
-        r"\.(\w+)\s*=\s*\{([^}]*)\}",
-        steps_inner,
-    ):
-        op_name = match.group(1)
-        union_member = match.group(2)
-        init_inner = match.group(3)
+    pos = 0
+    while pos < len(steps_inner):
+        op_match = re.search(
+            r"\.op_type\s*=\s*bluelink::MicroOpsPayload::MicroOpType::(\w+),\s*"
+            r"\.(\w+)\s*=\s*\{",
+            steps_inner[pos:],
+        )
+        if not op_match:
+            break
+        op_name = op_match.group(1)
+        union_member = op_match.group(2)
+        brace_start = pos + op_match.end() - 1
+        init_inner, after_brace = _find_braced_block(steps_inner, brace_start)
         expected = _OP_TYPE_TO_MEMBER.get(op_name)
         if expected and expected != union_member:
             raise ValueError(
@@ -176,6 +202,7 @@ def _parse_steps_block(steps_inner: str, schema: Schema) -> List[MicroOpStepStat
                 values=values,
             )
         )
+        pos = after_brace
     return steps
 
 

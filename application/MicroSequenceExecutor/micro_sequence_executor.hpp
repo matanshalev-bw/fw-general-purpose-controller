@@ -6,6 +6,7 @@
 #include "sequences_configs.hpp"
 
 class RawCanInterface;
+class GpcController;
 
 class MicroSequenceExecutor {
  public:
@@ -21,6 +22,7 @@ class MicroSequenceExecutor {
 
   void setRawCanInterface(RawCanInterface* raw_can);
   void setVarStore(MicroVarStore* var_store);
+  void setGpcController(GpcController* gpc_controller);
 
   bool isRunning() const;
   State getState() const;
@@ -44,9 +46,14 @@ class MicroSequenceExecutor {
   bool executeUartTransmit(const bluelink::MicroOpsPayload::MicroUartTransmit& op);
   bool executeSpiTransfer(const bluelink::MicroOpsPayload::MicroSpiTransfer& op);
   bool executeI2cWrite(const bluelink::MicroOpsPayload::MicroI2cWrite& op);
+  bool executeVarSet(const bluelink::MicroOpsPayload::MicroVarSet& op);
+  bool executeMoveToErrorState(const bluelink::MicroOpsPayload::MicroMoveToErrorState& op);
+  bool executeMoveToEmergencyState(const bluelink::MicroOpsPayload::MicroMoveToEmergencyState& op);
+  bool evaluateCondition(const bluelink::MicroOpsPayload::MicroIfCondition& op) const;
 
   RawCanInterface* raw_can_ = nullptr;
   MicroVarStore* var_store_ = nullptr;
+  GpcController* gpc_controller_ = nullptr;
   const volatile MicroSequence* active_sequence_ = nullptr;
   uint8_t step_index_ = 0;
   bool loop_on_complete_ = false;

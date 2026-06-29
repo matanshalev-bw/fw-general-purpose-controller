@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "comm_interface.hpp"
+#include "gpc_controller.hpp"
 #include "gpio_interface.hpp"
 #include "hardware_map.hpp"
 #include "raw_can_interface.hpp"
@@ -27,6 +28,8 @@ MicroSequenceExecutor::MicroSequenceExecutor() = default;
 void MicroSequenceExecutor::setRawCanInterface(RawCanInterface* raw_can) { raw_can_ = raw_can; }
 
 void MicroSequenceExecutor::setVarStore(MicroVarStore* var_store) { var_store_ = var_store; }
+
+void MicroSequenceExecutor::setGpcController(GpcController* gpc_controller) { gpc_controller_ = gpc_controller; }
 
 bool MicroSequenceExecutor::isDelayDue() const {
   if (delay_duration_ms_ == 0) {
@@ -118,6 +121,28 @@ void MicroSequenceExecutor::tick() {
       return;
     }
 
+    if (step.op_type == bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION) {
+      const auto* if_op = reinterpret_cast<const bluelink::MicroOpsPayload::MicroIfCondition*>(step.params);
+      if (if_op->first_var_index >= MICRO_VAR_SLOT_COUNT || if_op->second_var_index >= MICRO_VAR_SLOT_COUNT ||
+          if_op->compare_type > static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE) ||
+          var_store_ == nullptr) {
+        state_ = State::ERROR;
+        active_sequence_ = nullptr;
+        return;
+      }
+      if (step_index_ + if_op->step_count >= active_sequence_->step_count) {
+        state_ = State::ERROR;
+        active_sequence_ = nullptr;
+        return;
+      }
+      if (not evaluateCondition(*if_op)) {
+        step_index_ += if_op->step_count + 1;
+        continue;
+      }
+      step_index_++;
+      continue;
+    }
+
     if (not executeStep(step)) {
       state_ = State::ERROR;
       active_sequence_ = nullptr;
@@ -160,6 +185,14 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
       return executeSpiTransfer(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroSpiTransfer*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::I2C_WRITE:
       return executeI2cWrite(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroI2cWrite*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::VAR_SET:
+      return executeVarSet(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarSet*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::MOVE_TO_ERROR_STATE:
+      return executeMoveToErrorState(
+          *reinterpret_cast<const bluelink::MicroOpsPayload::MicroMoveToErrorState*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::MOVE_TO_EMERGENCY_STATE:
+      return executeMoveToEmergencyState(
+          *reinterpret_cast<const bluelink::MicroOpsPayload::MicroMoveToEmergencyState*>(step.params));
     default:
       return false;
   }
@@ -275,3 +308,58 @@ bool MicroSequenceExecutor::executeI2cWrite(const bluelink::MicroOpsPayload::Mic
   i2c.setDeviceAddr(static_cast<uint16_t>(op.device_addr << 1));
   return i2c.write(op.data, op.length) == InterfaceStatus::INTERFACE_OK;
 }
+
+bool MicroSequenceExecutor::executeVarSet(const bluelink::MicroOpsPayload::MicroVarSet& op) {
+  if (op.var_index >= MICRO_VAR_SLOT_COUNT || var_store_ == nullptr) {
+    return false;
+  }
+
+  var_store_->set(op.var_index, op.value);
+  return true;
+}
+
+bool MicroSequenceExecutor::executeMoveToErrorState(const bluelink::MicroOpsPayload::MicroMoveToErrorState& op) {
+  (void)op;
+  if (gpc_controller_ == nullptr) {
+    return false;
+  }
+
+  gpc_controller_->moveToErrorState();
+  stop();
+  return true;
+}
+
+bool MicroSequenceExecutor::executeMoveToEmergencyState(
+    const bluelink::MicroOpsPayload::MicroMoveToEmergencyState& op) {
+  (void)op;
+  if (gpc_controller_ == nullptr) {
+    return false;
+  }
+
+  gpc_controller_->moveToEmergencyState();
+  stop();
+  return true;
+}
+
+bool MicroSequenceExecutor::evaluateCondition(const bluelink::MicroOpsPayload::MicroIfCondition& op) const {
+  const uint32_t first = var_store_->get(op.first_var_index);
+  const uint32_t second = var_store_->get(op.second_var_index);
+
+  switch (static_cast<bluelink::MicroOpsPayload::MicroCompareType>(op.compare_type)) {
+    case bluelink::MicroOpsPayload::MicroCompareType::EQ:
+      return first == second;
+    case bluelink::MicroOpsPayload::MicroCompareType::NE:
+      return first != second;
+    case bluelink::MicroOpsPayload::MicroCompareType::GT:
+      return first > second;
+    case bluelink::MicroOpsPayload::MicroCompareType::GE:
+      return first >= second;
+    case bluelink::MicroOpsPayload::MicroCompareType::LT:
+      return first < second;
+    case bluelink::MicroOpsPayload::MicroCompareType::LE:
+      return first <= second;
+    default:
+      return false;
+  }
+}
+

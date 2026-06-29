@@ -14,11 +14,36 @@ from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS
 from gpc_recorder.validate import (
     validate_binding_count,
     validate_binding_step_count,
+    validate_condition_blocks,
     validate_powerup_step_count,
     validate_tick_step_count,
     validate_telemetry_binding_count,
     validate_var_index,
 )
+
+
+_COMPARE_TYPE_ALIASES = {
+    "==": "EQ",
+    "!=": "NE",
+    ">": "GT",
+    ">=": "GE",
+    "<": "LT",
+    "<=": "LE",
+    "EQ": "EQ",
+    "NE": "NE",
+    "GT": "GT",
+    "GE": "GE",
+    "LT": "LT",
+    "LE": "LE",
+}
+
+
+def _normalize_compare_type(comparing_type: str) -> str:
+    key = comparing_type.strip()
+    if key not in _COMPARE_TYPE_ALIASES:
+        allowed = ", ".join(sorted(set(_COMPARE_TYPE_ALIASES.keys())))
+        raise ValueError(f"Unknown comparing_type {comparing_type!r}; use one of: {allowed}")
+    return _COMPARE_TYPE_ALIASES[key]
 
 
 class RecorderContext:
@@ -27,6 +52,7 @@ class RecorderContext:
         self.schema = get_schema()
         self._config_path: Path = DEFAULT_EXPORT_PATH
         self._last_export_path: Optional[str] = None
+        self._open_condition_stack: List[int] = []
 
     def config(self, name: str = "G474_GPC_CONFIG", component: str = "") -> None:
         self.session.config_name = name
@@ -124,36 +150,48 @@ class RecorderContext:
 
     def end_binding(self) -> None:
         if self.session.recording_powerup:
+            validate_condition_blocks(self.session.powerup_steps, open_stack=self._open_condition_stack)
             validate_powerup_step_count(len(self.session.powerup_steps))
             self.session.recording_powerup = False
+            self._open_condition_stack = []
             print(f"Powerup saved ({len(self.session.powerup_steps)} steps).")
             return
         if self.session.recording_main_tick:
+            validate_condition_blocks(self.session.main_tick_steps, open_stack=self._open_condition_stack)
             validate_tick_step_count(len(self.session.main_tick_steps), label="Main tick sequence")
             self.session.recording_main_tick = False
+            self._open_condition_stack = []
             print(f"Main tick saved ({len(self.session.main_tick_steps)} steps).")
             return
         if self.session.recording_state is not None:
             state_name = self.session.recording_state
+            validate_condition_blocks(self.session.state_steps.get(state_name, []), open_stack=self._open_condition_stack)
             validate_tick_step_count(len(self.session.state_steps.get(state_name, [])), label=f"{state_name} sequence")
             self.session.recording_state = None
+            self._open_condition_stack = []
             print(f"State sequence saved for {state_name} ({len(self.session.state_steps[state_name])} steps).")
             return
         if self.session.recording_state_tick is not None:
             state_name = self.session.recording_state_tick
+            validate_condition_blocks(
+                self.session.state_tick_steps.get(state_name, []), open_stack=self._open_condition_stack
+            )
             validate_tick_step_count(
                 len(self.session.state_tick_steps.get(state_name, [])), label=f"{state_name} tick"
             )
             self.session.recording_state_tick = None
+            self._open_condition_stack = []
             print(f"State tick saved for {state_name} ({len(self.session.state_tick_steps[state_name])} steps).")
             return
         if self.session.current_binding is None:
             raise RuntimeError("No recording in progress")
         b = self.session.current_binding
+        validate_condition_blocks(b.steps, open_stack=self._open_condition_stack)
         validate_binding_step_count(len(b.steps))
         validate_binding_count(len(self.session.bindings) + 1)
         self.session.bindings.append(b)
         self.session.current_binding = None
+        self._open_condition_stack = []
         print(f"Binding saved ({len(b.steps)} steps). Total bindings: {len(self.session.bindings)}")
 
     def bind_powerup(self) -> None:
@@ -259,6 +297,21 @@ class RecorderContext:
             return
         print("Nothing to undo.")
 
+    def _current_step_target(self) -> List[MicroOpStepState]:
+        if self.session.recording_powerup:
+            return self.session.powerup_steps
+        if self.session.recording_main_tick:
+            return self.session.main_tick_steps
+        if self.session.recording_state is not None:
+            return self.session.state_steps[self.session.recording_state]
+        if self.session.recording_state_tick is not None:
+            return self.session.state_tick_steps[self.session.recording_state_tick]
+        if self.session.current_binding is not None:
+            return self.session.current_binding.steps
+        raise RuntimeError(
+            "Call bind_powerup(), bind_main_tick(), bind_state(), bind_state_tick(), or bind_command() first"
+        )
+
     def _add_step(self, union_member: str, values: Dict[str, Any]) -> None:
         if self.session.recording_powerup:
             target = self.session.powerup_steps
@@ -284,6 +337,10 @@ class RecorderContext:
         op = self.schema.micro_ops[union_member]
         if "var_index" in values:
             validate_var_index(int(values["var_index"]))
+        if "first_var_index" in values:
+            validate_var_index(int(values["first_var_index"]))
+        if "second_var_index" in values:
+            validate_var_index(int(values["second_var_index"]))
         if len(target) >= MICRO_SEQUENCE_MAX_STEPS:
             raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_STEPS} steps per {label}")
         target.append(
@@ -392,6 +449,48 @@ class RecorderContext:
                 "data": coerce_int_byte_list(data, name="data"),
             },
         )
+
+    def var_set(self, var_index: int, value: int) -> None:
+        validate_var_index(var_index)
+        self._add_step(
+            "var_set",
+            {
+                "var_index": var_index,
+                "reserved": [0, 0, 0],
+                "value": int(value),
+            },
+        )
+
+    def if_condition(self, first_var_index: int, comparing_type: str, second_var_index: int) -> None:
+        compare_type = _normalize_compare_type(comparing_type)
+        validate_var_index(first_var_index)
+        validate_var_index(second_var_index)
+        self._add_step(
+            "if_condition",
+            {
+                "first_var_index": first_var_index,
+                "compare_type": compare_type,
+                "second_var_index": second_var_index,
+                "step_count": 0,
+            },
+        )
+        self._open_condition_stack.append(len(self._current_step_target()) - 1)
+
+    def end_condition(self) -> None:
+        target = self._current_step_target()
+        if not self._open_condition_stack:
+            raise ValueError("end_condition without matching if_condition")
+        if_index = self._open_condition_stack.pop()
+        step_count = len(target) - if_index - 1
+        if step_count > 255:
+            raise ValueError(f"condition block exceeds maximum step count (255), got {step_count}")
+        target[if_index].values["step_count"] = step_count
+
+    def move_to_error_state(self) -> None:
+        self._add_step("move_to_error_state", {"reserved": [0, 0, 0, 0]})
+
+    def move_to_emergency_state(self) -> None:
+        self._add_step("move_to_emergency_state", {"reserved": [0, 0, 0, 0]})
 
     def powerup_summary(self) -> dict:
         return {
@@ -508,7 +607,8 @@ class RecorderContext:
                 "bind_main_tick(), clear_main_tick(), "
                 "bind_state(state), clear_state(state), "
                 "bind_state_tick(state), clear_state_tick(state), "
-                "gpio_write(), adc_read(), dac_write(), delay_ms(), can_transmit(), "
+                "gpio_write(), gpio_read(), adc_read(), var_set(), if_condition(), end_condition(), "
+                "move_to_error_state(), move_to_emergency_state(), dac_write(), delay_ms(), can_transmit(), "
                 "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), "
                 "undo(), help()"
             )
@@ -603,6 +703,11 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "uart_transmit": ctx.uart_transmit,
         "spi_transfer": ctx.spi_transfer,
         "i2c_write": ctx.i2c_write,
+        "var_set": ctx.var_set,
+        "if_condition": ctx.if_condition,
+        "end_condition": ctx.end_condition,
+        "move_to_error_state": ctx.move_to_error_state,
+        "move_to_emergency_state": ctx.move_to_emergency_state,
         "help": ctx.help,
         "True": True,
         "False": False,

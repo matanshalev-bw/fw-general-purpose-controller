@@ -222,6 +222,17 @@ class Schema:
         if op_type_match:
             op_types = _parse_enum_body(op_type_match.group(1))
 
+        compare_match = re.search(
+            r"enum\s+class\s+MicroCompareType\s*:\s*uint8_t\s*\{([^}]+)\}",
+            content,
+            re.DOTALL,
+        )
+        if compare_match:
+            self.enums["MicroCompareType"] = EnumDef(
+                name="MicroCompareType",
+                values=_parse_enum_body(compare_match.group(1)),
+            )
+
         structs = self._converter.extract_structs_from_header(content, "MicroOpsPayload")
         op_to_member = {
             "NOP": None,
@@ -235,6 +246,10 @@ class Schema:
             "UART_TRANSMIT": "uart_transmit",
             "SPI_TRANSFER": "spi_transfer",
             "I2C_WRITE": "i2c_write",
+            "VAR_SET": "var_set",
+            "IF_CONDITION": "if_condition",
+            "MOVE_TO_ERROR_STATE": "move_to_error_state",
+            "MOVE_TO_EMERGENCY_STATE": "move_to_emergency_state",
         }
         for op_name, member in op_to_member.items():
             if not member:
@@ -254,6 +269,10 @@ class Schema:
                     "uart_transmit": "MicroUartTransmit",
                     "spi_transfer": "MicroSpiTransfer",
                     "i2c_write": "MicroI2cWrite",
+                    "var_set": "MicroVarSet",
+                    "if_condition": "MicroIfCondition",
+                    "move_to_error_state": "MicroMoveToErrorState",
+                    "move_to_emergency_state": "MicroMoveToEmergencyState",
                 }
                 struct_name = alt.get(member, struct_name)
             if struct_name not in structs:

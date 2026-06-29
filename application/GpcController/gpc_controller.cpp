@@ -3,7 +3,10 @@
 #include "non_volatile_memory_interface.hpp"
 #include "raw_can_interface.hpp"
 
-GpcController::GpcController() = default;
+GpcController::GpcController() {
+  main_tick_executor_.setGpcController(this);
+  state_sequence_executor_.setGpcController(this);
+}
 
 void GpcController::setRawCanInterface(RawCanInterface* raw_can) {
   main_tick_executor_.setRawCanInterface(raw_can);
@@ -51,6 +54,14 @@ bool GpcController::handleControllerStateCommand(
 void GpcController::enterState(bluelink::ControllerState new_state) {
   state_ = new_state;
   onStateChanged();
+}
+
+void GpcController::moveToErrorState() {
+  enterState(bluelink::ControllerState::CONTROLLER_STATE_ERROR);
+}
+
+void GpcController::moveToEmergencyState() {
+  enterState(bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY);
 }
 
 void GpcController::onStateChanged() {
