@@ -35,6 +35,12 @@ bool GpcController::sendSetStateRequest(bluelink::ControllerState req_state) {
     return true;
   }
 
+  if (state_ == bluelink::ControllerState::CONTROLLER_STATE_MANUAL &&
+      (req_state == bluelink::ControllerState::CONTROLLER_STATE_POWER_UP_BIT ||
+       req_state == bluelink::ControllerState::CONTROLLER_STATE_ENGAGED)) {
+    return false;
+  }
+
   if (req_state == bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL ||
       req_state == bluelink::ControllerState::CONTROLLER_STATE_ERROR ||
       req_state == bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY ||
