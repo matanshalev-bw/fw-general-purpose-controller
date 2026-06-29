@@ -49,6 +49,17 @@ def test_bind_state_tick_rejects_one_shot_states():
         ns["bind_state_tick"]("CONTROLLER_STATE_INIT")
 
 
+def test_bind_state_tick_records_error_and_emergency_steps():
+    ctx = RecorderContext()
+    ns = build_namespace(ctx)
+    for state in ("CONTROLLER_STATE_ERROR", "CONTROLLER_STATE_EMERGENCY"):
+        ns["bind_state_tick"](state)
+        ns["delay_ms"](50)
+        ns["end_binding"]()
+        assert state in ctx.session.state_tick_steps
+        assert len(ctx.session.state_tick_steps[state]) == 1
+
+
 def test_end_binding_finishes_powerup():
     ctx = RecorderContext()
     ns = build_namespace(ctx)

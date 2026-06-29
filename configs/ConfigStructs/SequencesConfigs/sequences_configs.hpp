@@ -59,6 +59,8 @@ struct SequencesConfig {
   MicroSequence engaged_state_tick_sequence = {};
   MicroSequence power_up_bit_state_sequence = {};
   MicroSequence operational_state_tick_sequence = {};
+  MicroSequence error_state_tick_sequence = {};
+  MicroSequence emergency_state_tick_sequence = {};
   uint8_t binding_count = 0;
   CommandSequenceBinding bindings[MICRO_SEQUENCE_MAX_BINDINGS] = {};
   TelemetryConfig telemetry_config = {};

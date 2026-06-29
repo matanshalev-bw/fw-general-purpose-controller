@@ -93,6 +93,8 @@ CONTROLLER_STATE_TICK_FIELDS = {
     "CONTROLLER_STATE_MANUAL": "manual_state_tick_sequence",
     "CONTROLLER_STATE_ENGAGED": "engaged_state_tick_sequence",
     "CONTROLLER_STATE_OPERATIONAL": "operational_state_tick_sequence",
+    "CONTROLLER_STATE_ERROR": "error_state_tick_sequence",
+    "CONTROLLER_STATE_EMERGENCY": "emergency_state_tick_sequence",
 }
 
 FLASH_CONFIG_ADDRESS = 0x08070000

@@ -65,7 +65,7 @@ _DESCRIPTIONS: Dict[str, str] = {
     "clear_main_tick": "Clear the main tick sequence and stop main-tick recording.",
     "bind_state": "Start a one-shot state sequence (INIT, DISENGAGEMENT, or POWER_UP_BIT); runs once, then auto-transitions.",
     "clear_state": "Remove the saved one-shot sequence for the given state.",
-    "bind_state_tick": "Start a looping tick sequence for MANUAL, ENGAGED, or OPERATIONAL.",
+    "bind_state_tick": "Start a looping tick sequence for MANUAL, ENGAGED, OPERATIONAL, ERROR, or EMERGENCY.",
     "clear_state_tick": "Remove the saved tick sequence for the given state.",
     "bind_command": "Start a trigger binding: choose payload type and command fields, then append micro-op steps.",
     "bind_telemetry": (

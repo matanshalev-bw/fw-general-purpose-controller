@@ -84,6 +84,10 @@ const volatile MicroSequence* GpcController::getStateSequence(const volatile Seq
       return &sequences.power_up_bit_state_sequence;
     case bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL:
       return &sequences.operational_state_tick_sequence;
+    case bluelink::ControllerState::CONTROLLER_STATE_ERROR:
+      return &sequences.error_state_tick_sequence;
+    case bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY:
+      return &sequences.emergency_state_tick_sequence;
     default:
       return nullptr;
   }
@@ -94,6 +98,8 @@ bool GpcController::isStateTickLoop(bluelink::ControllerState state) {
     case bluelink::ControllerState::CONTROLLER_STATE_MANUAL:
     case bluelink::ControllerState::CONTROLLER_STATE_ENGAGED:
     case bluelink::ControllerState::CONTROLLER_STATE_OPERATIONAL:
+    case bluelink::ControllerState::CONTROLLER_STATE_ERROR:
+    case bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY:
       return true;
     default:
       return false;

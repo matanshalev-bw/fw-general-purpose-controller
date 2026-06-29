@@ -78,6 +78,22 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
 {% endwith %}
             },
         },
+        .error_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.error_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.error_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
+        .emergency_state_tick_sequence = {
+            .step_count = {{ state_tick_fields.emergency_state_tick_sequence.step_count }},
+            .steps = {
+{% with steps=state_tick_fields.emergency_state_tick_sequence.steps %}
+{% include "_micro_op_steps.j2" %}
+{% endwith %}
+            },
+        },
         .binding_count = {{ binding_count }},
         .bindings = {
 {% for b in bindings %}
