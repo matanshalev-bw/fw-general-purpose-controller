@@ -1,5 +1,3 @@
 out/
-!packaging/out/
-!packaging/out/**
 cmake/toolchain-paths.cmake
 config_projects/.metadata/
