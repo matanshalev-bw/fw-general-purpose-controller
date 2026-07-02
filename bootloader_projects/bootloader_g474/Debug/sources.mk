@@ -53,6 +53,7 @@ Core/Src/interfaces_g474/CanMessenger \
 Core/Src/interfaces_g474/CommHandler \
 Core/Src/interfaces_g474/CommInterface \
 Core/Src/interfaces_g474/GpioInterface \
+Core/Src/interfaces_g474/HardwareMap \
 Core/Src/interfaces_g474/NonVolatileMemoryInterface \
 Core/Src/interfaces_g474/SchedulerInterface \
 Core/Src/interfaces_g474/SystemInterface \

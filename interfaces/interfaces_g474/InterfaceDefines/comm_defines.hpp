@@ -9,6 +9,14 @@ using CommCanTxHeader = FDCAN_TxHeaderTypeDef;
 using CommCanRxHeader = FDCAN_RxHeaderTypeDef;
 using CommUsbHandle = USBD_HandleTypeDef;
 
+#ifdef HAL_UART_MODULE_ENABLED
+using CommUartHandle = UART_HandleTypeDef;
+#endif
+
+#ifdef HAL_I2C_MODULE_ENABLED
+using CommI2cHandle = I2C_HandleTypeDef;
+#endif
+
 #ifdef HAL_DMA_MODULE_ENABLED
 using CommDmaHandle = DMA_HandleTypeDef;
 #endif

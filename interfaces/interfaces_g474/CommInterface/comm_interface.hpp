@@ -16,9 +16,7 @@
 #include "usbd_def.h"
 #include "distributed_can_id.hpp"
 
-using CommUartHandle = UART_HandleTypeDef;
 using CommSpiHandle = SPI_HandleTypeDef;
-using CommI2cHandle = I2C_HandleTypeDef;
 
 class CommInterface {
  protected:
@@ -153,6 +151,7 @@ class CommSpi : public CommInterface {
   InterfaceStatus validateSlaveBuffers();
 };
 
+#ifdef HAL_UART_MODULE_ENABLED
 ///////////////////////////////// UART /////////////////////////////////
 
 class CommUart : public CommInterface {
@@ -164,7 +163,9 @@ class CommUart : public CommInterface {
 
   InterfaceStatus write(const uint8_t* data, const uint16_t size) override;
 };
+#endif  // HAL_UART_MODULE_ENABLED
 
+#ifdef HAL_I2C_MODULE_ENABLED
 ///////////////////////////////// I2C  /////////////////////////////////
 
 class CommI2c : public CommInterface {
@@ -178,6 +179,7 @@ class CommI2c : public CommInterface {
   InterfaceStatus setDeviceAddr(const uint16_t device_addr);
   InterfaceStatus write(const uint8_t* data, const uint16_t size) override;
 };
+#endif  // HAL_I2C_MODULE_ENABLED
 
 ///////////////////////////////// CAN  /////////////////////////////////
 

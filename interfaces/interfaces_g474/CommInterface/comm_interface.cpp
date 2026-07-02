@@ -40,6 +40,7 @@ InterfaceStatus CommUsb::startTransmitInterrupt(const uint8_t* data, const uint1
 
 InterfaceStatus CommUsb::deInit() { return static_cast<InterfaceStatus>(USBD_Stop(handler_)); }
 
+#ifdef HAL_UART_MODULE_ENABLED
 ///////////////////////////////// UART  /////////////////////////////////
 
 InterfaceStatus CommUart::write(const uint8_t* data, const uint16_t size) {
@@ -49,7 +50,9 @@ InterfaceStatus CommUart::write(const uint8_t* data, const uint16_t size) {
 
   return static_cast<InterfaceStatus>(HAL_UART_Transmit(handler_, const_cast<uint8_t*>(data), size, TIMEOUT_));
 }
+#endif  // HAL_UART_MODULE_ENABLED
 
+#ifdef HAL_I2C_MODULE_ENABLED
 ///////////////////////////////// I2C  /////////////////////////////////
 
 InterfaceStatus CommI2c::setDeviceAddr(const uint16_t device_addr) {
@@ -65,6 +68,7 @@ InterfaceStatus CommI2c::write(const uint8_t* data, const uint16_t size) {
   return static_cast<InterfaceStatus>(
       HAL_I2C_Master_Transmit(handler_, device_addr_, const_cast<uint8_t*>(data), size, TIMEOUT_));
 }
+#endif  // HAL_I2C_MODULE_ENABLED
 
 ///////////////////////////////// SPI  /////////////////////////////////
 
