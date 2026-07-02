@@ -42,7 +42,7 @@ _EXAMPLES: Dict[str, str] = {
     "delay_ms": "delay_ms(100)",
     "can_transmit": "can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])",
     "pwm_set": "pwm_set(timer_instance=1, channel=1, use_var=0, var_index=0, literal_duty=1000)",
-    "uart_transmit": "uart_transmit(uart_instance=1, length=3, data=[0x01, 0x02, 0x03])",
+    "uart_transmit": 'uart_transmit(uart_instance=1, length=5, data=[0x48, 0x45, 0x4C, 0x4C, 0x4F])  # or USB data: "HELLO"',
     "spi_transfer": "spi_transfer(spi_instance=1, tx_len=3, tx_data=[0x9F, 0x00, 0x00])",
     "i2c_write": "i2c_write(i2c_instance=1, device_addr=0x50, length=2, data=[0x00, 0x01])",
     "var_set": "var_set(var_index=1, value=3500)",

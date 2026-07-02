@@ -12,7 +12,8 @@ import threading
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from gpc_recorder.dsl.pack import fill_struct_fields, pack_struct
+from gpc_recorder.dsl.coerce import coerce_int_byte_list, quoted_string_bytes
+from gpc_recorder.dsl.pack import fill_struct_fields, pack_struct, _normalize_type
 from gpc_recorder.paths import REPO_ROOT, TOOL_DIR, _INSTALLED_BIN_DIR, _repo_is_installed_read_only
 from gpc_recorder.schema.cpp_parser import StructDef
 from gpc_recorder.schema.loader import get_schema
@@ -311,13 +312,48 @@ def micro_ops_catalog() -> List[Dict[str, Any]]:
     return catalog
 
 
+def _normalize_micro_op_values(union_member: str, values: Dict[str, Any]) -> Dict[str, Any]:
+    schema = get_schema()
+    if union_member not in schema.micro_ops:
+        return values
+
+    normalized = dict(values)
+    op = schema.micro_ops[union_member]
+    data_from_quoted_string = False
+
+    for field in op.fields:
+        if not field.array_size or _normalize_type(field.cpp_type) != "uint8_t":
+            continue
+        if field.name not in normalized:
+            continue
+        raw = normalized[field.name]
+        if isinstance(raw, str) and quoted_string_bytes(raw) is not None:
+            data_from_quoted_string = True
+        elif (
+            isinstance(raw, (list, tuple))
+            and len(raw) == 1
+            and isinstance(raw[0], str)
+            and quoted_string_bytes(raw[0]) is not None
+        ):
+            data_from_quoted_string = True
+        try:
+            normalized[field.name] = coerce_int_byte_list(raw, name=field.name)
+        except ValueError as exc:
+            raise UsbBridgeError(str(exc)) from exc
+
+    if union_member == "uart_transmit" and data_from_quoted_string and "data" in normalized:
+        normalized["length"] = len(normalized["data"])
+
+    return normalized
+
+
 def pack_micro_op_hex(union_member: str, values: Dict[str, Any]) -> str:
     schema = get_schema()
     if union_member not in schema.micro_ops:
         raise UsbBridgeError(f"Unknown micro-op: {union_member}")
     op = schema.micro_ops[union_member]
     struct_def = StructDef(name=op.struct_name, fields=op.fields)
-    merged = fill_struct_fields(schema, struct_def, values)
+    merged = fill_struct_fields(schema, struct_def, _normalize_micro_op_values(union_member, values))
     raw = pack_struct(schema, struct_def, merged)
     return "".join(f"{b:02x}" for b in raw)
 

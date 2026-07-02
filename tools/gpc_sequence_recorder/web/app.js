@@ -903,6 +903,11 @@
   function pythonListLiteral(raw) {
     const s = String(raw ?? "").trim();
     if (!s) return "[]";
+    const parsed = parseByteArrayInput(s);
+    if (parsed.fromQuotedString) {
+      const parts = parsed.bytes.map((b) => `0x${b.toString(16).padStart(2, "0")}`);
+      return `[${parts.join(", ")}]`;
+    }
     const parts = s
       .split(",")
       .map((x) => x.trim())
@@ -1276,6 +1281,38 @@
     }
   }
 
+  function parseByteArrayInput(raw) {
+    const s = String(raw ?? "").trim();
+    if (!s) return { bytes: [], fromQuotedString: false };
+    if (s.startsWith('"') && s.endsWith('"')) {
+      try {
+        const text = JSON.parse(s);
+        if (typeof text === "string") {
+          return {
+            bytes: [...text].map((c) => c.charCodeAt(0) & 0xff),
+            fromQuotedString: true,
+          };
+        }
+      } catch (_e) {
+        /* fall through to comma-separated parsing */
+      }
+    }
+    if (s.startsWith("'") && s.endsWith("'") && s.length >= 2) {
+      const text = s.slice(1, -1);
+      return {
+        bytes: [...text].map((c) => c.charCodeAt(0) & 0xff),
+        fromQuotedString: true,
+      };
+    }
+    return {
+      bytes: s
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean),
+      fromQuotedString: false,
+    };
+  }
+
   function renderUsbMicroFields(op) {
     usbMicroFieldsEl.innerHTML = "";
     if (!op) return;
@@ -1290,7 +1327,7 @@
       input.dataset.field = f.name;
       if (f.array_size) {
         input.classList.add("wide");
-        input.placeholder = `comma-separated (${f.array_size})`;
+        input.placeholder = `comma-separated or "text" (${f.array_size})`;
         if (Array.isArray(f.default)) {
           input.value = f.default.join(",");
         }
@@ -1306,14 +1343,17 @@
 
   function collectUsbFieldValues(op) {
     const values = {};
+    let uartDataFromQuotedString = false;
     op.fields.forEach((f) => {
       const input = document.getElementById(`usb-field-${f.name}`);
       if (!input) return;
       let raw = input.value.trim();
       if (f.array_size) {
-        values[f.name] = raw
-          ? raw.split(",").map((s) => s.trim())
-          : [];
+        const parsed = parseByteArrayInput(raw);
+        values[f.name] = parsed.bytes;
+        if (op.union_member === "uart_transmit" && f.name === "data" && parsed.fromQuotedString) {
+          uartDataFromQuotedString = true;
+        }
         return;
       }
       if (/^0x[0-9a-fA-F]+$/.test(raw)) {
@@ -1324,6 +1364,11 @@
         values[f.name] = raw;
       }
     });
+    if (uartDataFromQuotedString && Array.isArray(values.data)) {
+      values.length = values.data.length;
+      const lengthInput = document.getElementById("usb-field-length");
+      if (lengthInput) lengthInput.value = String(values.length);
+    }
     return values;
   }
 
