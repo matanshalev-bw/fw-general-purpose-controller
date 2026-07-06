@@ -70,6 +70,58 @@ def test_end_binding_finishes_powerup():
     assert len(ctx.session.powerup_steps) == 1
 
 
+def test_bind_main_tick_appends_to_existing_sequence():
+    ctx = RecorderContext()
+    ns = build_namespace(ctx)
+    ns["bind_main_tick"]()
+    ns["gpio_write"](port=1, pin=0, value=1)
+    ns["end_binding"]()
+    ns["bind_main_tick"]()
+    ns["delay_ms"](100)
+    ns["end_binding"]()
+    assert len(ctx.session.main_tick_steps) == 2
+    assert ctx.session.main_tick_steps[0].union_member == "digital_gpio_write"
+    assert ctx.session.main_tick_steps[1].union_member == "delay_ms"
+
+
+def test_bind_main_tick_clear_then_bind_starts_fresh():
+    ctx = RecorderContext()
+    ns = build_namespace(ctx)
+    ns["bind_main_tick"]()
+    ns["gpio_write"](port=1, pin=0, value=1)
+    ns["end_binding"]()
+    ns["clear_main_tick"]()
+    ns["bind_main_tick"]()
+    ns["delay_ms"](100)
+    ns["end_binding"]()
+    assert len(ctx.session.main_tick_steps) == 1
+    assert ctx.session.main_tick_steps[0].union_member == "delay_ms"
+
+
+def test_bind_state_appends_to_existing_sequence():
+    ctx = RecorderContext()
+    ns = build_namespace(ctx)
+    ns["bind_state"]("CONTROLLER_STATE_INIT")
+    ns["delay_ms"](100)
+    ns["end_binding"]()
+    ns["bind_state"]("CONTROLLER_STATE_INIT")
+    ns["gpio_write"](port=1, pin=0, value=1)
+    ns["end_binding"]()
+    assert len(ctx.session.state_steps["CONTROLLER_STATE_INIT"]) == 2
+
+
+def test_bind_powerup_appends_to_existing_sequence():
+    ctx = RecorderContext()
+    ns = build_namespace(ctx)
+    ns["bind_powerup"]()
+    ns["delay_ms"](10)
+    ns["end_binding"]()
+    ns["bind_powerup"]()
+    ns["delay_ms"](20)
+    ns["end_binding"]()
+    assert len(ctx.session.powerup_steps) == 2
+
+
 def test_tick_recording_mutual_exclusion():
     ctx = RecorderContext()
     ns = build_namespace(ctx)

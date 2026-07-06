@@ -196,15 +196,21 @@ class RecorderContext:
 
     def bind_powerup(self) -> None:
         self._ensure_not_recording("bind_powerup()")
-        self.session.powerup_steps = []
+        existing = len(self.session.powerup_steps)
         self.session.recording_powerup = True
-        print("Powerup recording started.")
+        if existing:
+            print(f"Powerup recording resumed ({existing} existing steps).")
+        else:
+            print("Powerup recording started.")
 
     def bind_main_tick(self) -> None:
         self._ensure_not_recording("bind_main_tick()")
-        self.session.main_tick_steps = []
+        existing = len(self.session.main_tick_steps)
         self.session.recording_main_tick = True
-        print("Main tick recording started.")
+        if existing:
+            print(f"Main tick recording resumed ({existing} existing steps).")
+        else:
+            print("Main tick recording started.")
 
     def clear_main_tick(self) -> None:
         self.session.main_tick_steps = []
@@ -217,9 +223,13 @@ class RecorderContext:
         if state_name not in CONTROLLER_STATE_SEQUENCE_FIELDS:
             allowed = ", ".join(sorted(CONTROLLER_STATE_SEQUENCE_FIELDS))
             raise ValueError(f"bind_state() supports one-shot states only: {allowed}")
-        self.session.state_steps[state_name] = []
+        existing = len(self.session.state_steps.get(state_name, []))
+        self.session.state_steps.setdefault(state_name, [])
         self.session.recording_state = state_name
-        print(f"State sequence recording started for {state_name} (runs once, then auto-transitions).")
+        if existing:
+            print(f"State sequence recording resumed for {state_name} ({existing} existing steps).")
+        else:
+            print(f"State sequence recording started for {state_name} (runs once, then auto-transitions).")
 
     def clear_state(self, state: str) -> None:
         state_name = state.split("::")[-1] if isinstance(state, str) else str(state)
@@ -237,9 +247,13 @@ class RecorderContext:
         if state_name not in CONTROLLER_STATE_TICK_FIELDS:
             allowed = ", ".join(sorted(CONTROLLER_STATE_TICK_FIELDS))
             raise ValueError(f"bind_state_tick() supports looping tick states only: {allowed}")
-        self.session.state_tick_steps[state_name] = []
+        existing = len(self.session.state_tick_steps.get(state_name, []))
+        self.session.state_tick_steps.setdefault(state_name, [])
         self.session.recording_state_tick = state_name
-        print(f"State tick recording started for {state_name}.")
+        if existing:
+            print(f"State tick recording resumed for {state_name} ({existing} existing steps).")
+        else:
+            print(f"State tick recording started for {state_name}.")
 
     def clear_state_tick(self, state: str) -> None:
         state_name = state.split("::")[-1] if isinstance(state, str) else str(state)

@@ -59,13 +59,13 @@ _EXAMPLES: Dict[str, str] = {
 
 _DESCRIPTIONS: Dict[str, str] = {
     "config": "Set the exported config struct name and target ComponentId.",
-    "bind_powerup": "Start recording the power-up micro-op sequence (max 15 steps).",
+    "bind_powerup": "Resume or start recording the power-up micro-op sequence; appends to existing steps (max 15). Use clear_powerup() to wipe first.",
     "clear_powerup": "Clear the power-up sequence and stop power-up recording.",
-    "bind_main_tick": "Start recording the main tick sequence; runs on every controller tick in all states.",
+    "bind_main_tick": "Resume or start recording the main tick sequence; appends to existing steps. Use clear_main_tick() to wipe first.",
     "clear_main_tick": "Clear the main tick sequence and stop main-tick recording.",
-    "bind_state": "Start a one-shot state sequence (INIT, DISENGAGEMENT, or POWER_UP_BIT); runs once, then auto-transitions.",
+    "bind_state": "Resume or start a one-shot state sequence (INIT, DISENGAGEMENT, or POWER_UP_BIT); appends to existing steps. Use clear_state() to wipe first.",
     "clear_state": "Remove the saved one-shot sequence for the given state.",
-    "bind_state_tick": "Start a looping tick sequence for MANUAL, ENGAGED, OPERATIONAL, ERROR, or EMERGENCY.",
+    "bind_state_tick": "Resume or start a looping tick sequence for MANUAL, ENGAGED, OPERATIONAL, ERROR, or EMERGENCY; appends to existing steps. Use clear_state_tick() to wipe first.",
     "clear_state_tick": "Remove the saved tick sequence for the given state.",
     "bind_command": "Start a trigger binding: choose payload type and command fields, then append micro-op steps.",
     "bind_telemetry": (
