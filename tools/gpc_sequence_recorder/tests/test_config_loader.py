@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from gpc_recorder.codegen.config_loader import load_config_hpp
+from gpc_recorder.codegen.config_loader import load_config_hpp, load_config_hpp_text
 from gpc_recorder.codegen.emitter import emit_config_hpp
 from gpc_recorder.dsl.pack import pack_trigger_data, unpack_trigger_data
 from gpc_recorder.dsl.repl import ReplEngine
@@ -44,6 +44,13 @@ def test_load_current_repo_config(schema):
     assert session.bindings[1].payload_type == "DRIVER_STATE_COMMAND"
     assert len(session.state_tick_steps["CONTROLLER_STATE_ENGAGED"]) == 4
     assert len(session.state_tick_steps["CONTROLLER_STATE_OPERATIONAL"]) == 4
+
+
+def test_load_config_hpp_text_matches_file(schema):
+    path = REPO_ROOT / "configs/ConfigsTypes/g474_gpc_config_memory.hpp"
+    from_file = load_config_hpp(path, schema)
+    from_text = load_config_hpp_text(path.read_text(encoding="utf-8"), schema, source=str(path))
+    assert from_file.to_dict() == from_text.to_dict()
 
 
 def test_reload_round_trip_emits_equivalent_hpp(schema, tmp_path):

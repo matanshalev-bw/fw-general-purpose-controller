@@ -23,8 +23,87 @@
   usbLogFitAddon.fit();
 
   const previewEl = document.getElementById("preview");
+  const previewDirtyEl = document.getElementById("preview-dirty");
+  const btnPreviewApply = document.getElementById("btn-preview-apply");
+  const btnPreviewRevert = document.getElementById("btn-preview-revert");
   const statusEl = document.getElementById("status");
   const bindingsEl = document.getElementById("bindings-list");
+
+  let previewDirty = false;
+  let previewServerText = previewEl ? previewEl.value : "";
+
+  function setPreviewText(text, { force = false } = {}) {
+    if (!previewEl) return;
+    previewServerText = text;
+    if (force || !previewDirty) {
+      previewEl.value = text;
+      previewDirty = false;
+      updatePreviewButtons();
+    }
+  }
+
+  function updatePreviewButtons() {
+    if (previewDirtyEl) previewDirtyEl.hidden = !previewDirty;
+    if (btnPreviewApply) btnPreviewApply.disabled = !previewDirty;
+    if (btnPreviewRevert) btnPreviewRevert.disabled = !previewDirty;
+  }
+
+  previewEl?.addEventListener("input", () => {
+    previewDirty = previewEl.value !== previewServerText;
+    updatePreviewButtons();
+  });
+
+  async function fetchPreview() {
+    try {
+      const res = await fetch("/api/preview");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.hpp !== undefined) setPreviewText(data.hpp);
+      if (data.powerup !== undefined || data.bindings) {
+        updateBindings(data.powerup, data.bindings);
+      }
+    } catch (_e) {
+      /* preview optional until connected */
+    }
+  }
+
+  btnPreviewApply?.addEventListener("click", async () => {
+    if (!previewEl || !previewDirty) return;
+    statusEl.textContent = "Applying HPP…";
+    btnPreviewApply.disabled = true;
+    try {
+      const res = await fetch("/api/preview/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hpp: previewEl.value }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPreviewText(data.preview || previewEl.value, { force: true });
+        if (data.powerup !== undefined || data.bindings) {
+          updateBindings(data.powerup, data.bindings);
+        }
+        if (data.output) {
+          term.writeln(`[Preview] ${data.output.split("\n").join("\r\n[Preview] ")}`);
+        }
+        statusEl.textContent = "HPP applied to session";
+      } else {
+        statusEl.textContent = `Apply failed: ${data.error}`;
+      }
+    } catch (e) {
+      statusEl.textContent = `Apply failed: ${e.message}`;
+    } finally {
+      updatePreviewButtons();
+    }
+  });
+
+  btnPreviewRevert?.addEventListener("click", () => {
+    if (!previewEl || !previewDirty) return;
+    previewEl.value = previewServerText;
+    previewDirty = false;
+    updatePreviewButtons();
+    statusEl.textContent = "Preview reverted";
+  });
 
   function updateBindings(powerup, bindings) {
     const parts = [];
@@ -68,6 +147,7 @@
     ws.onopen = () => {
       statusEl.textContent = "Connected";
       term.writeln("GPC Sequence Recorder — type help() for commands.");
+      fetchPreview();
       writePrompt();
     };
     ws.onclose = () => {
@@ -90,7 +170,7 @@
         if (msg.output) {
           msg.output.split("\n").forEach((l) => term.writeln(l));
         }
-        if (msg.preview) previewEl.textContent = msg.preview;
+        if (msg.preview) setPreviewText(msg.preview);
         if (msg.powerup !== undefined || msg.bindings) {
           updateBindings(msg.powerup, msg.bindings);
         }
@@ -233,7 +313,7 @@
     const data = await res.json();
     if (data.ok) {
       statusEl.textContent = `Exported to ${data.path} and ${data.bin_path}. ${data.flash_note || ""}`;
-      previewEl.textContent = data.hpp;
+      setPreviewText(data.hpp, { force: true });
     } else {
       statusEl.textContent = `Export failed: ${data.error}`;
     }

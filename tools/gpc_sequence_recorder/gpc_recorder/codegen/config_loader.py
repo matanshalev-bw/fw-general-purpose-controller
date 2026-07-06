@@ -291,14 +291,14 @@ def _parse_telemetry_bindings(block: str, schema: Schema) -> List[TelemetryBindi
     return bindings
 
 
-def load_config_hpp(path: Path, schema: Schema) -> Session:
-    """Parse g474_gpc_config_memory.hpp into a Session."""
-    text = _strip_comments(path.read_text(encoding="utf-8"))
+def load_config_hpp_text(text: str, schema: Schema, *, source: str = "<memory>") -> Session:
+    """Parse g474_gpc_config_memory.hpp text into a Session."""
+    text = _strip_comments(text)
 
     name_match = re.search(r'\.name\s*=\s*"([^"]+)"', text)
     component_match = re.search(r"ComponentId::(\w+)", text)
     if not name_match or not component_match:
-        raise ValueError(f"Not a valid GPC config memory file: {path}")
+        raise ValueError(f"Not a valid GPC config memory file: {source}")
 
     session = Session(
         config_name=name_match.group(1),
@@ -307,7 +307,7 @@ def load_config_hpp(path: Path, schema: Schema) -> Session:
 
     sequences_block = _find_field_block(text, "sequences_config")
     if sequences_block is None:
-        raise ValueError(f"Missing sequences_config in {path}")
+        raise ValueError(f"Missing sequences_config in {source}")
 
     session.powerup_steps = _parse_sequence_block(
         _find_field_block(sequences_block, "powerup_sequence") or "",
@@ -343,6 +343,11 @@ def load_config_hpp(path: Path, schema: Schema) -> Session:
             session.telemetry_bindings = _parse_telemetry_bindings(telemetry_bindings_block, schema)
 
     return session
+
+
+def load_config_hpp(path: Path, schema: Schema) -> Session:
+    """Parse g474_gpc_config_memory.hpp into a Session."""
+    return load_config_hpp_text(path.read_text(encoding="utf-8"), schema, source=str(path))
 
 
 def default_config_path() -> Path:

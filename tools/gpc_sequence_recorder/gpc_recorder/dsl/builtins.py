@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from gpc_recorder.codegen.config_loader import load_config_hpp
+from gpc_recorder.codegen.config_loader import load_config_hpp, load_config_hpp_text
 from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
 from gpc_recorder.dsl.coerce import coerce_int_byte_list
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
@@ -587,6 +587,13 @@ class RecorderContext:
         self._config_path = src.resolve()
         summary = self.show()
         print(f"Reloaded from {self._config_path}")
+        return summary
+
+    def load_hpp(self, text: str) -> str:
+        self._ensure_not_recording("load_hpp()")
+        self.session = load_config_hpp_text(text, self.schema, source="preview editor")
+        summary = self.show()
+        print("Loaded HPP from preview editor")
         return summary
 
     def export(self, path: str = "") -> str:

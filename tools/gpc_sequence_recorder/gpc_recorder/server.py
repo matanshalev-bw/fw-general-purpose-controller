@@ -60,7 +60,29 @@ async def gen4_llc_state_machine_png() -> FileResponse:
 
 @app.get("/api/preview")
 async def preview() -> dict:
-    return {"hpp": _repl.preview_hpp()}
+    return {
+        "hpp": _repl.preview_hpp(),
+        "powerup": _repl.ctx.powerup_summary(),
+        "bindings": _repl.ctx.bindings_summary(),
+    }
+
+
+@app.post("/api/preview/apply")
+async def preview_apply(body: dict) -> dict:
+    hpp = body.get("hpp")
+    if hpp is None:
+        return {"ok": False, "error": "Missing hpp"}
+    try:
+        summary = _repl.ctx.load_hpp(str(hpp))
+        return {
+            "ok": True,
+            "output": summary,
+            "preview": _repl.preview_hpp(),
+            "powerup": _repl.ctx.powerup_summary(),
+            "bindings": _repl.ctx.bindings_summary(),
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.get("/api/usb/ports")
