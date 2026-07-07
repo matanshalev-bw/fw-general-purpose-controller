@@ -45,6 +45,15 @@ _repl = ReplEngine()
 
 
 @app.get("/")
+@app.get("/visual")
+async def visual_index() -> HTMLResponse:
+    html_path = WEB_DIR / "visual.html"
+    html = html_path.read_text(encoding="utf-8")
+    html = html.replace('src="/visual.js"', f'src="/visual.js?v={_VISUAL_ASSET_VERSION}"')
+    return HTMLResponse(html, headers=_NO_CACHE)
+
+
+@app.get("/terminal")
 async def index() -> HTMLResponse:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     html = html.replace('src="/app.js"', f'src="/app.js?v={_ASSET_VERSION}"')
@@ -54,14 +63,6 @@ async def index() -> HTMLResponse:
 @app.get("/app.js")
 async def app_js() -> FileResponse:
     return FileResponse(_APP_JS, media_type="application/javascript", headers=_NO_CACHE)
-
-
-@app.get("/visual")
-async def visual_index() -> HTMLResponse:
-    html_path = WEB_DIR / "visual.html"
-    html = html_path.read_text(encoding="utf-8")
-    html = html.replace('src="/visual.js"', f'src="/visual.js?v={_VISUAL_ASSET_VERSION}"')
-    return HTMLResponse(html, headers=_NO_CACHE)
 
 
 @app.get("/visual.js")

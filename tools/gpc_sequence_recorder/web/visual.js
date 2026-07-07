@@ -116,6 +116,7 @@ const appState = {
   bluelinkCommands: [],
   telemetryStructs: [],
   usbMicroOps: [],
+  usbControllerCmds: [],
   usbOpen: false,
   activeContainerId: null,
   bindMode: null,
@@ -921,6 +922,7 @@ async function refreshUsbStatus() {
   document.getElementById("btn-live-open").disabled = data.open;
   document.getElementById("btn-live-close").disabled = !data.open;
   document.getElementById("btn-live-send").disabled = !data.open;
+  document.getElementById("btn-live-send-controller").disabled = !data.open;
 }
 
 async function usbOpen() {
@@ -959,6 +961,87 @@ async function usbSendMicro() {
   setStatus(data.ok ? "Micro command sent" : `Send failed: ${data.error}`);
 }
 
+function renderLiveControllerFields() {
+  const select = document.getElementById("live-controller");
+  select.innerHTML = "";
+  for (const cmd of appState.usbControllerCmds) {
+    const opt = document.createElement("option");
+    opt.value = cmd.payload_type;
+    opt.textContent = cmd.label || cmd.payload_type;
+    select.appendChild(opt);
+  }
+  select.addEventListener("change", () => updateLiveControllerFields());
+  updateLiveControllerFields();
+}
+
+function updateLiveControllerFields() {
+  const payloadType = document.getElementById("live-controller").value;
+  const cmd = appState.usbControllerCmds.find((c) => c.payload_type === payloadType);
+  const fieldsDiv = document.getElementById("live-controller-fields");
+  fieldsDiv.innerHTML = "";
+  if (!cmd || !cmd.fields) return;
+  for (const f of cmd.fields) {
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    const label = document.createElement("label");
+    label.textContent = f.name;
+    let input;
+    if (f.enum_values && f.enum_values.length) {
+      input = document.createElement("select");
+      for (const ev of f.enum_values) {
+        const opt = document.createElement("option");
+        opt.value = ev;
+        opt.textContent = ev;
+        input.appendChild(opt);
+      }
+      if (f.default !== undefined && f.default !== null) input.value = String(f.default);
+    } else {
+      input = document.createElement("input");
+      if (f.array_size) {
+        input.className = "wide";
+        input.placeholder = `comma-separated (${f.array_size})`;
+        if (Array.isArray(f.default)) input.value = f.default.join(",");
+      } else {
+        input.value = f.default !== undefined && f.default !== null ? String(f.default) : "0";
+      }
+    }
+    input.dataset.field = f.name;
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    fieldsDiv.appendChild(wrap);
+  }
+}
+
+async function usbSendController() {
+  const payloadType = document.getElementById("live-controller").value;
+  const cmd = appState.usbControllerCmds.find((c) => c.payload_type === payloadType);
+  if (!cmd) return;
+  const values = {};
+  document.querySelectorAll("#live-controller-fields [data-field]").forEach((el) => {
+    const field = (cmd.fields || []).find((f) => f.name === el.dataset.field);
+    let v = el.value.trim();
+    if (field && field.array_size) {
+      values[el.dataset.field] = v ? v.split(",").map((s) => s.trim()) : [];
+      return;
+    }
+    if (/^0x[0-9a-fA-F]+$/.test(v)) values[el.dataset.field] = v;
+    else if (/^-?\d+$/.test(v)) values[el.dataset.field] = parseInt(v, 10);
+    else values[el.dataset.field] = v;
+  });
+  setStatus("Sending controller command…");
+  const res = await fetch("/api/usb/send-controller", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ payload_type: payloadType, values, qos: "none" }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    setStatus(`Sent ${data.payload_type}${data.payload_hex ? ` (${data.payload_hex})` : ""}`);
+  } else {
+    setStatus(`Send failed: ${data.error}`);
+  }
+}
+
 function wireEvents() {
   document.getElementById("btn-load").addEventListener("click", loadGraph);
   document.getElementById("btn-export").addEventListener("click", exportGraph);
@@ -971,6 +1054,7 @@ function wireEvents() {
   document.getElementById("btn-live-open").addEventListener("click", usbOpen);
   document.getElementById("btn-live-close").addEventListener("click", usbClose);
   document.getElementById("btn-live-send").addEventListener("click", usbSendMicro);
+  document.getElementById("btn-live-send-controller").addEventListener("click", usbSendController);
 }
 
 async function init() {
@@ -983,6 +1067,11 @@ async function init() {
   const microData = await microRes.json();
   appState.usbMicroOps = microData.micro_ops || [];
   renderLiveFields();
+
+  const ctrlRes = await fetch("/api/usb/controller-commands");
+  const ctrlData = await ctrlRes.json();
+  appState.usbControllerCmds = ctrlData.controller_commands || [];
+  renderLiveControllerFields();
 
   await refreshUsbPorts();
   await refreshUsbStatus();

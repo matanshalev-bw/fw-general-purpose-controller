@@ -97,16 +97,24 @@
     }
     .live-row button.send { background: #388a34; }
     .live-row button.send:hover { background: #46a042; }
-    #live-fields {
+    #live-fields, #live-controller-fields {
       display: flex;
       flex-wrap: wrap;
       gap: 0.35rem 0.75rem;
       align-items: center;
     }
-    #live-fields .field { display: flex; align-items: center; gap: 0.25rem; }
-    #live-fields .field label { font-size: 0.8rem; color: #bbb; }
-    #live-fields input { width: 5rem; }
-    #live-fields input.wide { width: 12rem; }
+    #live-fields .field, #live-controller-fields .field { display: flex; align-items: center; gap: 0.25rem; }
+    #live-fields .field label, #live-controller-fields .field label { font-size: 0.8rem; color: #bbb; }
+    #live-fields input, #live-controller-fields input { width: 5rem; }
+    #live-fields input.wide, #live-controller-fields input.wide { width: 12rem; }
+    #live-controller-fields select {
+      background: #3c3c3c;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 3px;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.85rem;
+    }
 
     .palette {
       display: flex;
@@ -146,7 +154,7 @@
     .board {
       flex: 1;
       display: grid;
-      grid-template-columns: 1.1fr 1fr 1fr 1.3fr;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr);
       grid-template-rows: auto auto auto auto auto auto;
       grid-template-areas:
         "powerup   manual   manual   error"
@@ -186,6 +194,7 @@
     .state-card {
       position: relative;
       overflow: visible;
+      min-width: 0;
       border: 2px solid #4a6fa5;
       border-radius: 8px;
       background: #1e2838;
@@ -254,6 +263,8 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      max-width: 100%;
+      min-width: 0;
     }
     .state-card.type-command { border-color: #7a5a9a; background: #281e34; }
     .state-card.type-telemetry { border-color: #5a8a9a; background: #1e2a30; }
@@ -432,7 +443,7 @@
   <header>
     <h1>GPC Visual Recorder</h1>
     <div class="actions">
-      <a href="/">Terminal UI</a>
+      <a href="/terminal">Terminal UI</a>
       <button id="btn-load" type="button" class="secondary">Load</button>
       <button id="btn-export" type="button">Export</button>
       <button id="btn-flash" type="button" class="flash">Flash</button>
@@ -455,6 +466,12 @@
         <select id="live-micro"></select>
         <div id="live-fields"></div>
         <button type="button" id="btn-live-send" class="send" disabled>Send now</button>
+      </div>
+      <div class="live-row">
+        <label for="live-controller">Controller command</label>
+        <select id="live-controller"></select>
+        <div id="live-controller-fields"></div>
+        <button type="button" id="btn-live-send-controller" class="send" disabled>Send cmd</button>
       </div>
     </section>
 
