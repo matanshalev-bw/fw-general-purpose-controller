@@ -22,6 +22,7 @@ from gpc_recorder.usb_bridge import (
     stop_usb_log,
     usb_log_stream,
 )
+from gpc_recorder.graph_api import build_context_from_graph, export_graph, load_graph_from_config
 from gpc_recorder.schema.dictionary import bluelink_commands_dictionary
 from gpc_recorder.schema.recorder_dictionary import recorder_commands_dictionary
 from gpc_recorder.paths import (
@@ -34,8 +35,10 @@ from gpc_recorder.paths import (
 WEB_DIR = TOOL_DIR / "web"
 _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 _APP_JS = WEB_DIR / "app.js"
+_VISUAL_JS = WEB_DIR / "visual.js"
 _LLC_STATE_MACHINE_PNG = WEB_DIR / "gen4_llc_state_machine.png"
 _ASSET_VERSION = str(int(_APP_JS.stat().st_mtime)) if _APP_JS.is_file() else "0"
+_VISUAL_ASSET_VERSION = str(int(_VISUAL_JS.stat().st_mtime)) if _VISUAL_JS.is_file() else "0"
 
 app = FastAPI(title="GPC Sequence Recorder")
 _repl = ReplEngine()
@@ -51,6 +54,19 @@ async def index() -> HTMLResponse:
 @app.get("/app.js")
 async def app_js() -> FileResponse:
     return FileResponse(_APP_JS, media_type="application/javascript", headers=_NO_CACHE)
+
+
+@app.get("/visual")
+async def visual_index() -> HTMLResponse:
+    html_path = WEB_DIR / "visual.html"
+    html = html_path.read_text(encoding="utf-8")
+    html = html.replace('src="/visual.js"', f'src="/visual.js?v={_VISUAL_ASSET_VERSION}"')
+    return HTMLResponse(html, headers=_NO_CACHE)
+
+
+@app.get("/visual.js")
+async def visual_js() -> FileResponse:
+    return FileResponse(_VISUAL_JS, media_type="application/javascript", headers=_NO_CACHE)
 
 
 @app.get("/assets/gen4_llc_state_machine.png")
@@ -229,6 +245,50 @@ async def usb_log_ws(websocket: WebSocket) -> None:
         stop_usb_log()
     except UsbBridgeError as e:
         await websocket.send_json({"type": "error", "message": str(e)})
+
+
+@app.get("/api/graph/load")
+async def graph_load() -> dict:
+    try:
+        graph = load_graph_from_config()
+        _repl.ctx.session = build_context_from_graph(graph).session
+        return {"ok": True, "graph": graph}
+    except FileNotFoundError as e:
+        return {
+            "ok": True,
+            "graph": {
+                "config": {
+                    "name": "G474_GPC_CONFIG",
+                    "component": "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER",
+                },
+                "containers": [],
+            },
+            "note": str(e),
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/graph/export")
+async def graph_export(body: dict) -> dict:
+    graph = body.get("graph")
+    if graph is None:
+        return {"ok": False, "error": "Missing graph"}
+    try:
+        text = export_graph(graph)
+        _repl.ctx.session = build_context_from_graph(graph).session
+        return {
+            "ok": True,
+            "path": str(DEFAULT_EXPORT_PATH),
+            "bin_path": str(DEFAULT_EXPORT_BIN_PATH),
+            "hpp": text,
+            "flash_note": (
+                f"Also wrote {DEFAULT_EXPORT_BIN_PATH.name} (packed config image). "
+                f"Flash region: {FLASH_CONFIG_BYTES_SIZE // 1024} KB at 0x08070000."
+            ),
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.post("/api/export")
