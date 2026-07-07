@@ -57,6 +57,8 @@ def _step_to_command(step: MicroOpStepState) -> Optional[Dict[str, Any]]:
     if command is None:
         return None
     args = dict(step.values)
+    # Drop internal-only fields that the DSL builtins auto-fill and do not accept as kwargs.
+    args.pop("reserved", None)
     if command == "if_condition":
         compare = args.pop("compare_type", args.pop("comparing_type", "EQ"))
         args.pop("step_count", None)
@@ -241,10 +243,18 @@ def session_to_graph(session: Session) -> Dict[str, Any]:
             }
         )
 
+    schema = get_schema()
     for i, tb in enumerate(session.telemetry_bindings):
-        fields = {
-            f"{m['field_name']}_var_index": m["var_index"] for m in tb.field_mappings
-        }
+        struct_def = schema.telemetry_structs.get(tb.struct_name)
+        struct_fields = struct_def.fields if struct_def else []
+        fields = {}
+        for idx, m in enumerate(tb.field_mappings):
+            field_name = m.get("field_name")
+            if not field_name and idx < len(struct_fields):
+                field_name = struct_fields[idx].name
+            if not field_name:
+                field_name = f"field{idx}"
+            fields[f"{field_name}_var_index"] = m["var_index"]
         containers.append(
             {
                 "id": f"telemetry_{i}",

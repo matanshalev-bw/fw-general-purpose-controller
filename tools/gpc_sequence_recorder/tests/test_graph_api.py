@@ -43,6 +43,51 @@ def test_steps_to_commands_if_block():
     assert cmds[3]["command"] == "end_condition"
 
 
+def test_steps_to_commands_strips_internal_fields():
+    steps = [
+        MicroOpStepState(
+            op_type="VAR_SET",
+            union_member="var_set",
+            values={"var_index": 1, "reserved": [0, 0, 0], "value": 3500},
+        ),
+        MicroOpStepState(
+            op_type="MOVE_TO_ERROR_STATE",
+            union_member="move_to_error_state",
+            values={"reserved": [0, 0, 0, 0]},
+        ),
+    ]
+    cmds = _steps_to_commands(steps)
+    assert cmds[0] == {"command": "var_set", "args": {"var_index": 1, "value": 3500}}
+    assert cmds[1] == {"command": "move_to_error_state", "args": {}}
+    # Rebuilding a context from these commands must not raise on internal kwargs.
+    graph = {
+        "config": {"name": "G474_GPC_CONFIG", "component": "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER"},
+        "containers": [{"id": "powerup", "type": "powerup", "steps": cmds}],
+    }
+    ctx = build_context_from_graph(graph)
+    assert len(ctx.session.powerup_steps) == 2
+
+
+def test_session_to_graph_telemetry_field_names():
+    engine = ReplEngine(auto_reload=False)
+    for line in (
+        "bind_telemetry(rate=1, trigger=HORN_TELEMETRY, "
+        "requested_horn_time_var_index=1, remaining_horn_time_var_index=3)",
+    ):
+        out, cont = engine.execute(line)
+        assert cont, out
+
+    # Round-trip through config_loader-style mappings (no field_name key present).
+    for tb in engine.ctx.session.telemetry_bindings:
+        for m in tb.field_mappings:
+            m.pop("field_name", None)
+
+    graph = session_to_graph(engine.ctx.session)
+    tel = next(c for c in graph["containers"] if c["type"] == "telemetry")
+    assert "requested_horn_time_var_index" in tel["fields"]
+    assert "remaining_horn_time_var_index" in tel["fields"]
+
+
 def test_build_context_from_graph_powerup():
     graph = {
         "config": {"name": "G474_GPC_CONFIG", "component": "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER"},
