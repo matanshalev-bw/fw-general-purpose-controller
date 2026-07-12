@@ -11,6 +11,7 @@
 #include "micro_var_store.hpp"
 #include "non_volatile_memory_interface.hpp"
 #include "raw_can_interface.hpp"
+#include "safety_features.hpp"
 
 #ifdef HAL_ADC_MODULE_ENABLED
 #include "adc_manager.hpp"
@@ -28,9 +29,13 @@ std::unique_ptr<RawCanInterface> g_raw_can;
 std::unique_ptr<BluewhiteCanComm> g_bluewhite_can;
 std::unique_ptr<BluewhiteUsbComm> g_bluewhite_usb;
 std::unique_ptr<GpcTelemetrySender> g_telemetry_sender;
+std::unique_ptr<SafetyFeatures> g_safety_features;
 }  // namespace
 
 void applicationInit(void) {
+  g_safety_features = std::make_unique<SafetyFeatures>();
+  g_safety_features->initialize();
+
   const bool config_valid = NonVolatileMemoryInterface::isConfigMemoryValid();
   NonVolatileMemoryInterface::rewriteMetaData();
 
@@ -76,6 +81,9 @@ void applicationInit(void) {
 }
 
 void applicationTick(void) {
+  if (g_safety_features) {
+    g_safety_features->tick();
+  }
   if (g_gpc_controller) {
     g_gpc_controller->tick();
   }

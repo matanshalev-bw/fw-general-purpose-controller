@@ -509,20 +509,32 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(SAFETY_EN_GPIO_Port, SAFETY_EN_Pin, GPIO_PIN_SET);
+  s
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9|GPIO_PIN_10, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(WD_KA_GPIO_Port, WD_KA_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PB0 PB1 LED_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|LED_Pin;
+  /* WD_EN is driven to reset during SafetyFeatures powerup (not here). */
+  HAL_GPIO_WritePin(WD_EN_GPIO_Port, WD_EN_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : SAFETY_FB_Pin */
+  GPIO_InitStruct.Pin = SAFETY_FB_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(SAFETY_FB_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SAFETY_EN_Pin LED_Pin */
+  GPIO_InitStruct.Pin = SAFETY_EN_Pin|LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA9 PA10 */
-  GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_10;
+  /*Configure GPIO pins : WD_EN_Pin WD_KA_Pin */
+  GPIO_InitStruct.Pin = WD_EN_Pin|WD_KA_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

@@ -20,25 +20,8 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .main_tick_sequence = {
-            .step_count = 4,
-            .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {1, 10, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {1, 10, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {0},
-                        },
-            },
+            .step_count = 0,
+            .steps = {},
         },
         .init_state_sequence = {
             .step_count = 15,
