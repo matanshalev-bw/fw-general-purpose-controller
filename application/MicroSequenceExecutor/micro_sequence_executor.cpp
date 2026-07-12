@@ -21,6 +21,13 @@ GpioPinNumber toGpioPin(uint8_t pin) {
   return static_cast<GpioPinNumber>(static_cast<uint16_t>(GpioPinNumber::PIN_0) << pin);
 }
 
+bool isSafetyFeaturePin(uint8_t port, uint8_t pin) {
+  const GpioPortType gpio_port = toGpioPort(port);
+  const GpioPinNumber gpio_pin = toGpioPin(pin);
+  return (gpio_port == HardwareMap::WD_EN_PORT && gpio_pin == HardwareMap::WD_EN_PIN) ||
+         (gpio_port == HardwareMap::WD_KA_PORT && gpio_pin == HardwareMap::WD_KA_PIN) ||
+         (gpio_port == HardwareMap::SAFETY_EN_PORT && gpio_pin == HardwareMap::SAFETY_EN_PIN);
+}
 
 }  // namespace
 
@@ -207,6 +214,10 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
 }
 
 bool MicroSequenceExecutor::executeDigitalGpioWrite(const bluelink::MicroOpsPayload::MicroDigitalGpioWrite& op) {
+  if (::isSafetyFeaturePin(op.port, op.pin)) {
+    return false;
+  }
+
   const GpioPin pin = GpioInterface::createDigitalGpio(::toGpioPort(op.port), ::toGpioPin(op.pin));
   const GpioPinState state = op.value != 0 ? GpioPinState::PIN_SET : GpioPinState::PIN_RESET;
   return GpioInterface::digitalWrite(pin, state) == InterfaceStatus::INTERFACE_OK;
