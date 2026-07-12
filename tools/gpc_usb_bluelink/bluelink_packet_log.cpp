@@ -229,6 +229,16 @@ std::string formatPayloadDetails(bluelink::PayloadTypeIds type, const uint8_t* p
         return oss.str();
       }
       break;
+    case bluelink::PayloadTypeIds::CONTROLLER_STATE_TELEMETRY:
+      if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::ControllerStateTelemetry>(
+              payload, payload_len, oss,
+              [](const bluelink::TelemetryPayload::ControllerStateTelemetry& v, std::ostringstream& out) {
+                out << "controller_id=" << static_cast<unsigned>(v.controller_id)
+                    << " controller_state=" << static_cast<unsigned>(v.controller_state);
+              })) {
+        return oss.str();
+      }
+      break;
     case bluelink::PayloadTypeIds::LLC_SYSTEM_CONFIG_TELEMETRY:
       if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::LlcSystemConfigTelemetry>(
               payload, payload_len, oss,
@@ -505,6 +515,8 @@ std::string payloadTypeName(bluelink::PayloadTypeIds type) {
       return "REVERSER_ANALOG_CHANNEL_TELEMETRY";
     case bluelink::PayloadTypeIds::LLC_STATE_TELEMETRY:
       return "LLC_STATE_TELEMETRY";
+    case bluelink::PayloadTypeIds::CONTROLLER_STATE_TELEMETRY:
+      return "CONTROLLER_STATE_TELEMETRY";
     case bluelink::PayloadTypeIds::TRANSM_OUT_SPD_TELEMETRY:
       return "TRANSM_OUT_SPD_TELEMETRY";
     case bluelink::PayloadTypeIds::PPI_PP_TELEMETRY:

@@ -78,7 +78,8 @@ void applicationInit(void) {
   g_bluewhite_usb->initialize();
 
   g_telemetry_sender = std::make_unique<GpcTelemetrySender>();
-  g_telemetry_sender->initialize(g_var_store.get(), g_bluewhite_can.get(), g_bluewhite_usb.get());
+  g_telemetry_sender->initialize(g_var_store.get(), g_bluewhite_can.get(), g_bluewhite_usb.get(),
+                                 g_gpc_controller.get());
 }
 
 void applicationTick(void) {

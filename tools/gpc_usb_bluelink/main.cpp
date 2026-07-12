@@ -347,6 +347,7 @@ bool dispatchSend(bluelink::BluelinkCommunicationHandler& bluelink, const CliOpt
     BL_SEND_CASE(SEAT_COMMAND, bluelink::CommandsPayload::SeatCommand)
     BL_SEND_CASE(ENGAGE_AUTONOMOUS_COMMAND, bluelink::CommandsPayload::EngageAutonomousCommand)
     BL_SEND_CASE(LLC_STATE_TELEMETRY, bluelink::TelemetryPayload::LlcStateTelemetry)
+    BL_SEND_CASE(CONTROLLER_STATE_TELEMETRY, bluelink::TelemetryPayload::ControllerStateTelemetry)
     BL_SEND_CASE(POWER_TELEMETRY, bluelink::TelemetryPayload::PowerTelemetry)
     BL_SEND_CASE(LLC_CONTROLLER_TELEMETRIES, bluelink::TelemetryPayload::LlcControllerTelemetries)
     BL_SEND_CASE(LLC_HIGH_FREQ_SYSTEM_TELEMETRIES, bluelink::TelemetryPayload::LlcHighFreqSystemTelemetries)

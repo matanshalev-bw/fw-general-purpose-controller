@@ -2,21 +2,26 @@
 
 #include <cstring>
 
+#include "bluelink_messages.hpp"
 #include "bluewhite_can_comm.hpp"
 #include "bluewhite_usb_comm.hpp"
 #include "distributed_can_id.hpp"
+#include "gpc_controller.hpp"
 #include "micro_var_store.hpp"
 #include "non_volatile_memory_interface.hpp"
 
 void GpcTelemetrySender::initialize(MicroVarStore* var_store, BluewhiteCanComm* can_comm,
-                                    BluewhiteUsbComm* usb_comm) {
+                                    BluewhiteUsbComm* usb_comm, GpcController* gpc_controller) {
   var_store_ = var_store;
   can_comm_ = can_comm;
   usb_comm_ = usb_comm;
+  gpc_controller_ = gpc_controller;
 
   for (uint8_t i = 0; i < MAX_TELEMETRY_BINDINGS; ++i) {
     schedulers_[i].reset();
   }
+  controller_state_scheduler_ =
+      std::make_unique<SchedulerMainClock>(static_cast<float>(CONTROLLER_STATE_TELEMETRY_RATE_HZ));
 
   const volatile TelemetryConfig& telemetry_config =
       NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config.telemetry_config;
@@ -75,8 +80,36 @@ bool GpcTelemetrySender::sendBinding(const volatile TelemetryBinding& binding, c
   return usb_sent;
 }
 
+void GpcTelemetrySender::tickControllerStateTelemetry() {
+  if (controller_state_scheduler_ == nullptr || not controller_state_scheduler_->isDue() ||
+      gpc_controller_ == nullptr || can_comm_ == nullptr || usb_comm_ == nullptr) {
+    return;
+  }
+
+  bluelink::TelemetryPayload::ControllerStateTelemetry telemetry{};
+  telemetry.controller_id = NonVolatileMemoryInterface::CONFIG_MEMORY_.bluelink_identity_config.component_id;
+  telemetry.controller_state = gpc_controller_->getState();
+
+  const auto* payload = reinterpret_cast<const uint8_t*>(&telemetry);
+  constexpr uint8_t payload_size = sizeof(telemetry);
+  const auto payload_type = bluelink::PayloadTypeIds::CONTROLLER_STATE_TELEMETRY;
+  const uint8_t broadcast_dest = bluelink::ComponentId::COMPONENT_ID_BROADCAST;
+
+  const bool usb_sent = usb_comm_->sendTelemetry(payload_type, payload, payload_size);
+  const bool can_sent = can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, payload_size);
+  if (usb_sent || can_sent) {
+    controller_state_scheduler_->restart();
+  }
+}
+
 void GpcTelemetrySender::tick() {
-  if (var_store_ == nullptr || can_comm_ == nullptr || usb_comm_ == nullptr) {
+  if (can_comm_ == nullptr || usb_comm_ == nullptr) {
+    return;
+  }
+
+  tickControllerStateTelemetry();
+
+  if (var_store_ == nullptr) {
     return;
   }
 

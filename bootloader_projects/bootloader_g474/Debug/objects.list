@@ -21,6 +21,7 @@
 "./Core/Src/interfaces_g474/CommHandler/gpc_bluelink_usb_callbacks.o"
 "./Core/Src/interfaces_g474/CommInterface/comm_interface.o"
 "./Core/Src/interfaces_g474/GpioInterface/gpio_interface.o"
+"./Core/Src/interfaces_g474/HardwareMap/hardware_map.o"
 "./Core/Src/interfaces_g474/NonVolatileMemoryInterface/non_volatile_memory_interface.o"
 "./Core/Src/interfaces_g474/SchedulerInterface/scheduler_interface.o"
 "./Core/Src/interfaces_g474/SystemInterface/system_interface.o"
