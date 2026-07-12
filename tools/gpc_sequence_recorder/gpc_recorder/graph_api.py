@@ -29,6 +29,7 @@ _UNION_TO_COMMAND: Dict[str, str] = {
     "if_condition": "if_condition",
     "move_to_error_state": "move_to_error_state",
     "move_to_emergency_state": "move_to_emergency_state",
+    "trigger_safety": "trigger_safety",
 }
 
 _COMPARE_TYPE_TO_DSL: Dict[str, str] = {

@@ -23,6 +23,7 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "can_transmit": ["can_bus=", "id=", "dlc=", "data="],
     "pwm_set": ["timer_instance=", "channel=", "use_var=", "var_index=", "literal_duty="],
     "uart_transmit": ["uart_instance=", "length=", "data="],
+    "trigger_safety": ["safety_en="],
     "spi_transfer": ["spi_instance=", "tx_len=", "tx_data="],
     "i2c_write": ["i2c_instance=", "device_addr=", "length=", "data="],
     "reload": ["path="],

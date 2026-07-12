@@ -50,6 +50,7 @@ void applicationInit(void) {
   g_gpc_controller->setRawCanInterface(g_raw_can.get());
   g_gpc_controller->setVarStore(g_var_store.get());
   g_sequence_executor->setGpcController(g_gpc_controller.get());
+  g_sequence_executor->setSafetyFeatures(g_safety_features.get());
 
   if (config_valid) {
     const volatile MicroSequence& powerup =

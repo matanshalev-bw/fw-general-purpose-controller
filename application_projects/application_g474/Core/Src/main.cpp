@@ -510,7 +510,6 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SAFETY_EN_GPIO_Port, SAFETY_EN_Pin, GPIO_PIN_SET);
-  s
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 

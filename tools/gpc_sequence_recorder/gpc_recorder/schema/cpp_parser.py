@@ -250,6 +250,7 @@ class Schema:
             "IF_CONDITION": "if_condition",
             "MOVE_TO_ERROR_STATE": "move_to_error_state",
             "MOVE_TO_EMERGENCY_STATE": "move_to_emergency_state",
+            "TRIGGER_SAFETY": "trigger_safety",
         }
         for op_name, member in op_to_member.items():
             if not member:
@@ -273,6 +274,7 @@ class Schema:
                     "if_condition": "MicroIfCondition",
                     "move_to_error_state": "MicroMoveToErrorState",
                     "move_to_emergency_state": "MicroMoveToEmergencyState",
+                    "trigger_safety": "MicroTriggerSafety",
                 }
                 struct_name = alt.get(member, struct_name)
             if struct_name not in structs:

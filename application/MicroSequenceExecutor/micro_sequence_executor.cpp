@@ -7,6 +7,7 @@
 #include "gpio_interface.hpp"
 #include "hardware_map.hpp"
 #include "raw_can_interface.hpp"
+#include "safety_features.hpp"
 #include "system_interface.hpp"
 
 namespace {
@@ -30,6 +31,10 @@ void MicroSequenceExecutor::setRawCanInterface(RawCanInterface* raw_can) { raw_c
 void MicroSequenceExecutor::setVarStore(MicroVarStore* var_store) { var_store_ = var_store; }
 
 void MicroSequenceExecutor::setGpcController(GpcController* gpc_controller) { gpc_controller_ = gpc_controller; }
+
+void MicroSequenceExecutor::setSafetyFeatures(SafetyFeatures* safety_features) {
+  safety_features_ = safety_features;
+}
 
 bool MicroSequenceExecutor::isDelayDue() const {
   if (delay_duration_ms_ == 0) {
@@ -193,6 +198,9 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
     case bluelink::MicroOpsPayload::MicroOpType::MOVE_TO_EMERGENCY_STATE:
       return executeMoveToEmergencyState(
           *reinterpret_cast<const bluelink::MicroOpsPayload::MicroMoveToEmergencyState*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::TRIGGER_SAFETY:
+      return executeTriggerSafety(
+          *reinterpret_cast<const bluelink::MicroOpsPayload::MicroTriggerSafety*>(step.params));
     default:
       return false;
   }
@@ -338,6 +346,15 @@ bool MicroSequenceExecutor::executeMoveToEmergencyState(
 
   gpc_controller_->moveToEmergencyState();
   stop();
+  return true;
+}
+
+bool MicroSequenceExecutor::executeTriggerSafety(const bluelink::MicroOpsPayload::MicroTriggerSafety& op) {
+  if (safety_features_ == nullptr) {
+    return false;
+  }
+
+  safety_features_->triggerSafety(op.safety_en);
   return true;
 }
 

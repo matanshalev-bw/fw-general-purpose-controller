@@ -11,6 +11,7 @@ class SafetyFeatures {
  public:
   void initialize();
   void tick();
+  void triggerSafety(uint8_t value);
 
  private:
   static constexpr uint32_t WD_UPPER_MS = 1000;
@@ -21,6 +22,7 @@ class SafetyFeatures {
 
   GpioPin wd_en_;
   GpioPin wd_ka_;
+  GpioPin safety_en_;
   bool ka_high_ = false;
   uint32_t ka_phase_start_ms_ = 0;
 };

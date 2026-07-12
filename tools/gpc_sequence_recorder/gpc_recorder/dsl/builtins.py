@@ -506,6 +506,9 @@ class RecorderContext:
     def move_to_emergency_state(self) -> None:
         self._add_step("move_to_emergency_state", {"reserved": [0, 0, 0, 0]})
 
+    def trigger_safety(self, safety_en: int) -> None:
+        self._add_step("trigger_safety", {"safety_en": int(safety_en)})
+
     def powerup_summary(self) -> dict:
         return {
             "step_count": len(self.session.powerup_steps),
@@ -629,7 +632,7 @@ class RecorderContext:
                 "bind_state(state), clear_state(state), "
                 "bind_state_tick(state), clear_state_tick(state), "
                 "gpio_write(), gpio_read(), adc_read(), var_set(), if_condition(), end_condition(), "
-                "move_to_error_state(), move_to_emergency_state(), dac_write(), delay_ms(), can_transmit(), "
+                "move_to_error_state(), move_to_emergency_state(), trigger_safety(0), dac_write(), delay_ms(), can_transmit(), "
                 "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), "
                 "undo(), help()"
             )
@@ -729,6 +732,7 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "end_condition": ctx.end_condition,
         "move_to_error_state": ctx.move_to_error_state,
         "move_to_emergency_state": ctx.move_to_emergency_state,
+        "trigger_safety": ctx.trigger_safety,
         "help": ctx.help,
         "True": True,
         "False": False,

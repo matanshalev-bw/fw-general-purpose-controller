@@ -36,6 +36,7 @@ _OP_TYPE_TO_MEMBER = {
     "IF_CONDITION": "if_condition",
     "MOVE_TO_ERROR_STATE": "move_to_error_state",
     "MOVE_TO_EMERGENCY_STATE": "move_to_emergency_state",
+    "TRIGGER_SAFETY": "trigger_safety",
 }
 
 

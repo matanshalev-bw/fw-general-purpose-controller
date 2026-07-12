@@ -14,6 +14,8 @@ constexpr GpioPortType WD_EN_PORT = GpioPortType::PORT_A;
 constexpr GpioPinNumber WD_EN_PIN = GpioPinNumber::PIN_9;
 constexpr GpioPortType WD_KA_PORT = GpioPortType::PORT_A;
 constexpr GpioPinNumber WD_KA_PIN = GpioPinNumber::PIN_10;
+constexpr GpioPortType SAFETY_EN_PORT = GpioPortType::PORT_B;
+constexpr GpioPinNumber SAFETY_EN_PIN = GpioPinNumber::PIN_1;
 
 #ifdef HAL_UART_MODULE_ENABLED
 extern CommUartHandle& uart_main;

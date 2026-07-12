@@ -88,6 +88,7 @@ const FRIENDLY_NAMES = {
   var_set: "var set",
   move_to_error_state: "move to error",
   move_to_emergency_state: "move to emergency",
+  trigger_safety: "trigger safety",
 };
 
 const UNION_BY_COMMAND = {

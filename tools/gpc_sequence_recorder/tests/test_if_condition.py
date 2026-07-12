@@ -123,6 +123,7 @@ def test_schema_includes_new_micro_ops():
     assert "end_condition" not in schema.micro_ops
     assert "move_to_error_state" in schema.micro_ops
     assert "move_to_emergency_state" in schema.micro_ops
+    assert "trigger_safety" in schema.micro_ops
     assert "GE" in schema.enums["MicroCompareType"].values
 
 
@@ -133,6 +134,25 @@ def test_move_to_error_state_records_step(ns):
     namespace["end_binding"]()
     assert len(ctx.session.main_tick_steps) == 1
     assert ctx.session.main_tick_steps[0].union_member == "move_to_error_state"
+
+
+def test_trigger_safety_records_and_round_trips(ns, tmp_path):
+    namespace, ctx = ns
+    namespace["config"]()
+    namespace["bind_main_tick"]()
+    namespace["trigger_safety"](0)
+    namespace["trigger_safety"](1)
+    namespace["end_binding"]()
+    assert ctx.session.main_tick_steps[0].union_member == "trigger_safety"
+    assert ctx.session.main_tick_steps[0].values["safety_en"] == 0
+    assert ctx.session.main_tick_steps[1].values["safety_en"] == 1
+    out_path = tmp_path / "trigger_safety_config.hpp"
+    text = emit_config_hpp(ctx.session.to_dict(), ctx.schema, out_path, write=True)
+    assert "MicroOpType::TRIGGER_SAFETY" in text
+    reloaded = load_config_hpp(out_path, ctx.schema)
+    assert reloaded.main_tick_steps[0].union_member == "trigger_safety"
+    assert reloaded.main_tick_steps[0].values["safety_en"] == 0
+    assert reloaded.main_tick_steps[1].values["safety_en"] == 1
 
 
 def test_move_to_error_state_export(ns, tmp_path):

@@ -3,6 +3,7 @@
 void SafetyFeatures::initialize() {
   wd_en_ = GpioInterface::createDigitalGpio(HardwareMap::WD_EN_PORT, HardwareMap::WD_EN_PIN);
   wd_ka_ = GpioInterface::createDigitalGpio(HardwareMap::WD_KA_PORT, HardwareMap::WD_KA_PIN);
+  safety_en_ = GpioInterface::createDigitalGpio(HardwareMap::SAFETY_EN_PORT, HardwareMap::SAFETY_EN_PIN);
 
   powerupWdEn();
 
@@ -13,6 +14,10 @@ void SafetyFeatures::initialize() {
 
 void SafetyFeatures::tick() {
   tickWdKa();
+}
+
+void SafetyFeatures::triggerSafety(uint8_t value) {
+  GpioInterface::digitalWrite(safety_en_, value != 0 ? GpioPinState::PIN_SET : GpioPinState::PIN_RESET);
 }
 
 void SafetyFeatures::powerupWdEn() {
