@@ -506,15 +506,14 @@ function renderPropsPanel(nodeId) {
         value = parseInt(el.value, 10);
         if (Number.isNaN(value)) value = el.value;
       }
+      // getNodeFromId returns a deep clone — write back via updateNodeDataFromId
+      // so Save / linearizeDrawflow see the edited args instead of defaults.
       node.data.args[param] = value;
+      drawflowEditor.updateNodeDataFromId(nodeId, node.data);
       const label = formatNodeLabel({ command, args: node.data.args });
-      const labelEl = node.html?.querySelector?.(".node-label");
-      if (labelEl) labelEl.innerHTML = label.replace(/\n/g, "<br>");
-      else {
-        const nodeEl = document.getElementById(`node-${nodeId}`);
-        const inner = nodeEl?.querySelector(".node-label");
-        if (inner) inner.innerHTML = label.replace(/\n/g, "<br>");
-      }
+      const nodeEl = document.getElementById(`node-${nodeId}`);
+      const inner = nodeEl?.querySelector(".node-label");
+      if (inner) inner.innerHTML = label.replace(/\n/g, "<br>");
     };
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
