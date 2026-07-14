@@ -22,6 +22,7 @@ void SafetyFeatures::triggerSafety(uint8_t value) {
 
 void SafetyFeatures::powerupWdEn() {
   GpioInterface::digitalWrite(wd_en_, GpioPinState::PIN_SET);
+  SystemInterface::delay(200);
   GpioInterface::digitalWrite(wd_en_, GpioPinState::PIN_RESET);
 }
 
