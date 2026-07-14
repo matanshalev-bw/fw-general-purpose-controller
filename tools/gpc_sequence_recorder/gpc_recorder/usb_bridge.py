@@ -44,6 +44,7 @@ MICRO_OP_TO_PAYLOAD_TYPE: Dict[str, str] = {
     "uart_transmit": "MICRO_UART_TRANSMIT_COMMAND",
     "spi_transfer": "MICRO_SPI_TRANSFER_COMMAND",
     "i2c_write": "MICRO_I2C_WRITE_COMMAND",
+    "trigger_safety": "MICRO_TRIGGER_SAFETY_COMMAND",
 }
 
 

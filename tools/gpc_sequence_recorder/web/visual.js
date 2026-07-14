@@ -102,6 +102,7 @@ const UNION_BY_COMMAND = {
   uart_transmit: "uart_transmit",
   spi_transfer: "spi_transfer",
   i2c_write: "i2c_write",
+  trigger_safety: "trigger_safety",
 };
 
 const PALETTE_SKIP = new Set(["undo"]);

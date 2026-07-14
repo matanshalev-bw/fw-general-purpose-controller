@@ -151,6 +151,9 @@ bool BluewhiteMessageHandler::tryExecuteMicroCommand(bluelink::PayloadTypeIds pa
     case bluelink::PayloadTypeIds::MICRO_I2C_WRITE_COMMAND:
       step.op_type = bluelink::MicroOpsPayload::MicroOpType::I2C_WRITE;
       break;
+    case bluelink::PayloadTypeIds::MICRO_TRIGGER_SAFETY_COMMAND:
+      step.op_type = bluelink::MicroOpsPayload::MicroOpType::TRIGGER_SAFETY;
+      break;
     default:
       return false;
   }

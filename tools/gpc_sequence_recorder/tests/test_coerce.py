@@ -38,6 +38,15 @@ def test_pack_uart_transmit_quoted_string_sets_length():
     assert payload_hex == "010548454c4c4f000000"
 
 
+def test_pack_trigger_safety_and_usb_catalog():
+    from gpc_recorder.usb_bridge import micro_ops_catalog, payload_type_id
+
+    assert pack_micro_op_hex("trigger_safety", {"safety_en": 0}) == "00"
+    assert pack_micro_op_hex("trigger_safety", {"safety_en": 1}) == "01"
+    assert payload_type_id("MICRO_TRIGGER_SAFETY_COMMAND") == 111
+    assert any(op["union_member"] == "trigger_safety" for op in micro_ops_catalog())
+
+
 def test_coerce_int_byte_list_rejects_invalid_string():
     with pytest.raises(ValueError, match="quoted string"):
         coerce_int_byte_list("HELLO")
