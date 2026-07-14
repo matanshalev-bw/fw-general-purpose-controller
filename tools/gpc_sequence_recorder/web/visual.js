@@ -907,24 +907,35 @@ async function refreshUsbPorts() {
   const select = document.getElementById("live-port");
   const prev = select.value;
   select.innerHTML = "";
-  for (const p of data.ports || []) {
+  const ports = data.ports || [];
+  if (!ports.length) {
     const opt = document.createElement("option");
-    opt.value = p.device || p.port || p;
-    opt.textContent = p.description ? `${p.device} — ${p.description}` : p.device || p;
+    opt.value = "";
+    opt.textContent = "(no ports found)";
+    select.appendChild(opt);
+    return;
+  }
+  for (const p of ports) {
+    const device = typeof p === "string" ? p : p.device || p.port || "";
+    const opt = document.createElement("option");
+    opt.value = device;
+    opt.textContent =
+      typeof p === "object" && p.description ? `${device} — ${p.description}` : device;
     select.appendChild(opt);
   }
-  if (prev) select.value = prev;
+  if (prev && [...select.options].some((o) => o.value === prev)) select.value = prev;
 }
 
 async function refreshUsbStatus() {
   const res = await fetch("/api/usb/status");
   const data = await res.json();
-  appState.usbOpen = !!data.open;
-  document.getElementById("live-status").textContent = data.open ? `Open: ${data.port}` : "Closed";
-  document.getElementById("btn-live-open").disabled = data.open;
-  document.getElementById("btn-live-close").disabled = !data.open;
-  document.getElementById("btn-live-send").disabled = !data.open;
-  document.getElementById("btn-live-send-controller").disabled = !data.open;
+  const opened = !!data.opened;
+  appState.usbOpen = opened;
+  document.getElementById("live-status").textContent = opened ? `Open: ${data.port}` : "Closed";
+  document.getElementById("btn-live-open").disabled = opened;
+  document.getElementById("btn-live-close").disabled = !opened;
+  document.getElementById("btn-live-send").disabled = !opened;
+  document.getElementById("btn-live-send-controller").disabled = !opened;
 }
 
 async function usbOpen() {
