@@ -70,6 +70,8 @@ def _field_size(schema: Schema, field: FieldDef) -> int:
         "int16_t": 2,
         "uint32_t": 4,
         "int32_t": 4,
+        "uint64_t": 8,
+        "int64_t": 8,
         "float": 4,
     }
     if t in sizes:
@@ -103,6 +105,10 @@ def _pack_field(schema: Schema, field: FieldDef, value: Any) -> bytes:
         return struct.pack("<I", int(value) & 0xFFFFFFFF)
     if t == "int32_t":
         return struct.pack("<i", int(value))
+    if t == "uint64_t":
+        return struct.pack("<Q", int(value) & 0xFFFFFFFFFFFFFFFF)
+    if t == "int64_t":
+        return struct.pack("<q", int(value))
     if t == "float":
         return struct.pack("<f", float(value))
     raise ValueError(f"Cannot pack type {field.cpp_type!r}")
@@ -130,13 +136,27 @@ def _parse_default_literal(schema: Schema, field: FieldDef, raw: str) -> Any:
 
 def _zero_default(schema: Schema, field: FieldDef) -> Any:
     t = _normalize_type(field.cpp_type)
+    if field.array_size:
+        n = resolve_array_size(schema, field.array_size)
+        elem = FieldDef(field.cpp_type, "elem")
+        return [_zero_default(schema, elem) for _ in range(n)]
     if t == "bool":
         return False
     if t in schema.enums:
         return 0
     if t == "float":
         return 0.0
-    if t in ("uint8_t", "int8_t", "char", "uint16_t", "int16_t", "uint32_t", "int32_t"):
+    if t in (
+        "uint8_t",
+        "int8_t",
+        "char",
+        "uint16_t",
+        "int16_t",
+        "uint32_t",
+        "int32_t",
+        "uint64_t",
+        "int64_t",
+    ):
         return 0
     return 0
 
@@ -221,6 +241,10 @@ def _unpack_field(schema: Schema, field: FieldDef, chunk: bytes) -> Any:
         return struct.unpack("<I", chunk[:4])[0]
     if t == "int32_t":
         return struct.unpack("<i", chunk[:4])[0]
+    if t == "uint64_t":
+        return struct.unpack("<Q", chunk[:8])[0]
+    if t == "int64_t":
+        return struct.unpack("<q", chunk[:8])[0]
     if t == "float":
         return struct.unpack("<f", chunk[:4])[0]
     raise ValueError(f"Cannot unpack type {field.cpp_type!r}")

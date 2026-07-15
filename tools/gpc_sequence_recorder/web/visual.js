@@ -85,6 +85,10 @@ const FRIENDLY_NAMES = {
   uart_transmit: "UART tx",
   spi_transfer: "SPI tx",
   i2c_write: "I2C write",
+  can_receive: "CAN rx",
+  uart_receive: "UART rx",
+  spi_receive: "SPI rx",
+  i2c_read: "I2C read",
   var_set: "var set",
   move_to_error_state: "move to error",
   move_to_emergency_state: "move to emergency",
@@ -102,6 +106,10 @@ const UNION_BY_COMMAND = {
   uart_transmit: "uart_transmit",
   spi_transfer: "spi_transfer",
   i2c_write: "i2c_write",
+  can_receive: "can_receive",
+  uart_receive: "uart_receive",
+  spi_receive: "spi_receive",
+  i2c_read: "i2c_read",
   trigger_safety: "trigger_safety",
 };
 
@@ -129,7 +137,7 @@ const appState = {
     max_command_bindings: 16,
     max_telemetry_bindings: 3,
     max_telemetry_fields: 8,
-    max_var_slots: 8,
+    max_var_slots: 20,
     comm_data_length: 8,
   },
 };

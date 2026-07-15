@@ -151,6 +151,18 @@ bool BluewhiteMessageHandler::tryExecuteMicroCommand(bluelink::PayloadTypeIds pa
     case bluelink::PayloadTypeIds::MICRO_I2C_WRITE_COMMAND:
       step.op_type = bluelink::MicroOpsPayload::MicroOpType::I2C_WRITE;
       break;
+    case bluelink::PayloadTypeIds::MICRO_CAN_RECEIVE_COMMAND:
+      step.op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_RECEIVE;
+      break;
+    case bluelink::PayloadTypeIds::MICRO_UART_RECEIVE_COMMAND:
+      step.op_type = bluelink::MicroOpsPayload::MicroOpType::UART_RECEIVE;
+      break;
+    case bluelink::PayloadTypeIds::MICRO_SPI_RECEIVE_COMMAND:
+      step.op_type = bluelink::MicroOpsPayload::MicroOpType::SPI_RECEIVE;
+      break;
+    case bluelink::PayloadTypeIds::MICRO_I2C_READ_COMMAND:
+      step.op_type = bluelink::MicroOpsPayload::MicroOpType::I2C_READ;
+      break;
     case bluelink::PayloadTypeIds::MICRO_TRIGGER_SAFETY_COMMAND:
       step.op_type = bluelink::MicroOpsPayload::MicroOpType::TRIGGER_SAFETY;
       break;

@@ -260,6 +260,10 @@ class Schema:
             "MOVE_TO_ERROR_STATE": "move_to_error_state",
             "MOVE_TO_EMERGENCY_STATE": "move_to_emergency_state",
             "TRIGGER_SAFETY": "trigger_safety",
+            "CAN_RECEIVE": "can_receive",
+            "UART_RECEIVE": "uart_receive",
+            "SPI_RECEIVE": "spi_receive",
+            "I2C_READ": "i2c_read",
         }
         for op_name, member in op_to_member.items():
             if not member:
@@ -279,6 +283,10 @@ class Schema:
                     "uart_transmit": "MicroUartTransmit",
                     "spi_transfer": "MicroSpiTransfer",
                     "i2c_write": "MicroI2cWrite",
+                    "can_receive": "MicroCanReceive",
+                    "uart_receive": "MicroUartReceive",
+                    "spi_receive": "MicroSpiReceive",
+                    "i2c_read": "MicroI2cRead",
                     "var_set": "MicroVarSet",
                     "if_condition": "MicroIfCondition",
                     "move_to_error_state": "MicroMoveToErrorState",

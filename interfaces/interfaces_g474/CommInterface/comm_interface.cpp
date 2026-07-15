@@ -50,6 +50,14 @@ InterfaceStatus CommUart::write(const uint8_t* data, const uint16_t size) {
 
   return static_cast<InterfaceStatus>(HAL_UART_Transmit(handler_, const_cast<uint8_t*>(data), size, TIMEOUT_));
 }
+
+InterfaceStatus CommUart::read(uint8_t* data, const uint16_t size) {
+  if (handler_ == nullptr || data == nullptr || size == 0) {
+    return InterfaceStatus::INTERFACE_ERROR;
+  }
+
+  return static_cast<InterfaceStatus>(HAL_UART_Receive(handler_, data, size, TIMEOUT_));
+}
 #endif  // HAL_UART_MODULE_ENABLED
 
 #ifdef HAL_I2C_MODULE_ENABLED
@@ -67,6 +75,14 @@ InterfaceStatus CommI2c::write(const uint8_t* data, const uint16_t size) {
 
   return static_cast<InterfaceStatus>(
       HAL_I2C_Master_Transmit(handler_, device_addr_, const_cast<uint8_t*>(data), size, TIMEOUT_));
+}
+
+InterfaceStatus CommI2c::read(uint8_t* data, const uint16_t size) {
+  if (handler_ == nullptr || device_addr_ == 0 || data == nullptr || size == 0) {
+    return InterfaceStatus::INTERFACE_ERROR;
+  }
+
+  return static_cast<InterfaceStatus>(HAL_I2C_Master_Receive(handler_, device_addr_, data, size, TIMEOUT_));
 }
 #endif  // HAL_I2C_MODULE_ENABLED
 
@@ -500,6 +516,54 @@ InterfaceStatus CommCan::transmitStandard(CommCanHandle* handler, uint32_t id, c
     }
 
     return InterfaceStatus::INTERFACE_OK;
+}
+
+InterfaceStatus CommCan::receiveStandard(CommCanHandle* handler, uint32_t id, uint8_t* data,
+                                         uint8_t& dlc, uint32_t timeout_ms) {
+    if (handler == nullptr || data == nullptr || dlc == 0 || dlc > 8) {
+        return InterfaceStatus::INTERFACE_ERROR;
+    }
+
+    const uint8_t max_dlc = dlc;
+    const uint32_t start_tick = HAL_GetTick();
+    const uint32_t matched_id = id & 0x7FFU;
+    const uint32_t fifos[] = {FDCAN_RX_FIFO0, FDCAN_RX_FIFO1};
+
+    while ((HAL_GetTick() - start_tick) < timeout_ms) {
+        for (uint32_t fifo : fifos) {
+            while (HAL_FDCAN_GetRxFifoFillLevel(handler, fifo) > 0U) {
+                CommCanRxHeader rx_header{};
+                uint8_t rx_data[8] = {};
+                if (HAL_FDCAN_GetRxMessage(handler, fifo, &rx_header, rx_data) != HAL_OK) {
+                    continue;
+                }
+
+                if (rx_header.IdType != FDCAN_STANDARD_ID || rx_header.Identifier != matched_id) {
+                    continue;
+                }
+
+                uint8_t frame_dlc = 0;
+                switch (rx_header.DataLength) {
+                    case FDCAN_DLC_BYTES_0: frame_dlc = 0; break;
+                    case FDCAN_DLC_BYTES_1: frame_dlc = 1; break;
+                    case FDCAN_DLC_BYTES_2: frame_dlc = 2; break;
+                    case FDCAN_DLC_BYTES_3: frame_dlc = 3; break;
+                    case FDCAN_DLC_BYTES_4: frame_dlc = 4; break;
+                    case FDCAN_DLC_BYTES_5: frame_dlc = 5; break;
+                    case FDCAN_DLC_BYTES_6: frame_dlc = 6; break;
+                    case FDCAN_DLC_BYTES_7: frame_dlc = 7; break;
+                    case FDCAN_DLC_BYTES_8: frame_dlc = 8; break;
+                    default: frame_dlc = 8; break;
+                }
+
+                dlc = frame_dlc < max_dlc ? frame_dlc : max_dlc;
+                memcpy(data, rx_data, dlc);
+                return InterfaceStatus::INTERFACE_OK;
+            }
+        }
+    }
+
+    return InterfaceStatus::INTERFACE_ERROR;
 }
 
 InterfaceStatus CommCan::startCanPeripheral() {

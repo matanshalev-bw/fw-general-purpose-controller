@@ -45,8 +45,8 @@ void GpcTelemetrySender::buildPayload(const volatile TelemetryBinding& binding, 
       continue;
     }
 
-    const uint32_t var_value = var_store_->get(field.var_index);
-    uint8_t encoded[4] = {};
+    const uint64_t var_value = var_store_->get(field.var_index);
+    uint8_t encoded[8] = {};
     switch (field.byte_size) {
       case 1:
         encoded[0] = static_cast<uint8_t>(var_value);
@@ -56,7 +56,12 @@ void GpcTelemetrySender::buildPayload(const volatile TelemetryBinding& binding, 
         memcpy(encoded, &value16, sizeof(value16));
         break;
       }
-      case 4:
+      case 4: {
+        const uint32_t value32 = static_cast<uint32_t>(var_value);
+        memcpy(encoded, &value32, sizeof(value32));
+        break;
+      }
+      case 8:
         memcpy(encoded, &var_value, sizeof(var_value));
         break;
       default:

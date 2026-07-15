@@ -12,9 +12,9 @@
 
 namespace {
 
-  static CommUart uart(&HardwareMap::uart_main);
-  static CommSpi spi(&HardwareMap::spi_main);
-  static CommI2c i2c(&HardwareMap::i2c_main);
+static CommUart uart(&HardwareMap::uart_main, bluelink::MicroOpsPayload::DEFAULT_COMM_RX_TIMEOUT);
+static CommSpi spi(&HardwareMap::spi_main, bluelink::MicroOpsPayload::DEFAULT_COMM_RX_TIMEOUT);
+static CommI2c i2c(&HardwareMap::i2c_main, bluelink::MicroOpsPayload::DEFAULT_COMM_RX_TIMEOUT);
 
 GpioPortType toGpioPort(uint8_t port) { return static_cast<GpioPortType>(port); }
 GpioPinNumber toGpioPin(uint8_t pin) {
@@ -27,6 +27,18 @@ bool isSafetyFeaturePin(uint8_t port, uint8_t pin) {
   return (gpio_port == HardwareMap::WD_EN_PORT && gpio_pin == HardwareMap::WD_EN_PIN) ||
          (gpio_port == HardwareMap::WD_KA_PORT && gpio_pin == HardwareMap::WD_KA_PIN) ||
          (gpio_port == HardwareMap::SAFETY_EN_PORT && gpio_pin == HardwareMap::SAFETY_EN_PIN);
+}
+
+bool storeCommRxBytes(MicroVarStore* store, uint8_t var_index, const uint8_t* data, uint8_t length) {
+  if (store == nullptr || data == nullptr || var_index >= MICRO_VAR_SLOT_COUNT || length == 0 ||
+      length > bluelink::MicroOpsPayload::COMM_DATA_LENGTH) {
+    return false;
+  }
+
+  uint64_t value = 0;
+  memcpy(&value, data, length);
+  store->set(var_index, value);
+  return true;
 }
 
 }  // namespace
@@ -197,6 +209,14 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
       return executeSpiTransfer(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroSpiTransfer*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::I2C_WRITE:
       return executeI2cWrite(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroI2cWrite*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::CAN_RECEIVE:
+      return executeCanReceive(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroCanReceive*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::UART_RECEIVE:
+      return executeUartReceive(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroUartReceive*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::SPI_RECEIVE:
+      return executeSpiReceive(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroSpiReceive*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::I2C_READ:
+      return executeI2cRead(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroI2cRead*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::VAR_SET:
       return executeVarSet(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarSet*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::MOVE_TO_ERROR_STATE:
@@ -291,7 +311,7 @@ bool MicroSequenceExecutor::executePwmSet(const bluelink::MicroOpsPayload::Micro
 }
 
 bool MicroSequenceExecutor::executeCanTransmit(const bluelink::MicroOpsPayload::MicroCanTransmit& op) {
-  if (raw_can_ == nullptr || op.can_bus != 1) {
+  if (raw_can_ == nullptr) {
     return false;
   }
 
@@ -328,6 +348,71 @@ bool MicroSequenceExecutor::executeI2cWrite(const bluelink::MicroOpsPayload::Mic
 
   i2c.setDeviceAddr(static_cast<uint16_t>(op.device_addr << 1));
   return i2c.write(op.data, op.length) == InterfaceStatus::INTERFACE_OK;
+}
+
+bool MicroSequenceExecutor::executeCanReceive(const bluelink::MicroOpsPayload::MicroCanReceive& op) {
+  if (raw_can_ == nullptr || var_store_ == nullptr || op.dlc == 0 ||
+      op.dlc > bluelink::MicroOpsPayload::COMM_DATA_LENGTH || op.var_index >= MICRO_VAR_SLOT_COUNT) {
+    return false;
+  }
+
+  uint8_t rx_data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+  uint8_t dlc = op.dlc;
+  if (raw_can_->receiveStandard(op.id, rx_data, dlc, bluelink::MicroOpsPayload::DEFAULT_COMM_RX_TIMEOUT) !=
+      InterfaceStatus::INTERFACE_OK) {
+    return false;
+  }
+
+  if (dlc == 0) {
+    var_store_->set(op.var_index, 0);
+    return true;
+  }
+
+  return storeCommRxBytes(var_store_, op.var_index, rx_data, dlc);
+}
+
+bool MicroSequenceExecutor::executeUartReceive(const bluelink::MicroOpsPayload::MicroUartReceive& op) {
+  if (op.length == 0 || op.length > bluelink::MicroOpsPayload::COMM_DATA_LENGTH ||
+      op.var_index >= MICRO_VAR_SLOT_COUNT || var_store_ == nullptr) {
+    return false;
+  }
+
+  uint8_t rx_data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+  if (uart.read(rx_data, op.length) != InterfaceStatus::INTERFACE_OK) {
+    return false;
+  }
+
+  return storeCommRxBytes(var_store_, op.var_index, rx_data, op.length);
+}
+
+bool MicroSequenceExecutor::executeSpiReceive(const bluelink::MicroOpsPayload::MicroSpiReceive& op) {
+  if (op.rx_len == 0 || op.rx_len > bluelink::MicroOpsPayload::COMM_DATA_LENGTH ||
+      op.var_index >= MICRO_VAR_SLOT_COUNT || var_store_ == nullptr) {
+    return false;
+  }
+
+  uint8_t tx_data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+  uint8_t rx_data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+  if (spi.transmitReceive(tx_data, rx_data, op.rx_len) != InterfaceStatus::INTERFACE_OK) {
+    return false;
+  }
+
+  return storeCommRxBytes(var_store_, op.var_index, rx_data, op.rx_len);
+}
+
+bool MicroSequenceExecutor::executeI2cRead(const bluelink::MicroOpsPayload::MicroI2cRead& op) {
+  if (op.length == 0 || op.length > bluelink::MicroOpsPayload::COMM_DATA_LENGTH ||
+      op.var_index >= MICRO_VAR_SLOT_COUNT || var_store_ == nullptr) {
+    return false;
+  }
+
+  uint8_t rx_data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+  i2c.setDeviceAddr(static_cast<uint16_t>(op.device_addr << 1));
+  if (i2c.read(rx_data, op.length) != InterfaceStatus::INTERFACE_OK) {
+    return false;
+  }
+
+  return storeCommRxBytes(var_store_, op.var_index, rx_data, op.length);
 }
 
 bool MicroSequenceExecutor::executeVarSet(const bluelink::MicroOpsPayload::MicroVarSet& op) {
@@ -372,8 +457,8 @@ bool MicroSequenceExecutor::executeTriggerSafety(const bluelink::MicroOpsPayload
 }
 
 bool MicroSequenceExecutor::evaluateCondition(const bluelink::MicroOpsPayload::MicroIfCondition& op) const {
-  const uint32_t first = var_store_->get(op.first_var_index);
-  const uint32_t second = var_store_->get(op.second_var_index);
+  const uint64_t first = var_store_->get(op.first_var_index);
+  const uint64_t second = var_store_->get(op.second_var_index);
 
   switch (static_cast<bluelink::MicroOpsPayload::MicroCompareType>(op.compare_type)) {
     case bluelink::MicroOpsPayload::MicroCompareType::EQ:

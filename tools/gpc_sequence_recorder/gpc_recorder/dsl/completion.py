@@ -26,6 +26,10 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "trigger_safety": ["safety_en="],
     "spi_transfer": ["spi_instance=", "tx_len=", "tx_data="],
     "i2c_write": ["i2c_instance=", "device_addr=", "length=", "data="],
+    "can_receive": ["can_bus=", "id=", "dlc=", "var_index="],
+    "uart_receive": ["uart_instance=", "length=", "var_index="],
+    "spi_receive": ["spi_instance=", "rx_len=", "var_index="],
+    "i2c_read": ["i2c_instance=", "device_addr=", "length=", "var_index="],
     "reload": ["path="],
     "export": ["path="],
 }

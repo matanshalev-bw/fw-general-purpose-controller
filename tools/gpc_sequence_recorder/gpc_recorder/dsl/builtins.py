@@ -464,6 +464,45 @@ class RecorderContext:
             },
         )
 
+    def can_receive(self, can_bus: int, id: int, dlc: int, var_index: int) -> None:
+        validate_var_index(var_index)
+        self._add_step(
+            "can_receive",
+            {"can_bus": can_bus, "id": id, "dlc": dlc, "var_index": var_index},
+        )
+
+    def uart_receive(self, uart_instance: int, length: int, var_index: int) -> None:
+        validate_var_index(var_index)
+        self._add_step(
+            "uart_receive",
+            {"uart_instance": uart_instance, "length": length, "var_index": var_index},
+        )
+
+    def spi_receive(self, spi_instance: int, rx_len: int, var_index: int) -> None:
+        validate_var_index(var_index)
+        self._add_step(
+            "spi_receive",
+            {"spi_instance": spi_instance, "rx_len": rx_len, "var_index": var_index},
+        )
+
+    def i2c_read(
+        self,
+        i2c_instance: int,
+        device_addr: int,
+        length: int,
+        var_index: int,
+    ) -> None:
+        validate_var_index(var_index)
+        self._add_step(
+            "i2c_read",
+            {
+                "i2c_instance": i2c_instance,
+                "device_addr": device_addr,
+                "length": length,
+                "var_index": var_index,
+            },
+        )
+
     def var_set(self, var_index: int, value: int) -> None:
         validate_var_index(var_index)
         self._add_step(
@@ -634,6 +673,7 @@ class RecorderContext:
                 "gpio_write(), gpio_read(), adc_read(), var_set(), if_condition(), end_condition(), "
                 "move_to_error_state(), move_to_emergency_state(), trigger_safety(0), dac_write(), delay_ms(), can_transmit(), "
                 "pwm_set(), uart_transmit(), spi_transfer(), i2c_write(), "
+                "can_receive(), uart_receive(), spi_receive(), i2c_read(), "
                 "undo(), help()"
             )
         name = name.split("::")[-1]
@@ -727,6 +767,10 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "uart_transmit": ctx.uart_transmit,
         "spi_transfer": ctx.spi_transfer,
         "i2c_write": ctx.i2c_write,
+        "can_receive": ctx.can_receive,
+        "uart_receive": ctx.uart_receive,
+        "spi_receive": ctx.spi_receive,
+        "i2c_read": ctx.i2c_read,
         "var_set": ctx.var_set,
         "if_condition": ctx.if_condition,
         "end_condition": ctx.end_condition,

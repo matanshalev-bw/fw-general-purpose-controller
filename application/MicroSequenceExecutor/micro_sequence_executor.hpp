@@ -48,6 +48,10 @@ class MicroSequenceExecutor {
   bool executeUartTransmit(const bluelink::MicroOpsPayload::MicroUartTransmit& op);
   bool executeSpiTransfer(const bluelink::MicroOpsPayload::MicroSpiTransfer& op);
   bool executeI2cWrite(const bluelink::MicroOpsPayload::MicroI2cWrite& op);
+  bool executeCanReceive(const bluelink::MicroOpsPayload::MicroCanReceive& op);
+  bool executeUartReceive(const bluelink::MicroOpsPayload::MicroUartReceive& op);
+  bool executeSpiReceive(const bluelink::MicroOpsPayload::MicroSpiReceive& op);
+  bool executeI2cRead(const bluelink::MicroOpsPayload::MicroI2cRead& op);
   bool executeVarSet(const bluelink::MicroOpsPayload::MicroVarSet& op);
   bool executeMoveToErrorState(const bluelink::MicroOpsPayload::MicroMoveToErrorState& op);
   bool executeMoveToEmergencyState(const bluelink::MicroOpsPayload::MicroMoveToEmergencyState& op);

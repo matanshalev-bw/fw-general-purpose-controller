@@ -162,6 +162,7 @@ class CommUart : public CommInterface {
       : CommInterface(timeout), handler_(handler) {}
 
   InterfaceStatus write(const uint8_t* data, const uint16_t size) override;
+  InterfaceStatus read(uint8_t* data, const uint16_t size);
 };
 #endif  // HAL_UART_MODULE_ENABLED
 
@@ -178,6 +179,7 @@ class CommI2c : public CommInterface {
 
   InterfaceStatus setDeviceAddr(const uint16_t device_addr);
   InterfaceStatus write(const uint8_t* data, const uint16_t size) override;
+  InterfaceStatus read(uint8_t* data, const uint16_t size);
 };
 #endif  // HAL_I2C_MODULE_ENABLED
 
@@ -243,6 +245,9 @@ class CommCan : public CommInterface {
   static InterfaceStatus startPeripheral(CommCanHandle* handler);
   static InterfaceStatus transmitStandard(CommCanHandle* handler, uint32_t id, const uint8_t* data,
                                           uint8_t dlc);
+  // dlc: in = max bytes to copy (1..8), out = actual bytes copied from matching frame.
+  static InterfaceStatus receiveStandard(CommCanHandle* handler, uint32_t id, uint8_t* data,
+                                         uint8_t& dlc, uint32_t timeout_ms);
 
   CommCan(CommCanHandle* handler, uint16_t* receive_size, bool* transmit_flag, bool perform_reset = true)
       : CommInterface(receive_size, transmit_flag), fdcan_handler_(handler) {
