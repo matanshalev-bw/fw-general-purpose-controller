@@ -279,6 +279,18 @@ async def usb_log_stream(port: str) -> AsyncIterator[Dict[str, Any]]:
 
 def micro_ops_catalog() -> List[Dict[str, Any]]:
     schema = get_schema()
+    pin_hints = {
+        "adc_read": {
+            "adc_instance": "1=PA0 (ADC1_IN1), 2=PB2 (ADC2_IN12)",
+            "channel": "use 0 (only buffer index)",
+            "store_raw": "1=raw ADC counts, 0=millivolts",
+        },
+        "dac_write": {
+            "dac_instance": "use 1 → PA4 (DAC1_OUT1)",
+            "use_var": "1=value from var_index, 0=use literal_value",
+            "literal_value": "12-bit code 0–4095",
+        },
+    }
     catalog: List[Dict[str, Any]] = []
     for member, op in sorted(schema.micro_ops.items()):
         payload_type = MICRO_OP_TO_PAYLOAD_TYPE.get(member)
@@ -300,15 +312,17 @@ def micro_ops_catalog() -> List[Dict[str, Any]]:
             max_len = None
             if field.array_size:
                 max_len = resolve_array_size(schema, field.array_size)
-            fields.append(
-                {
-                    "name": field.name,
-                    "type": field.cpp_type,
-                    "array_size": field.array_size,
-                    "max_len": max_len,
-                    "default": default,
-                }
-            )
+            entry = {
+                "name": field.name,
+                "type": field.cpp_type,
+                "array_size": field.array_size,
+                "max_len": max_len,
+                "default": default,
+            }
+            hint = pin_hints.get(member, {}).get(field.name)
+            if hint:
+                entry["hint"] = hint
+            fields.append(entry)
         payload_max = next((f["max_len"] for f in fields if f.get("max_len")), None)
         if payload_max is not None:
             for entry in fields:

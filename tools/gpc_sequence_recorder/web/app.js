@@ -1403,10 +1403,9 @@
       label.htmlFor = `usb-field-${f.name}`;
       const maxLen = f.max_len || (f.array_size ? parseInt(String(f.array_size), 10) : null);
       const maxValue = f.max_value;
-      if (maxLen) {
-        label.innerHTML = `${f.name} <span style="color:#7a9aad;font-size:0.75rem;">max ${maxLen} bytes</span>`;
-      } else if (maxValue !== undefined && maxValue !== null) {
-        label.innerHTML = `${f.name} <span style="color:#7a9aad;font-size:0.75rem;">max ${maxValue}</span>`;
+      const hint = f.hint || (maxLen ? `max ${maxLen} bytes` : maxValue != null ? `max ${maxValue}` : null);
+      if (hint) {
+        label.innerHTML = `${f.name} <span style="color:#7a9aad;font-size:0.75rem;">${hint}</span>`;
       } else {
         label.textContent = f.name;
       }

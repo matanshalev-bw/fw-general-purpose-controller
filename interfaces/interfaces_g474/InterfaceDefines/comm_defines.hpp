@@ -25,4 +25,8 @@ using CommDmaHandle = DMA_HandleTypeDef;
 using CommAdcHandle = ADC_HandleTypeDef;
 #endif
 
+#ifdef HAL_DAC_MODULE_ENABLED
+using CommDacHandle = DAC_HandleTypeDef;
+#endif
+
 #endif  // COMM_DEFINES_HPP_

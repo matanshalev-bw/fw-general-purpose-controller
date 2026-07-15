@@ -20,10 +20,10 @@
 class AdcManager {
 private:
     static constexpr uint8_t MAX_ADC_CHANNELS_ = 16;
-    static constexpr float VOLTAGE_DIVIDER_RATIO_ = (11.0f / (5.1f + 11.0f));
-    static constexpr uint8_t ADC1_BUFFER_SIZE_ = 7;
+    // GPC CubeMX mapping: ADC1 IN1 (PA0), ADC2 IN12 (PB2). ADC3 unused.
+    static constexpr uint8_t ADC1_BUFFER_SIZE_ = 1;
     static constexpr uint8_t ADC2_BUFFER_SIZE_ = 1;
-    static constexpr uint8_t ADC3_BUFFER_SIZE_ = 1;
+    static constexpr uint8_t ADC3_BUFFER_SIZE_ = 0;
 
     static AdcManager* instance_;
     
@@ -32,7 +32,6 @@ private:
     
     uint16_t dma_buffer_adc1_[ADC1_BUFFER_SIZE_];
     uint16_t dma_buffer_adc2_[ADC2_BUFFER_SIZE_];
-    uint16_t dma_buffer_adc3_[ADC3_BUFFER_SIZE_];
     
     static uint32_t adc_interrupt_flags_;
     bool is_initialized_ = false;

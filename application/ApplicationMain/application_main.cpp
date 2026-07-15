@@ -14,8 +14,8 @@
 #include "safety_features.hpp"
 
 #ifdef HAL_ADC_MODULE_ENABLED
-#include "adc_manager.hpp"
 #include "comm_defines.hpp"
+#include "gpio_interface.hpp"
 #endif
 
 extern CommCanHandle hfdcan2;
@@ -65,9 +65,9 @@ void applicationInit(void) {
   extern CommAdcHandle hadc2;
   extern CommDmaHandle hdma_adc1;
   extern CommDmaHandle hdma_adc2;
-  if (AdcManager::getInstance()->initialize(&hadc1, &hadc2, nullptr, &hdma_adc1, &hdma_adc2, nullptr) ==
+  if (GpioInterface::initializeAdcDma(&hadc1, &hadc2, nullptr, &hdma_adc1, &hdma_adc2, nullptr) ==
       InterfaceStatus::INTERFACE_OK) {
-    AdcManager::getInstance()->startAllAdcs();
+    GpioInterface::startAdcDma();
   }
 #endif
 

@@ -13,29 +13,20 @@ AdcManager* AdcManager::instance_ = nullptr;
 uint32_t AdcManager::adc_interrupt_flags_ = 0;
 
 AdcManager::AdcManager() {
+    // Matches application_g474 CubeMX: PA0=ADC1_IN1, PB2=ADC2_IN12.
     static const AdcChannelConfig ADC1_CHANNELS[] = {
-        AdcChannelConfig(AdcChannel::CHANNEL_1, 1, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_),
-        AdcChannelConfig(AdcChannel::CHANNEL_2, 2, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_),
-        AdcChannelConfig(AdcChannel::CHANNEL_3, 3, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_),
-        AdcChannelConfig(AdcChannel::CHANNEL_4, 4, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_),
-        AdcChannelConfig(AdcChannel::CHANNEL_5, 5, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_),
-        AdcChannelConfig(AdcChannel::CHANNEL_11, 6, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_),
-        AdcChannelConfig(AdcChannel::CHANNEL_15, 7, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_)
+        AdcChannelConfig(AdcChannel::CHANNEL_1, 1, ADC_SAMPLETIME_640CYCLES_5, 1.0f),
     };
     
     static const AdcChannelConfig ADC2_CHANNELS[] = {
-        AdcChannelConfig(AdcChannel::CHANNEL_12, 1, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_)
+        AdcChannelConfig(AdcChannel::CHANNEL_12, 1, ADC_SAMPLETIME_640CYCLES_5, 1.0f),
     };
     
-    static const AdcChannelConfig ADC3_CHANNELS[] = {
-        AdcChannelConfig(AdcChannel::CHANNEL_1, 1, ADC_SAMPLETIME_640CYCLES_5, VOLTAGE_DIVIDER_RATIO_)
-    };
-    
-    static constexpr uint8_t CHANNEL_COUNTS[] = {7, 1, 1};
-    static constexpr AdcChannelConfig* CHANNEL_CONFIGS[] = {
-        const_cast<AdcChannelConfig*>(ADC1_CHANNELS),
-        const_cast<AdcChannelConfig*>(ADC2_CHANNELS),
-        const_cast<AdcChannelConfig*>(ADC3_CHANNELS)
+    static constexpr uint8_t CHANNEL_COUNTS[] = {ADC1_BUFFER_SIZE_, ADC2_BUFFER_SIZE_, ADC3_BUFFER_SIZE_};
+    static constexpr const AdcChannelConfig* CHANNEL_CONFIGS[] = {
+        ADC1_CHANNELS,
+        ADC2_CHANNELS,
+        nullptr
     };
     
     for (uint8_t i = 0; i < static_cast<uint8_t>(AdcInstance::ADC_COUNT); i++) {
@@ -78,7 +69,7 @@ InterfaceStatus AdcManager::initialize(CommAdcHandle* hadc1, CommAdcHandle* hadc
                 adc_configs_[i].buffer_size = AdcManager::ADC2_BUFFER_SIZE_;
                 break;
             case AdcInstance::ADC_3:
-                adc_configs_[i].dma_buffer = dma_buffer_adc3_;
+                adc_configs_[i].dma_buffer = nullptr;
                 adc_configs_[i].buffer_size = AdcManager::ADC3_BUFFER_SIZE_;
                 break;
             default:
@@ -91,6 +82,10 @@ InterfaceStatus AdcManager::initialize(CommAdcHandle* hadc1, CommAdcHandle* hadc
     }
     
     for (uint8_t i = 0; i < static_cast<uint8_t>(AdcInstance::ADC_COUNT); i++) {
+        // Skip ADCs that are not present on this board (e.g. ADC3).
+        if (adc_configs_[i].adc_handle == nullptr || adc_configs_[i].channel_count == 0) {
+            continue;
+        }
         InterfaceStatus status = configureAdcChannels(static_cast<AdcInstance>(i));
         if (status != InterfaceStatus::INTERFACE_OK) {
             return status;
@@ -109,8 +104,7 @@ InterfaceStatus AdcManager::configureAdcChannels(AdcInstance adc_instance) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
     
-    // Channels are already configured in main.cpp, so we just verify the configuration
-    // and ensure the ADC is in the correct state for DMA operation
+    // Channels are already configured in main.cpp; verify count matches AdcManager.
     if (hadc->Init.NbrOfConversion != config.channel_count) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
@@ -124,6 +118,9 @@ InterfaceStatus AdcManager::startAllAdcs() {
     }
     
     for (uint8_t i = 0; i < static_cast<uint8_t>(AdcInstance::ADC_COUNT); i++) {
+        if (adc_configs_[i].adc_handle == nullptr || adc_configs_[i].channel_count == 0) {
+            continue;
+        }
         InterfaceStatus status = startAdcDma(static_cast<AdcInstance>(i));
         if (status != InterfaceStatus::INTERFACE_OK) {
             return status;
@@ -142,8 +139,6 @@ InterfaceStatus AdcManager::startAdcDma(AdcInstance adc_instance) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
     
-    // For continuous DMA mode, we need to specify the total number of samples
-    // that will be transferred in one complete cycle (channels × conversions per cycle)
     uint32_t total_samples = config.channel_count;
     
     if (HAL_ADC_Start_DMA(hadc, reinterpret_cast<uint32_t*>(config.dma_buffer), 
@@ -156,6 +151,9 @@ InterfaceStatus AdcManager::startAdcDma(AdcInstance adc_instance) {
 
 InterfaceStatus AdcManager::stopAllAdcs() {
     for (uint8_t i = 0; i < static_cast<uint8_t>(AdcInstance::ADC_COUNT); i++) {
+        if (adc_configs_[i].adc_handle == nullptr || adc_configs_[i].channel_count == 0) {
+            continue;
+        }
         InterfaceStatus status = stopAdcDma(static_cast<AdcInstance>(i));
         if (status != InterfaceStatus::INTERFACE_OK) {
             return status;
@@ -200,6 +198,8 @@ InterfaceStatus AdcManager::getChannelValue(AdcInstance adc_instance, uint8_t ch
     if (not is_initialized_ or channel_index >= MAX_ADC_CHANNELS_) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
+
+    processInterruptFlags();
     
     AdcBufferData& adc_data = adc_data_[static_cast<uint8_t>(adc_instance)];
     if (not adc_data.data_ready or channel_index >= adc_data.channel_count) {
@@ -211,8 +211,6 @@ InterfaceStatus AdcManager::getChannelValue(AdcInstance adc_instance, uint8_t ch
 }
 
 InterfaceStatus AdcManager::getChannelVoltage(AdcInstance adc_instance, uint8_t channel_index, float& voltage) {
-    processInterruptFlags();
-    
     uint16_t raw_value;
     InterfaceStatus status = getChannelValue(adc_instance, channel_index, raw_value);
     if (status != InterfaceStatus::INTERFACE_OK) {
@@ -220,16 +218,14 @@ InterfaceStatus AdcManager::getChannelVoltage(AdcInstance adc_instance, uint8_t 
     }
     
     AdcDmaConfig& config = adc_configs_[static_cast<uint8_t>(adc_instance)];
-    if (channel_index >= config.channel_count) {
+    if (channel_index >= config.channel_count || config.adc_handle == nullptr) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
     
-    // Calculate voltage in mV first, then convert to V and apply voltage divider ratio
     uint32_t voltage_mv = __LL_ADC_CALC_DATA_TO_VOLTAGE(3300,
                                                         raw_value,
                                                         config.adc_handle->Init.Resolution);
     
-    // Convert to volts and apply voltage divider ratio
     voltage = static_cast<float>(voltage_mv) / (1000.0f * config.channels[channel_index].voltage_divider_ratio);
     
     return InterfaceStatus::INTERFACE_OK;
@@ -240,7 +236,6 @@ void AdcManager::handleDmaComplete(AdcInstance adc_instance) {
 }
 
 void AdcManager::handleDmaError(AdcInstance adc_instance) {
-    // Reset data ready flag on error
     adc_data_[static_cast<uint8_t>(adc_instance)].data_ready = false;
 }
 
@@ -248,7 +243,6 @@ void AdcManager::processDmaData(AdcInstance adc_instance) {
     AdcDmaConfig& config = adc_configs_[static_cast<uint8_t>(adc_instance)];
     AdcBufferData& adc_data = adc_data_[static_cast<uint8_t>(adc_instance)];
     
-    // Process only the actual channel count, not the full buffer size
     for (uint8_t i = 0; i < config.channel_count; i++) {
         adc_data.raw_values[i] = config.dma_buffer[i];
     }
@@ -279,7 +273,7 @@ AdcInstance AdcManager::getAdcIndexFromHandle(CommAdcHandle* hadc) {
     } else if (hadc->Instance == ADC3) {
         return AdcInstance::ADC_3;
     }
-    return AdcInstance::ADC_1; // Default fallback
+    return AdcInstance::ADC_1;
 }
 
 void AdcManager::setBit(uint32_t& flags, uint32_t bit) {

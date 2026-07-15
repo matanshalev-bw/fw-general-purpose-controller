@@ -631,12 +631,13 @@ function renderPropsPanel(nodeId) {
       }
       const maxValue = p.max_value;
       const maxAttr = maxValue ? ` max="${maxValue}"` : "";
-      const maxLabel = maxValue
-        ? `<span class="limit-hint">max ${maxValue}</span>`
+      const hintText = p.hint || (maxValue ? `max ${maxValue}` : "");
+      const hintLabel = hintText
+        ? `<span class="limit-hint">${hintText}</span>`
         : "";
       return `
         <div class="field">
-          <label for="prop-${p.name}">${p.name}${maxLabel}</label>
+          <label for="prop-${p.name}">${p.name}${hintLabel}</label>
           <input id="prop-${p.name}" data-param="${p.name}" value="${displayVal}"${maxAttr} />
         </div>`;
     })
@@ -1141,10 +1142,9 @@ function updateLiveFields() {
     const label = document.createElement("label");
     const maxLen = f.max_len || (f.array_size ? parseInt(String(f.array_size), 10) : null);
     const maxValue = f.max_value;
-    if (maxLen) {
-      label.innerHTML = `${f.name}<span class="limit-hint">max ${maxLen} bytes</span>`;
-    } else if (maxValue) {
-      label.innerHTML = `${f.name}<span class="limit-hint">max ${maxValue}</span>`;
+    const hint = f.hint || (maxLen ? `max ${maxLen} bytes` : maxValue != null ? `max ${maxValue}` : null);
+    if (hint) {
+      label.innerHTML = `${f.name}<span class="limit-hint">${hint}</span>`;
     } else {
       label.textContent = f.name;
     }

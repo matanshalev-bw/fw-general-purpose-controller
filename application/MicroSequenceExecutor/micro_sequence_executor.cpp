@@ -10,6 +10,13 @@
 #include "safety_features.hpp"
 #include "system_interface.hpp"
 
+#ifdef HAL_ADC_MODULE_ENABLED
+#include "adc_manager.hpp"
+#endif
+#ifdef HAL_DAC_MODULE_ENABLED
+#include "comm_defines.hpp"
+#endif
+
 namespace {
 
 static CommUart uart(&HardwareMap::uart_main, bluelink::MicroOpsPayload::DEFAULT_COMM_RX_TIMEOUT);
@@ -268,7 +275,7 @@ bool MicroSequenceExecutor::executeAdcRead(const bluelink::MicroOpsPayload::Micr
   }
 
 #ifdef HAL_ADC_MODULE_ENABLED
-  if (op.adc_instance == 0 || op.adc_instance > static_cast<uint8_t>(AdcInstance::ADC_COUNT)) {
+  if (op.adc_instance == 0 || op.adc_instance > 2) {
     return false;
   }
 
@@ -297,8 +304,27 @@ bool MicroSequenceExecutor::executeAdcRead(const bluelink::MicroOpsPayload::Micr
 
 bool MicroSequenceExecutor::executeDacWrite(const bluelink::MicroOpsPayload::MicroDacWrite& op) {
 #ifdef HAL_DAC_MODULE_ENABLED
-  (void)op;
-  return false;
+  extern CommDacHandle hdac1;
+
+  // Only DAC1 CH1 on PA4 is enabled.
+  if (op.dac_instance != 1) {
+    return false;
+  }
+
+  uint16_t value = op.literal_value;
+  if (op.use_var != 0) {
+    if (var_store_ == nullptr || op.var_index >= MICRO_VAR_SLOT_COUNT) {
+      return false;
+    }
+    value = static_cast<uint16_t>(var_store_->get(op.var_index) & 0xFFFU);
+  } else if (value > 0xFFFU) {
+    value = 0xFFFU;
+  }
+
+  if (HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, value) != HAL_OK) {
+    return false;
+  }
+  return true;
 #else
   (void)op;
   return false;

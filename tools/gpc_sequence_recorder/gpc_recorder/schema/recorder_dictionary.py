@@ -37,8 +37,8 @@ _EXAMPLES: Dict[str, str] = {
     "undo": "undo()",
     "gpio_write": "gpio_write(port=1, pin=5, value=1)",
     "gpio_read": "gpio_read(port=1, pin=5, var_index=0)",
-    "adc_read": "adc_read(adc_instance=2, channel=0, var_index=0, store_raw=1)",
-    "dac_write": "dac_write(dac_instance=1, use_var=0, var_index=0, literal_value=0)",
+    "adc_read": "adc_read(adc_instance=1, channel=0, var_index=0, store_raw=1)",
+    "dac_write": "dac_write(dac_instance=1, use_var=0, var_index=0, literal_value=2048)",
     "delay_ms": "delay_ms(100)",
     "can_transmit": "can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])",
     "pwm_set": "pwm_set(timer_instance=1, channel=1, use_var=0, var_index=0, literal_duty=1000)",
@@ -83,8 +83,8 @@ _DESCRIPTIONS: Dict[str, str] = {
     "undo": "Remove the last micro-op step from the active recording, or peel back the last saved binding.",
     "gpio_write": "Append a digital GPIO write step to the active recording.",
     "gpio_read": "Append a digital GPIO read step; stores the pin value in var_index (0–19).",
-    "adc_read": "Append an ADC read step; stores the sample in var_index (store_raw selects raw vs scaled).",
-    "dac_write": "Append a DAC write step using a literal value or a var slot (use_var=1).",
+    "adc_read": "Append an ADC read step; stores the sample in var_index (store_raw selects raw vs scaled). Pins: ADC1→PA0, ADC2→PB2.",
+    "dac_write": "Append a DAC write step using a literal value or a var slot (use_var=1). Uses DAC1 CH1 on PA4.",
     "delay_ms": "Append a delay step (milliseconds).",
     "can_transmit": "Append a CAN transmit step (bus, id, dlc, and up to 8 data bytes).",
     "pwm_set": "Append a PWM duty step using a literal value or a var slot (use_var=1).",
@@ -207,6 +207,20 @@ def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
 _LENGTH_PARAM_NAMES = frozenset({"length", "dlc", "tx_len", "rx_len"})
 _DATA_PARAM_NAMES = frozenset({"data", "tx_data"})
 
+# Explicit pin / channel maps shown next to param labels (same style as max-length hints).
+_PARAM_HINTS: Dict[str, Dict[str, str]] = {
+    "adc_read": {
+        "adc_instance": "1=PA0 (ADC1_IN1), 2=PB2 (ADC2_IN12)",
+        "channel": "use 0 (only buffer index)",
+        "store_raw": "1=raw ADC counts, 0=millivolts",
+    },
+    "dac_write": {
+        "dac_instance": "use 1 → PA4 (DAC1_OUT1)",
+        "use_var": "1=value from var_index, 0=use literal_value",
+        "literal_value": "12-bit code 0–4095",
+    },
+}
+
 
 def _enrich_params_with_payload_limits(name: str, params: List[Dict[str, Any]]) -> None:
     """Attach max byte counts from the MicroOps C++ structs when available."""
@@ -251,6 +265,16 @@ def _enrich_params_with_payload_limits(name: str, params: List[Dict[str, Any]]) 
                 p["max_value"] = payload_max
 
 
+def _enrich_params_with_pin_hints(name: str, params: List[Dict[str, Any]]) -> None:
+    hints = _PARAM_HINTS.get(name)
+    if not hints:
+        return
+    for p in params:
+        hint = hints.get(p["name"])
+        if hint:
+            p["hint"] = hint
+
+
 def recorder_commands_dictionary() -> Dict[str, Any]:
     """
     Returns a stable list of DSL builtins available in the REPL.
@@ -280,6 +304,7 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
                     continue
                 params.append(_param_to_dict(p))
         _enrich_params_with_payload_limits(name, params)
+        _enrich_params_with_pin_hints(name, params)
         out.append(
             {
                 "name": name,
