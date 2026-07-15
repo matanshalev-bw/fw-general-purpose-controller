@@ -36,6 +36,7 @@ from gpc_recorder.paths import (
     MICRO_VAR_SLOT_COUNT,
     TOOL_DIR,
 )
+from gpc_recorder.schema.loader import get_schema
 
 WEB_DIR = TOOL_DIR / "web"
 _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
@@ -142,12 +143,14 @@ async def schema_recorder_dictionary() -> dict:
 
 @app.get("/api/limits")
 async def config_limits() -> dict:
+    schema = get_schema()
     return {
         "max_steps": MICRO_SEQUENCE_MAX_STEPS,
         "max_command_bindings": MAX_COMMANDS_BINDINGS,
         "max_telemetry_bindings": MAX_TELEMETRY_BINDINGS,
         "max_telemetry_fields": MAX_TELEMETRY_FIELD_MAPPINGS,
         "max_var_slots": MICRO_VAR_SLOT_COUNT,
+        "comm_data_length": schema.constants.get("COMM_DATA_LENGTH", 8),
     }
 
 

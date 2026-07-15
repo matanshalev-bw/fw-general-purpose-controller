@@ -295,12 +295,14 @@ bool MicroSequenceExecutor::executeCanTransmit(const bluelink::MicroOpsPayload::
     return false;
   }
 
-  const uint8_t dlc = op.dlc > 8 ? 8 : op.dlc;
+  const uint8_t dlc =
+      op.dlc > bluelink::MicroOpsPayload::COMM_DATA_LENGTH ? bluelink::MicroOpsPayload::COMM_DATA_LENGTH : op.dlc;
   return raw_can_->transmitStandard(op.id, op.data, dlc) == InterfaceStatus::INTERFACE_OK;
 }
 
 bool MicroSequenceExecutor::executeUartTransmit(const bluelink::MicroOpsPayload::MicroUartTransmit& op) {
-  // if (op.uart_instance != HardwareMap::MICRO_SEQUENCE_UART_INSTANCE || op.length == 0 || op.length > 8) {
+  // if (op.uart_instance != HardwareMap::MICRO_SEQUENCE_UART_INSTANCE || op.length == 0 ||
+  //     op.length > bluelink::MicroOpsPayload::COMM_DATA_LENGTH) {
   //   return false;
   // }
 
@@ -310,7 +312,7 @@ bool MicroSequenceExecutor::executeUartTransmit(const bluelink::MicroOpsPayload:
 bool MicroSequenceExecutor::executeSpiTransfer(const bluelink::MicroOpsPayload::MicroSpiTransfer& op) {
   if (
     //op.spi_instance != HardwareMap::MICRO_SEQUENCE_SPI_INSTANCE ||
-     op.tx_len == 0 || op.tx_len > 8) {
+     op.tx_len == 0 || op.tx_len > bluelink::MicroOpsPayload::COMM_DATA_LENGTH) {
     return false;
   }
 
@@ -320,7 +322,7 @@ bool MicroSequenceExecutor::executeSpiTransfer(const bluelink::MicroOpsPayload::
 bool MicroSequenceExecutor::executeI2cWrite(const bluelink::MicroOpsPayload::MicroI2cWrite& op) {
   if (
     //op.i2c_instance != HardwareMap::MICRO_SEQUENCE_I2C_INSTANCE || 
-    op.length == 0 || op.length > 8) {
+    op.length == 0 || op.length > bluelink::MicroOpsPayload::COMM_DATA_LENGTH) {
     return false;
   }
 

@@ -13,6 +13,7 @@ from gpc_recorder.paths import (
     MICRO_SEQUENCE_MAX_STEPS,
     TOOL_DIR,
 )
+from gpc_recorder.dsl.pack import resolve_array_size
 
 
 def _format_data_array(data: List[int], struct_name: str, field_values: Dict[str, Any], schema) -> str:
@@ -71,7 +72,7 @@ def _format_union_init(member: str, values: Dict[str, Any], schema=None) -> str:
             if v is None:
                 raise ValueError(f"Missing field {field.name!r} for {member}")
             if field.array_size:
-                size = int(field.array_size.strip()) if field.array_size.strip().isdigit() else 8
+                size = resolve_array_size(schema, field.array_size)
                 use_hex = member == "can_transmit" and field.name == "data"
                 parts.append(_format_array_field(v, size, hex_bytes=use_hex))
             elif member == "can_transmit" and field.name == "id":

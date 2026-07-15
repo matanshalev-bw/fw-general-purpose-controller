@@ -130,6 +130,7 @@ const appState = {
     max_telemetry_bindings: 3,
     max_telemetry_fields: 8,
     max_var_slots: 8,
+    comm_data_length: 8,
   },
 };
 
@@ -541,11 +542,12 @@ function renderPropsPanel(nodeId) {
       const val = node.data.args[p.name];
       const displayVal = Array.isArray(val) ? val.join(", ") : val ?? "";
       if (p.is_list) {
+        const maxLen = p.max_len || appState.limits.comm_data_length;
         return `
           <div class="field">
-            <label for="prop-${p.name}">${p.name}</label>
-            <input id="prop-${p.name}" data-param="${p.name}" data-is-list="1" class="wide"
-              value="${displayVal}" placeholder="comma-separated bytes" />
+            <label for="prop-${p.name}">${p.name}<span class="limit-hint">max ${maxLen} bytes</span></label>
+            <input id="prop-${p.name}" data-param="${p.name}" data-is-list="1" data-max-len="${maxLen}" class="wide"
+              value="${displayVal}" placeholder="comma-separated, max ${maxLen} bytes" />
           </div>`;
       }
       if (p.name === "comparing_type") {
@@ -559,10 +561,15 @@ function renderPropsPanel(nodeId) {
             <select id="prop-${p.name}" data-param="${p.name}">${opts}</select>
           </div>`;
       }
+      const maxValue = p.max_value;
+      const maxAttr = maxValue ? ` max="${maxValue}"` : "";
+      const maxLabel = maxValue
+        ? `<span class="limit-hint">max ${maxValue}</span>`
+        : "";
       return `
         <div class="field">
-          <label for="prop-${p.name}">${p.name}</label>
-          <input id="prop-${p.name}" data-param="${p.name}" value="${displayVal}" />
+          <label for="prop-${p.name}">${p.name}${maxLabel}</label>
+          <input id="prop-${p.name}" data-param="${p.name}" value="${displayVal}"${maxAttr} />
         </div>`;
     })
     .join("");
@@ -574,11 +581,17 @@ function renderPropsPanel(nodeId) {
       const param = el.dataset.param;
       let value;
       if (el.dataset.isList === "1") {
+        const maxLen = parseInt(el.dataset.maxLen || "8", 10);
         value = el.value
           .split(",")
           .map((s) => s.trim())
           .filter((s) => s.length)
           .map((s) => (s.startsWith("0x") ? parseInt(s, 16) : parseInt(s, 10) || 0));
+        if (value.length > maxLen) {
+          value = value.slice(0, maxLen);
+          el.value = value.join(", ");
+          setStatus(`Trimmed ${param} to max ${maxLen} bytes`);
+        }
       } else if (el.tagName === "SELECT") {
         value = el.value;
       } else if (el.value.startsWith("0x")) {
@@ -588,6 +601,11 @@ function renderPropsPanel(nodeId) {
       } else {
         value = parseInt(el.value, 10);
         if (Number.isNaN(value)) value = el.value;
+        if (el.max !== "" && typeof value === "number" && value > Number(el.max)) {
+          value = Number(el.max);
+          el.value = String(value);
+          setStatus(`${param} capped at ${el.max}`);
+        }
       }
       // getNodeFromId returns a deep clone — write back via updateNodeDataFromId
       // so Save / linearizeDrawflow see the edited args instead of defaults.
@@ -1001,6 +1019,7 @@ async function loadDictionaries() {
       max_telemetry_bindings: limits.max_telemetry_bindings ?? appState.limits.max_telemetry_bindings,
       max_telemetry_fields: limits.max_telemetry_fields ?? appState.limits.max_telemetry_fields,
       max_var_slots: limits.max_var_slots ?? appState.limits.max_var_slots,
+      comm_data_length: limits.comm_data_length ?? appState.limits.comm_data_length,
     };
   }
 
@@ -1040,11 +1059,29 @@ function updateLiveFields() {
     const wrap = document.createElement("div");
     wrap.className = "field";
     const label = document.createElement("label");
-    label.textContent = f.name;
+    const maxLen = f.max_len || (f.array_size ? parseInt(String(f.array_size), 10) : null);
+    const maxValue = f.max_value;
+    if (maxLen) {
+      label.innerHTML = `${f.name}<span class="limit-hint">max ${maxLen} bytes</span>`;
+    } else if (maxValue) {
+      label.innerHTML = `${f.name}<span class="limit-hint">max ${maxValue}</span>`;
+    } else {
+      label.textContent = f.name;
+    }
     const input = document.createElement("input");
     input.dataset.field = f.name;
     input.value = f.default ?? 0;
-    if (f.array_size) input.className = "wide";
+    if (maxLen || f.array_size) {
+      input.className = "wide";
+      input.placeholder = `comma-separated or "text", max ${maxLen || f.array_size} bytes`;
+      input.dataset.maxLen = String(maxLen || f.array_size);
+      if (Array.isArray(f.default)) input.value = f.default.join(",");
+      else input.value = "";
+    } else if (maxValue) {
+      input.type = "number";
+      input.min = "0";
+      input.max = String(maxValue);
+    }
     wrap.appendChild(label);
     wrap.appendChild(input);
     fieldsDiv.appendChild(wrap);

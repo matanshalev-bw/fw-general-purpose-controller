@@ -189,6 +189,44 @@ def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
     }
 
 
+_LENGTH_PARAM_NAMES = frozenset({"length", "dlc", "tx_len"})
+_DATA_PARAM_NAMES = frozenset({"data", "tx_data"})
+
+
+def _enrich_params_with_payload_limits(name: str, params: List[Dict[str, Any]]) -> None:
+    """Attach max byte counts from the MicroOps C++ structs when available."""
+    try:
+        from gpc_recorder.dsl.pack import resolve_array_size
+        from gpc_recorder.schema.loader import get_schema
+    except Exception:
+        return
+    try:
+        schema = get_schema()
+    except Exception:
+        return
+    op = schema.micro_ops.get(name)
+    if op is None:
+        return
+    field_by_name = {f.name: f for f in op.fields}
+    payload_max = None
+    for field in op.fields:
+        if not field.array_size:
+            continue
+        payload_max = resolve_array_size(schema, field.array_size)
+        break
+    if payload_max is None:
+        return
+    for p in params:
+        field = field_by_name.get(p["name"])
+        if field and field.array_size:
+            p["max_len"] = resolve_array_size(schema, field.array_size)
+        elif p["name"] in _LENGTH_PARAM_NAMES or p["name"] in _DATA_PARAM_NAMES:
+            if p.get("is_list") or p["name"] in _DATA_PARAM_NAMES:
+                p["max_len"] = payload_max
+            else:
+                p["max_value"] = payload_max
+
+
 def recorder_commands_dictionary() -> Dict[str, Any]:
     """
     Returns a stable list of DSL builtins available in the REPL.
@@ -217,6 +255,7 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
                 if p.name == "self":
                     continue
                 params.append(_param_to_dict(p))
+        _enrich_params_with_payload_limits(name, params)
         out.append(
             {
                 "name": name,

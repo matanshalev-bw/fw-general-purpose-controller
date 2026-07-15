@@ -1400,20 +1400,34 @@
       const wrap = document.createElement("div");
       wrap.className = "field";
       const label = document.createElement("label");
-      label.textContent = f.name;
       label.htmlFor = `usb-field-${f.name}`;
+      const maxLen = f.max_len || (f.array_size ? parseInt(String(f.array_size), 10) : null);
+      const maxValue = f.max_value;
+      if (maxLen) {
+        label.innerHTML = `${f.name} <span style="color:#7a9aad;font-size:0.75rem;">max ${maxLen} bytes</span>`;
+      } else if (maxValue !== undefined && maxValue !== null) {
+        label.innerHTML = `${f.name} <span style="color:#7a9aad;font-size:0.75rem;">max ${maxValue}</span>`;
+      } else {
+        label.textContent = f.name;
+      }
       const input = document.createElement("input");
       input.id = `usb-field-${f.name}`;
       input.dataset.field = f.name;
-      if (f.array_size) {
+      if (maxLen || f.array_size) {
         input.classList.add("wide");
-        input.placeholder = `comma-separated or "text" (${f.array_size})`;
+        input.placeholder = `comma-separated or "text", max ${maxLen || f.array_size} bytes`;
+        input.dataset.maxLen = String(maxLen || f.array_size);
         if (Array.isArray(f.default)) {
           input.value = f.default.join(",");
         }
       } else {
         input.value =
           f.default !== undefined && f.default !== null ? String(f.default) : "0";
+        if (maxValue !== undefined && maxValue !== null) {
+          input.type = "number";
+          input.min = "0";
+          input.max = String(maxValue);
+        }
       }
       wrap.appendChild(label);
       wrap.appendChild(input);

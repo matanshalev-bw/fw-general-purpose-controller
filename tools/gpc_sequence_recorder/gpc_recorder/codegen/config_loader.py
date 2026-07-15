@@ -7,7 +7,7 @@ import struct
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from gpc_recorder.dsl.pack import _field_size, _normalize_type, unpack_trigger_data
+from gpc_recorder.dsl.pack import _field_size, _normalize_type, resolve_array_size, unpack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session, TelemetryBindingState
 from gpc_recorder.paths import (
     CONTROLLER_STATE_SEQUENCE_FIELDS,
@@ -148,8 +148,7 @@ def _parse_step_values(
     ti = 0
     for field in op_def.fields:
         if field.array_size:
-            size_str = field.array_size.strip()
-            size = int(size_str) if size_str.isdigit() else 8
+            size = resolve_array_size(schema, field.array_size)
             if ti >= len(tokens):
                 raise ValueError(f"Missing value for {field.name} in {union_member}")
             token = tokens[ti].strip()

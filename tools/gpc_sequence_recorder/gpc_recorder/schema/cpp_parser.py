@@ -127,6 +127,7 @@ class Schema:
         self.enums: Dict[str, EnumDef] = {}
         self.micro_ops: Dict[str, MicroOpDef] = {}
         self.component_ids: Dict[str, int] = {}
+        self.constants: Dict[str, int] = {}
 
     def load(
         self,
@@ -213,6 +214,14 @@ class Schema:
 
     def _load_micro_ops(self, content: str) -> None:
         content = self._converter.remove_c_comments(content)
+        for match in re.finditer(
+            r"static\s+constexpr\s+\w+\s+(\w+)\s*=\s*(0x[0-9a-fA-F]+|\d+)\s*;",
+            content,
+        ):
+            name = match.group(1)
+            raw = match.group(2)
+            self.constants[name] = int(raw, 16) if raw.startswith("0x") else int(raw)
+
         op_type_match = re.search(
             r"enum\s+class\s+MicroOpType\s*:\s*uint8_t\s*\{([^}]+)\}",
             content,

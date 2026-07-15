@@ -3,7 +3,7 @@
 import re
 import struct
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from gpc_recorder.schema.cpp_parser import FieldDef, Schema, StructDef
 
@@ -19,6 +19,24 @@ def _normalize_type(cpp_type: str) -> str:
     t = t.split("::")[-1]
     t = re.sub(r"\s+", " ", t)
     return t
+
+
+def resolve_array_size(schema: Schema, size_str: Optional[str], *, default: int = 8) -> int:
+    """Resolve a C++ array bound (`8`, `COMM_DATA_LENGTH`, …) to an integer length."""
+    if size_str is None:
+        return default
+    text = size_str.strip()
+    if not text:
+        return default
+    if text.isdigit() or (text.startswith("0x") or text.startswith("0X")):
+        try:
+            return int(text, 0)
+        except ValueError:
+            return default
+    name = text.split("::")[-1]
+    if name in schema.constants:
+        return int(schema.constants[name])
+    return default
 
 
 def _enum_numeric(schema: Schema, enum_type: str, value: Any) -> int:
@@ -41,10 +59,7 @@ def _field_size(schema: Schema, field: FieldDef) -> int:
     t = _normalize_type(field.cpp_type)
     if field.array_size:
         base = _field_size(schema, FieldDef(t, "x"))
-        size_str = field.array_size.strip()
-        if size_str.isdigit():
-            return base * int(size_str)
-        return base * 8
+        return base * resolve_array_size(schema, field.array_size)
     sizes = {
         "bool": 1,
         "uint8_t": 1,
@@ -68,8 +83,7 @@ def _pack_field(schema: Schema, field: FieldDef, value: Any) -> bytes:
     t = _normalize_type(field.cpp_type)
     if field.array_size:
         arr = list(value)
-        size_str = field.array_size.strip()
-        n = int(size_str) if size_str.isdigit() else len(arr)
+        n = resolve_array_size(schema, field.array_size, default=len(arr))
         parts = []
         for i in range(n):
             item = arr[i] if i < len(arr) else 0
@@ -229,8 +243,7 @@ def unpack_trigger_data(
         if len(chunk) < sz:
             chunk = chunk + bytes(sz - len(chunk))
         if field.array_size:
-            size_str = field.array_size.strip()
-            n = int(size_str) if size_str.isdigit() else len(chunk)
+            n = resolve_array_size(schema, field.array_size, default=len(chunk))
             base_sz = sz // n if n else 1
             field_values[field.name] = [
                 _unpack_field(schema, FieldDef(_normalize_type(field.cpp_type), "elem"), chunk[i : i + base_sz])

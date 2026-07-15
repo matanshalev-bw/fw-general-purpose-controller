@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from gpc_recorder.dsl.coerce import coerce_int_byte_list, quoted_string_bytes
-from gpc_recorder.dsl.pack import fill_struct_fields, pack_struct, _normalize_type
+from gpc_recorder.dsl.pack import fill_struct_fields, pack_struct, resolve_array_size, _normalize_type
 from gpc_recorder.paths import REPO_ROOT, TOOL_DIR, _INSTALLED_BIN_DIR, _repo_is_installed_read_only
 from gpc_recorder.schema.cpp_parser import StructDef
 from gpc_recorder.schema.loader import get_schema
@@ -293,14 +293,25 @@ def micro_ops_catalog() -> List[Dict[str, Any]]:
                         default = int(field.default_raw, 0) if field.default_raw.startswith("0x") else int(field.default_raw)
                     except ValueError:
                         default = field.default_raw
+            max_len = None
+            if field.array_size:
+                max_len = resolve_array_size(schema, field.array_size)
             fields.append(
                 {
                     "name": field.name,
                     "type": field.cpp_type,
                     "array_size": field.array_size,
+                    "max_len": max_len,
                     "default": default,
                 }
             )
+        payload_max = next((f["max_len"] for f in fields if f.get("max_len")), None)
+        if payload_max is not None:
+            for entry in fields:
+                if entry.get("max_len"):
+                    continue
+                if entry["name"] in {"length", "dlc", "tx_len"}:
+                    entry["max_value"] = payload_max
         catalog.append(
             {
                 "union_member": member,
