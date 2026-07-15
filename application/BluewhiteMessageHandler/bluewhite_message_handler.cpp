@@ -169,7 +169,7 @@ bool BluewhiteMessageHandler::tryStartSequenceForMessage(uint8_t payload_type_id
   }
 
   const volatile SequencesConfig& sequences = NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config;
-  for (uint8_t i = 0; i < sequences.binding_count && i < MICRO_SEQUENCE_MAX_BINDINGS; ++i) {
+  for (uint8_t i = 0; i < sequences.binding_count && i < MAX_COMMANDS_BINDINGS; ++i) {
     const volatile CommandSequenceBinding& binding = sequences.bindings[i];
     if (binding.trigger.payload_type != static_cast<bluelink::PayloadTypeIds>(payload_type_id)) {
       continue;

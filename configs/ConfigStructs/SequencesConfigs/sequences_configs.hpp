@@ -6,7 +6,7 @@
 #include "PayloadTypes.hpp"
 
 #define MICRO_SEQUENCE_MAX_STEPS 15
-#define MICRO_SEQUENCE_MAX_BINDINGS 16
+#define MAX_COMMANDS_BINDINGS 16
 #define MICRO_VAR_SLOT_COUNT 8
 #define MAX_TELEMETRY_BINDINGS 3
 #define MAX_TELEMETRY_FIELD_MAPPINGS 8
@@ -62,7 +62,7 @@ struct SequencesConfig {
   MicroSequence error_state_tick_sequence = {};
   MicroSequence emergency_state_tick_sequence = {};
   uint8_t binding_count = 0;
-  CommandSequenceBinding bindings[MICRO_SEQUENCE_MAX_BINDINGS] = {};
+  CommandSequenceBinding bindings[MAX_COMMANDS_BINDINGS] = {};
   TelemetryConfig telemetry_config = {};
 } __attribute__((packed));
 

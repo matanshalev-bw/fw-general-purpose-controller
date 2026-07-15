@@ -1,5 +1,5 @@
 from gpc_recorder.paths import (
-    MICRO_SEQUENCE_MAX_BINDINGS,
+    MAX_COMMANDS_BINDINGS,
     MICRO_SEQUENCE_MAX_STEPS,
     MICRO_VAR_SLOT_COUNT,
     MAX_TELEMETRY_BINDINGS,
@@ -33,8 +33,8 @@ def validate_tick_step_count(count: int, *, label: str = "Tick sequence") -> Non
 
 
 def validate_binding_count(count: int) -> None:
-    if count > MICRO_SEQUENCE_MAX_BINDINGS:
-        raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_BINDINGS} bindings")
+    if count > MAX_COMMANDS_BINDINGS:
+        raise ValueError(f"Maximum {MAX_COMMANDS_BINDINGS} bindings")
 
 
 def validate_telemetry_binding_count(count: int) -> None:
