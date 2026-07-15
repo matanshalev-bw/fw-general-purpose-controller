@@ -124,6 +124,13 @@ const appState = {
   bindMode: null,
   commandCounter: 0,
   telemetryCounter: 0,
+  limits: {
+    max_steps: 30,
+    max_command_bindings: 16,
+    max_telemetry_bindings: 3,
+    max_telemetry_fields: 8,
+    max_var_slots: 8,
+  },
 };
 
 let drawflowEditor = null;
@@ -135,6 +142,31 @@ function setStatus(msg) {
 
 function friendlyName(command) {
   return FRIENDLY_NAMES[command] || command.replace(/_/g, " ");
+}
+
+function limitClass(used, max) {
+  if (used >= max) return "full";
+  if (used >= Math.max(1, max - 3) || used / max >= 0.8) return "warn";
+  return "";
+}
+
+function formatBudget(used, max, unit) {
+  const free = Math.max(0, max - used);
+  if (used === 0) return `max ${max} ${unit}`;
+  if (free === 0) return `full · max ${max} ${unit}`;
+  if (free === 1) return `${used} used · room for 1 more`;
+  return `${used} used · room for ${free} more`;
+}
+
+function setLimitHint(el, used, max, unit) {
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = formatBudget(used, max, unit);
+  el.className = `limit-hint ${limitClass(used, max)}`.trim();
+}
+
+function countByType(type) {
+  return Object.values(appState.containers).filter((c) => c.type === type).length;
 }
 
 function defaultArgs(meta) {
@@ -208,17 +240,20 @@ function renderBoard() {
   ensureFixedContainers();
   const board = document.getElementById("state-board");
   board.innerHTML = "";
+  const maxSteps = appState.limits.max_steps;
 
   for (const slot of FIXED_SLOTS) {
     const c = appState.containers[slot.id];
+    const used = (c.steps || []).length;
     const card = document.createElement("div");
     card.className = `state-card ${slot.cardClass || ""}`;
     card.style.gridArea = slot.area;
-    if ((c.steps || []).length > 0) card.classList.add("has-steps");
+    if (used > 0) card.classList.add("has-steps");
     card.innerHTML = `
       <div class="card-title">${c.label}</div>
-      <div class="card-meta">${(c.steps || []).length} step(s)</div>
+      <div class="card-meta">${used} step${used === 1 ? "" : "s"}</div>
       <div class="card-preview">${containerPreview(c)}</div>
+      <div class="limit-hint ${limitClass(used, maxSteps)}">${formatBudget(used, maxSteps, "steps")}</div>
     `;
     card.appendChild(makeStateArrow(slot.repeatable, slot.arrowUp));
     card.addEventListener("click", () => openEditor(c.id));
@@ -228,46 +263,77 @@ function renderBoard() {
   const commandZone = document.createElement("div");
   commandZone.className = "board-zone zone-command";
   const commandContainers = Object.values(appState.containers).filter((c) => c.type === "command");
+  const cmdUsed = commandContainers.length;
+  const cmdMax = appState.limits.max_command_bindings;
+  const cmdHeading = document.createElement("div");
+  cmdHeading.className = "zone-heading";
+  cmdHeading.innerHTML = `
+    <span>Command bindings</span>
+    <span class="limit-hint ${limitClass(cmdUsed, cmdMax)}">${formatBudget(cmdUsed, cmdMax, "bindings")}</span>
+  `;
+  commandZone.appendChild(cmdHeading);
   for (const c of commandContainers) {
+    const used = (c.steps || []).length;
     const card = document.createElement("div");
     card.className = "state-card type-command";
-    if ((c.steps || []).length) card.classList.add("has-steps");
+    if (used) card.classList.add("has-steps");
     card.innerHTML = `
       <div class="card-title">${c.label || "COMMAND"}</div>
-      <div class="card-meta">${(c.steps || []).length} step(s)</div>
+      <div class="card-meta">${used} step${used === 1 ? "" : "s"}</div>
       <div class="card-preview">${containerPreview(c)}</div>
+      <div class="limit-hint ${limitClass(used, maxSteps)}">${formatBudget(used, maxSteps, "steps")}</div>
     `;
     card.appendChild(makeStateArrow(false));
     card.addEventListener("click", () => openEditor(c.id));
     commandZone.appendChild(card);
   }
   const addCmd = document.createElement("div");
-  addCmd.className = "add-card";
-  addCmd.textContent = "+ Add COMMAND binding";
-  addCmd.addEventListener("click", () => openBindModal("command"));
+  addCmd.className = `add-card${cmdUsed >= cmdMax ? " disabled" : ""}`;
+  addCmd.textContent = cmdUsed >= cmdMax ? "No room for more command bindings" : "+ Add COMMAND binding";
+  addCmd.title =
+    cmdUsed >= cmdMax
+      ? `At capacity (max ${cmdMax} command bindings)`
+      : `Room for ${cmdMax - cmdUsed} more command binding(s)`;
+  if (cmdUsed < cmdMax) addCmd.addEventListener("click", () => openBindModal("command"));
   commandZone.appendChild(addCmd);
   board.appendChild(commandZone);
 
   const telemetryZone = document.createElement("div");
   telemetryZone.className = "board-zone zone-telemetry";
   const telemetryContainers = Object.values(appState.containers).filter((c) => c.type === "telemetry");
+  const telUsed = telemetryContainers.length;
+  const telMax = appState.limits.max_telemetry_bindings;
+  const telHeading = document.createElement("div");
+  telHeading.className = "zone-heading";
+  telHeading.innerHTML = `
+    <span>Telemetry bindings</span>
+    <span class="limit-hint ${limitClass(telUsed, telMax)}">${formatBudget(telUsed, telMax, "bindings")}</span>
+  `;
+  telemetryZone.appendChild(telHeading);
   for (const c of telemetryContainers) {
     const card = document.createElement("div");
     card.className = "state-card type-telemetry";
     if (c.trigger) card.classList.add("has-steps");
+    const fieldCount = Object.keys(c.fields || {}).length;
+    const fieldMax = appState.limits.max_telemetry_fields;
     card.innerHTML = `
       <div class="card-title">${c.label || "TELEMETRY"}</div>
       <div class="card-meta">telemetry binding</div>
       <div class="card-preview">${containerPreview(c)}</div>
+      <div class="limit-hint ${limitClass(fieldCount, fieldMax)}">${formatBudget(fieldCount, fieldMax, "fields")}</div>
     `;
     card.appendChild(makeStateArrow(true));
     card.addEventListener("click", () => openTelemetryEditor(c.id));
     telemetryZone.appendChild(card);
   }
   const addTel = document.createElement("div");
-  addTel.className = "add-card";
-  addTel.textContent = "+ Add TELEMETRY binding";
-  addTel.addEventListener("click", () => openBindModal("telemetry"));
+  addTel.className = `add-card${telUsed >= telMax ? " disabled" : ""}`;
+  addTel.textContent = telUsed >= telMax ? "No room for more telemetry bindings" : "+ Add TELEMETRY binding";
+  addTel.title =
+    telUsed >= telMax
+      ? `At capacity (max ${telMax} telemetry bindings)`
+      : `Room for ${telMax - telUsed} more telemetry binding(s)`;
+  if (telUsed < telMax) addTel.addEventListener("click", () => openBindModal("telemetry"));
   telemetryZone.appendChild(addTel);
   board.appendChild(telemetryZone);
 }
@@ -417,6 +483,11 @@ function linearizeDrawflow() {
 
 function addNodeAtDrop(command, args, clientX, clientY) {
   if (!drawflowEditor) return;
+  if (countDrawflowNodes() >= appState.limits.max_steps) {
+    setStatus(`No room for more steps (max ${appState.limits.max_steps})`);
+    updateModalStepLimit();
+    return;
+  }
   const precanvas = drawflowEditor.precanvas;
   const rect = precanvas.getBoundingClientRect();
   const zoom = drawflowEditor.zoom || 1;
@@ -435,6 +506,18 @@ function addNodeAtDrop(command, args, clientX, clientY) {
     { command, args: { ...step.args }, metaName: command },
     html
   );
+  updateModalStepLimit();
+}
+
+function countDrawflowNodes() {
+  if (!drawflowEditor) return 0;
+  const exported = drawflowEditor.export();
+  return Object.keys(exported.drawflow?.Home?.data || {}).length;
+}
+
+function updateModalStepLimit() {
+  const used = countDrawflowNodes();
+  setLimitHint(document.getElementById("modal-limit"), used, appState.limits.max_steps, "steps");
 }
 
 function renderPropsPanel(nodeId) {
@@ -546,6 +629,8 @@ function initDrawflow() {
     selectedNodeId = null;
     renderPropsPanel(null);
   });
+  drawflowEditor.on("nodeCreated", () => updateModalStepLimit());
+  drawflowEditor.on("nodeRemoved", () => updateModalStepLimit());
 }
 
 function openEditor(containerId) {
@@ -565,11 +650,19 @@ function openEditor(containerId) {
   else drawflowEditor.clear();
 
   buildDrawflowFromSteps(container.steps || []);
+  updateModalStepLimit();
 }
 
 function closeEditor(save) {
   if (save && appState.activeContainerId) {
     const steps = linearizeDrawflow();
+    if (steps.length > appState.limits.max_steps) {
+      setStatus(
+        `Cannot save: ${steps.length} steps, max is ${appState.limits.max_steps}`
+      );
+      updateModalStepLimit();
+      return;
+    }
     const container = appState.containers[appState.activeContainerId];
     if (container) container.steps = steps;
     renderBoard();
@@ -577,6 +670,8 @@ function closeEditor(save) {
   }
   appState.activeContainerId = null;
   document.getElementById("editor-modal").classList.remove("open");
+  const modalLimit = document.getElementById("modal-limit");
+  if (modalLimit) modalLimit.hidden = true;
 }
 
 function openTelemetryEditor(containerId) {
@@ -585,6 +680,12 @@ function openTelemetryEditor(containerId) {
   appState.bindMode = "telemetry-edit";
   appState.activeContainerId = containerId;
   document.getElementById("bind-modal-title").textContent = `Edit telemetry: ${container.label}`;
+  setLimitHint(
+    document.getElementById("bind-modal-limit"),
+    Object.keys(container.fields || {}).length,
+    appState.limits.max_telemetry_fields,
+    "fields"
+  );
   renderBindForm(container);
   document.getElementById("bind-modal").classList.add("open");
 }
@@ -594,6 +695,21 @@ function openBindModal(mode) {
   appState.activeContainerId = null;
   document.getElementById("bind-modal-title").textContent =
     mode === "command" ? "Add COMMAND binding" : "Add TELEMETRY binding";
+  if (mode === "command") {
+    setLimitHint(
+      document.getElementById("bind-modal-limit"),
+      countByType("command"),
+      appState.limits.max_command_bindings,
+      "bindings"
+    );
+  } else {
+    setLimitHint(
+      document.getElementById("bind-modal-limit"),
+      countByType("telemetry"),
+      appState.limits.max_telemetry_bindings,
+      "bindings"
+    );
+  }
   renderBindForm(null);
   document.getElementById("bind-modal").classList.add("open");
 }
@@ -638,7 +754,7 @@ function renderBindForm(existing) {
         extraFields += `
           <div class="field">
             <label for="bind-${key}">${f.name} var_index</label>
-            <input id="bind-${key}" data-field="${key}" type="number" min="0" max="7" value="${val}" />
+            <input id="bind-${key}" data-field="${key}" type="number" min="0" max="${appState.limits.max_var_slots - 1}" value="${val}" />
           </div>`;
       } else {
         extraFields += `
@@ -684,12 +800,23 @@ function closeBindModal(save) {
     });
 
     if (appState.bindMode === "telemetry-edit" && appState.activeContainerId) {
+      const fieldCount = Object.keys(fields).length;
+      if (fieldCount > appState.limits.max_telemetry_fields) {
+        setStatus(
+          `Cannot save: ${fieldCount} fields, max is ${appState.limits.max_telemetry_fields}`
+        );
+        return;
+      }
       const c = appState.containers[appState.activeContainerId];
       c.trigger = trigger;
       c.rate = parseInt(document.getElementById("bind-rate")?.value || "1", 10);
       c.fields = fields;
       c.label = `TELEMETRY: ${trigger}`;
     } else if (appState.bindMode === "command") {
+      if (countByType("command") >= appState.limits.max_command_bindings) {
+        setStatus(`No room for more command bindings (max ${appState.limits.max_command_bindings})`);
+        return;
+      }
       const id = `command_${appState.commandCounter++}`;
       appState.containers[id] = {
         id,
@@ -700,6 +827,17 @@ function closeBindModal(save) {
         steps: [],
       };
     } else if (appState.bindMode === "telemetry") {
+      if (countByType("telemetry") >= appState.limits.max_telemetry_bindings) {
+        setStatus(`No room for more telemetry bindings (max ${appState.limits.max_telemetry_bindings})`);
+        return;
+      }
+      const fieldCount = Object.keys(fields).length;
+      if (fieldCount > appState.limits.max_telemetry_fields) {
+        setStatus(
+          `Cannot add: ${fieldCount} fields, max is ${appState.limits.max_telemetry_fields}`
+        );
+        return;
+      }
       const id = `telemetry_${appState.telemetryCounter++}`;
       appState.containers[id] = {
         id,
@@ -716,6 +854,8 @@ function closeBindModal(save) {
   }
   appState.bindMode = null;
   document.getElementById("bind-modal").classList.remove("open");
+  const bindLimit = document.getElementById("bind-modal-limit");
+  if (bindLimit) bindLimit.hidden = true;
 }
 
 function buildGraphPayload() {
@@ -848,10 +988,21 @@ async function flashConfig() {
 }
 
 async function loadDictionaries() {
-  const [rec, bl] = await Promise.all([
+  const [rec, bl, limits] = await Promise.all([
     fetch("/api/schema/recorder-dictionary").then((r) => r.json()),
     fetch("/api/schema/commands-dictionary").then((r) => r.json()),
+    fetch("/api/limits").then((r) => r.json()).catch(() => null),
   ]);
+
+  if (limits) {
+    appState.limits = {
+      max_steps: limits.max_steps ?? appState.limits.max_steps,
+      max_command_bindings: limits.max_command_bindings ?? appState.limits.max_command_bindings,
+      max_telemetry_bindings: limits.max_telemetry_bindings ?? appState.limits.max_telemetry_bindings,
+      max_telemetry_fields: limits.max_telemetry_fields ?? appState.limits.max_telemetry_fields,
+      max_var_slots: limits.max_var_slots ?? appState.limits.max_var_slots,
+    };
+  }
 
   appState.microCommands = (rec.recorder_commands || []).filter((c) => c.group === "micro commands");
   for (const cmd of rec.recorder_commands || []) {

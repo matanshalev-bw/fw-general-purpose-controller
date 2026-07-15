@@ -256,6 +256,55 @@
       color: #888;
       flex: 1;
     }
+    .limit-hint {
+      font-size: 0.68rem;
+      color: #7a9aad;
+      margin-top: 0.25rem;
+      letter-spacing: 0.01em;
+    }
+    .limit-hint.warn { color: #d4a84b; }
+    .limit-hint.full { color: #e06c75; font-weight: 600; }
+    .zone-heading {
+      flex: 1 1 100%;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.15rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #888;
+    }
+    .zone-heading .limit-hint {
+      margin-top: 0;
+      text-transform: none;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+    .add-card.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .modal-header .limit-hint {
+      margin-top: 0;
+      margin-right: 0.35rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      background: #1e2a32;
+      border: 1px solid #3a5566;
+      white-space: nowrap;
+    }
+    .modal-header .limit-hint.warn {
+      background: #3a3020;
+      border-color: #6a5530;
+    }
+    .modal-header .limit-hint.full {
+      background: #3a2024;
+      border-color: #6a3038;
+    }
     .state-card .card-preview {
       font-size: 0.7rem;
       color: #aaa;
@@ -495,6 +544,7 @@
     <div class="modal">
       <div class="modal-header">
         <h2 id="modal-title">Sequence editor</h2>
+        <span id="modal-limit" class="limit-hint" hidden></span>
         <button type="button" id="btn-modal-save" class="primary">Save</button>
         <button type="button" id="btn-modal-close">Close</button>
       </div>
@@ -513,6 +563,7 @@
     <div class="modal" style="height: auto; max-height: 80vh;">
       <div class="modal-header">
         <h2 id="bind-modal-title">Add binding</h2>
+        <span id="bind-modal-limit" class="limit-hint" hidden></span>
         <button type="button" id="btn-bind-save" class="primary">Add</button>
         <button type="button" id="btn-bind-close">Cancel</button>
       </div>

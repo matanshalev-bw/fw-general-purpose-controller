@@ -29,6 +29,11 @@ from gpc_recorder.paths import (
     DEFAULT_EXPORT_BIN_PATH,
     DEFAULT_EXPORT_PATH,
     FLASH_CONFIG_BYTES_SIZE,
+    MAX_COMMANDS_BINDINGS,
+    MAX_TELEMETRY_BINDINGS,
+    MAX_TELEMETRY_FIELD_MAPPINGS,
+    MICRO_SEQUENCE_MAX_STEPS,
+    MICRO_VAR_SLOT_COUNT,
     TOOL_DIR,
 )
 
@@ -133,6 +138,17 @@ async def schema_commands_dictionary() -> dict:
 @app.get("/api/schema/recorder-dictionary")
 async def schema_recorder_dictionary() -> dict:
     return recorder_commands_dictionary()
+
+
+@app.get("/api/limits")
+async def config_limits() -> dict:
+    return {
+        "max_steps": MICRO_SEQUENCE_MAX_STEPS,
+        "max_command_bindings": MAX_COMMANDS_BINDINGS,
+        "max_telemetry_bindings": MAX_TELEMETRY_BINDINGS,
+        "max_telemetry_fields": MAX_TELEMETRY_FIELD_MAPPINGS,
+        "max_var_slots": MICRO_VAR_SLOT_COUNT,
+    }
 
 
 @app.post("/api/usb/open")
