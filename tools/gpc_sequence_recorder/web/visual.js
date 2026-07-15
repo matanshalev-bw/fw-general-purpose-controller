@@ -383,6 +383,48 @@ function renderModalPalette() {
   }
 }
 
+function packBytesLeToUint64(bytes) {
+  let value = 0n;
+  for (let i = 0; i < bytes.length && i < 8; i++) {
+    value |= BigInt(bytes[i] & 0xff) << BigInt(8 * i);
+  }
+  if (value <= BigInt(Number.MAX_SAFE_INTEGER)) {
+    return Number(value);
+  }
+  return `0x${value.toString(16)}`;
+}
+
+/** Parse var_set value: raw integer, or LE byte list matching GPC COMM RX packing. */
+function parseVarSetValueInput(text) {
+  const s = String(text).trim();
+  if (!s) return 0;
+  if (s.startsWith("[") || s.includes(",")) {
+    const inner = s.startsWith("[") && s.endsWith("]") ? s.slice(1, -1) : s;
+    const parts = inner
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length);
+    if (!parts.length || parts.length > 8) {
+      throw new Error("byte list length must be 1..8");
+    }
+    const bytes = parts.map((p) =>
+      p.startsWith("0x") || p.startsWith("0X") ? parseInt(p, 16) : parseInt(p, 10)
+    );
+    if (bytes.some((b) => Number.isNaN(b) || b < 0 || b > 255)) {
+      throw new Error("bytes must be 0..255");
+    }
+    return packBytesLeToUint64(bytes);
+  }
+  if (s.startsWith("0x") || s.startsWith("0X")) {
+    const n = Number.parseInt(s, 16);
+    if (Number.isNaN(n)) throw new Error("invalid hex");
+    return n;
+  }
+  const n = Number.parseInt(s, 10);
+  if (Number.isNaN(n)) throw new Error("invalid integer");
+  return n;
+}
+
 function formatNodeLabel(step) {
   const name = friendlyName(step.command);
   const args = step.args || {};
@@ -395,7 +437,14 @@ function formatNodeLabel(step) {
   if (!keys.length) return name;
   return `${name}\n${keys
     .slice(0, 2)
-    .map((k) => `${k}=${args[k]}`)
+    .map((k) => {
+      const v = args[k];
+      if (Array.isArray(v)) return `${k}=[${v.join(", ")}]`;
+      if (typeof v === "number" && (step.command === "var_set" || k === "value") && v > 255) {
+        return `${k}=0x${v.toString(16)}`;
+      }
+      return `${k}=${v}`;
+    })
     .join(", ")}`;
 }
 
@@ -558,6 +607,17 @@ function renderPropsPanel(nodeId) {
               value="${displayVal}" placeholder="comma-separated, max ${maxLen} bytes" />
           </div>`;
       }
+      if (p.accepts_byte_list) {
+        const maxLen = p.max_len || appState.limits.comm_data_length || 8;
+        const shown =
+          typeof val === "number" && val > 255 ? `0x${val.toString(16)}` : displayVal;
+        return `
+          <div class="field">
+            <label for="prop-${p.name}">${p.name}<span class="limit-hint">uint64 or LE bytes (max ${maxLen})</span></label>
+            <input id="prop-${p.name}" data-param="${p.name}" data-accepts-byte-list="1" data-max-len="${maxLen}" class="wide"
+              value="${shown}" placeholder="3500 or 0x0A, 0x03, 0x33" />
+          </div>`;
+      }
       if (p.name === "comparing_type") {
         const ops = [">=", ">", "<=", "<", "==", "!="];
         const opts = ops
@@ -599,6 +659,18 @@ function renderPropsPanel(nodeId) {
           value = value.slice(0, maxLen);
           el.value = value.join(", ");
           setStatus(`Trimmed ${param} to max ${maxLen} bytes`);
+        }
+      } else if (el.dataset.acceptsByteList === "1") {
+        try {
+          value = parseVarSetValueInput(el.value);
+          if (typeof value === "number" && value > 255) {
+            el.value = `0x${value.toString(16)}`;
+          } else {
+            el.value = String(value);
+          }
+        } catch (err) {
+          setStatus(`Invalid ${param}: ${err.message || err}`);
+          return;
         }
       } else if (el.tagName === "SELECT") {
         value = el.value;

@@ -49,7 +49,7 @@ _EXAMPLES: Dict[str, str] = {
     "uart_receive": "uart_receive(uart_instance=1, length=4, var_index=0)",
     "spi_receive": "spi_receive(spi_instance=1, rx_len=3, var_index=0)",
     "i2c_read": "i2c_read(i2c_instance=1, device_addr=0x50, length=2, var_index=0)",
-    "var_set": "var_set(var_index=1, value=3500)",
+    "var_set": "var_set(var_index=1, value=3343114)  # or value=[0x0A, 0x03, 0x33] (LE → uint64)",
     "if_condition": "if_condition(first_var_index=0, comparing_type=\">=\", second_var_index=1)",
     "end_condition": "end_condition()",
     "move_to_error_state": "move_to_error_state()",
@@ -95,7 +95,10 @@ _DESCRIPTIONS: Dict[str, str] = {
     "uart_receive": "Poll UART RX for length bytes; store little-endian into var_index.",
     "spi_receive": "SPI master receive (zero TX clocking); store rx_len bytes into var_index.",
     "i2c_read": "I2C master read; store length bytes into var_index.",
-    "var_set": "Set a var slot (0–19) to a raw uint64 constant (e.g. ADC threshold in mV×1000).",
+    "var_set": (
+        "Set a var slot (0–19) to a uint64: raw integer, or a byte array packed little-endian "
+        "the same way COMM RX stores into the var (e.g. [0x0A, 0x03, 0x33] → 0x33030A)."
+    ),
     "if_condition": "Start a conditional block; compare two var slots (==, !=, >, >=, <, <=).",
     "end_condition": "Close the active if_condition block and record its body step count.",
     "move_to_error_state": "Transition the controller to CONTROLLER_STATE_ERROR.",
@@ -201,7 +204,7 @@ def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
     }
 
 
-_LENGTH_PARAM_NAMES = frozenset({"length", "dlc", "tx_len"})
+_LENGTH_PARAM_NAMES = frozenset({"length", "dlc", "tx_len", "rx_len"})
 _DATA_PARAM_NAMES = frozenset({"data", "tx_data"})
 
 
@@ -216,6 +219,15 @@ def _enrich_params_with_payload_limits(name: str, params: List[Dict[str, Any]]) 
         schema = get_schema()
     except Exception:
         return
+
+    # var_set.value accepts a LE byte array (same packing as COMM RX → uint64).
+    if name == "var_set":
+        for p in params:
+            if p["name"] == "value":
+                p["accepts_byte_list"] = True
+                p["max_len"] = schema.constants.get("COMM_DATA_LENGTH", 8)
+        return
+
     op = schema.micro_ops.get(name)
     if op is None:
         return

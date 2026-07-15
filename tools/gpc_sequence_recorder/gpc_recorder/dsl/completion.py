@@ -30,6 +30,7 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "uart_receive": ["uart_instance=", "length=", "var_index="],
     "spi_receive": ["spi_instance=", "rx_len=", "var_index="],
     "i2c_read": ["i2c_instance=", "device_addr=", "length=", "var_index="],
+    "var_set": ["var_index=", "value="],
     "reload": ["path="],
     "export": ["path="],
 }

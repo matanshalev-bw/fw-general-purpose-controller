@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from gpc_recorder.codegen.config_loader import load_config_hpp, load_config_hpp_text
 from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
-from gpc_recorder.dsl.coerce import coerce_int_byte_list
+from gpc_recorder.dsl.coerce import coerce_int_byte_list, coerce_var_set_value
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session, TelemetryBindingState
 from gpc_recorder.paths import CONTROLLER_STATE_SEQUENCE_FIELDS, CONTROLLER_STATE_TICK_FIELDS, DEFAULT_EXPORT_BIN_PATH, DEFAULT_EXPORT_PATH
@@ -503,14 +503,14 @@ class RecorderContext:
             },
         )
 
-    def var_set(self, var_index: int, value: int) -> None:
+    def var_set(self, var_index: int, value) -> None:
         validate_var_index(var_index)
         self._add_step(
             "var_set",
             {
                 "var_index": var_index,
                 "reserved": [0, 0, 0],
-                "value": int(value),
+                "value": coerce_var_set_value(value),
             },
         )
 

@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from gpc_recorder.dsl.coerce import coerce_int_byte_list, quoted_string_bytes
+from gpc_recorder.dsl.coerce import coerce_int_byte_list, coerce_var_set_value, quoted_string_bytes
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_struct, resolve_array_size, _normalize_type
 from gpc_recorder.paths import REPO_ROOT, TOOL_DIR, _INSTALLED_BIN_DIR, _repo_is_installed_read_only
 from gpc_recorder.schema.cpp_parser import StructDef
@@ -359,6 +359,12 @@ def _normalize_micro_op_values(union_member: str, values: Dict[str, Any]) -> Dic
 
     if union_member == "uart_transmit" and data_from_quoted_string and "data" in normalized:
         normalized["length"] = len(normalized["data"])
+
+    if union_member == "var_set" and "value" in normalized:
+        try:
+            normalized["value"] = coerce_var_set_value(normalized["value"])
+        except ValueError as exc:
+            raise UsbBridgeError(str(exc)) from exc
 
     return normalized
 
