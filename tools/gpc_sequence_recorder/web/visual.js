@@ -273,6 +273,33 @@ function setBindModalActions(mode) {
   if (btnSave) btnSave.textContent = editing ? "Save" : "Add";
 }
 
+function buildBindCommandFieldHtml(field, value) {
+  if (field.enum_values && field.enum_values.length) {
+    const first =
+      typeof field.enum_values[0] === "string" ? field.enum_values[0] : field.enum_values[0].name;
+    const resolved = value ?? field.default ?? first;
+    const options = field.enum_values
+      .map((ev) => {
+        const name = typeof ev === "string" ? ev : ev.name;
+        const selected = String(resolved) === String(name) ? " selected" : "";
+        return `<option value="${name}"${selected}>${name}</option>`;
+      })
+      .join("");
+    return `
+      <div class="field">
+        <label for="bind-${field.name}">${field.name}</label>
+        <select id="bind-${field.name}" data-field="${field.name}" data-is-enum="1">${options}</select>
+      </div>`;
+  }
+
+  const displayVal = value ?? field.default ?? 0;
+  return `
+    <div class="field">
+      <label for="bind-${field.name}">${field.name}</label>
+      <input id="bind-${field.name}" data-field="${field.name}" value="${displayVal}" />
+    </div>`;
+}
+
 function makeStateArrow(repeatable, arrowUp) {
   const arrow = document.createElement("div");
   if (repeatable) {
@@ -904,11 +931,7 @@ function renderBindForm(existing) {
             <input id="bind-${key}" data-field="${key}" type="number" min="0" max="${appState.limits.max_var_slots - 1}" value="${val}" />
           </div>`;
       } else {
-        extraFields += `
-          <div class="field">
-            <label for="bind-${f.name}">${f.name}</label>
-            <input id="bind-${f.name}" data-field="${f.name}" value="${val}" />
-          </div>`;
+        extraFields += buildBindCommandFieldHtml(f, existing?.fields?.[f.name]);
       }
     }
   }
@@ -940,6 +963,10 @@ function closeBindModal(save) {
     document.querySelectorAll("#bind-form [data-field]").forEach((el) => {
       const key = el.dataset.field;
       let val = el.value;
+      if (el.dataset.isEnum === "1") {
+        fields[key] = val;
+        return;
+      }
       if (el.type === "number") val = parseInt(val, 10) || 0;
       else if (val === "true" || val === "false") val = val === "true";
       else if (/^\d+$/.test(val)) val = parseInt(val, 10);
