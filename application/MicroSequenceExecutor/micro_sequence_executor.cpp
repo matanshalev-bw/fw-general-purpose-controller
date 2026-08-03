@@ -16,6 +16,9 @@
 #ifdef HAL_DAC_MODULE_ENABLED
 #include "comm_defines.hpp"
 #endif
+#ifdef HAL_TIM_MODULE_ENABLED
+#include "pwm_interface.hpp"
+#endif
 
 namespace {
 
@@ -332,8 +335,27 @@ bool MicroSequenceExecutor::executeDacWrite(const bluelink::MicroOpsPayload::Mic
 }
 
 bool MicroSequenceExecutor::executePwmSet(const bluelink::MicroOpsPayload::MicroPwmSet& op) {
+#ifdef HAL_TIM_MODULE_ENABLED
+  if (op.frequency_hz == 0U) {
+    return false;
+  }
+
+  uint16_t duty_percent = op.duty_percent;
+  if (op.use_var != 0) {
+    if (var_store_ == nullptr || op.var_index >= MICRO_VAR_SLOT_COUNT) {
+      return false;
+    }
+    duty_percent = static_cast<uint16_t>(var_store_->get(op.var_index) & 0xFFFFU);
+  }
+  if (duty_percent > 100U) {
+    duty_percent = 100U;
+  }
+
+  return PwmInterface::setPwm(op.frequency_hz, duty_percent) == InterfaceStatus::INTERFACE_OK;
+#else
   (void)op;
   return false;
+#endif
 }
 
 bool MicroSequenceExecutor::executeCanTransmit(const bluelink::MicroOpsPayload::MicroCanTransmit& op) {

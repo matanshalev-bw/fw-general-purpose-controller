@@ -3,9 +3,17 @@
 
 #include <cstdint>
 #include <memory>
+#include <cstring>
 
 #include "scheduler_interface.hpp"
 #include "sequences_configs.hpp"
+#include "bluelink_messages.hpp"
+#include "bluewhite_can_comm.hpp"
+#include "bluewhite_usb_comm.hpp"
+#include "distributed_can_id.hpp"
+#include "gpc_controller.hpp"
+#include "micro_var_store.hpp"
+#include "non_volatile_memory_interface.hpp"
 
 class BluewhiteCanComm;
 class BluewhiteUsbComm;

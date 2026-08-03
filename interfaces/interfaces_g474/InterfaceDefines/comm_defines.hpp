@@ -29,4 +29,8 @@ using CommAdcHandle = ADC_HandleTypeDef;
 using CommDacHandle = DAC_HandleTypeDef;
 #endif
 
+#ifdef HAL_TIM_MODULE_ENABLED
+using CommTimHandle = TIM_HandleTypeDef;
+#endif
+
 #endif  // COMM_DEFINES_HPP_

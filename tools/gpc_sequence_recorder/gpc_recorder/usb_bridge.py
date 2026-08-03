@@ -290,6 +290,12 @@ def micro_ops_catalog() -> List[Dict[str, Any]]:
             "use_var": "1=value from var_index, 0=use literal_value",
             "literal_value": "12-bit code 0–4095",
         },
+        "pwm_set": {
+            "frequency_hz": "Hz, e.g. 1000 = 1 kHz (output on PB11)",
+            "duty_percent": "0–100%",
+            "use_var": "1=duty from var_index, 0=use duty_percent",
+            "var_index": "var slot 0–19 when use_var=1",
+        },
     }
     catalog: List[Dict[str, Any]] = []
     for member, op in sorted(schema.micro_ops.items()):

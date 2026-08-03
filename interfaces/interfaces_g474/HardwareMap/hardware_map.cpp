@@ -7,6 +7,9 @@ extern CommUartHandle huart2;
 #ifdef HAL_I2C_MODULE_ENABLED
 extern CommI2cHandle hi2c1;
 #endif
+#ifdef HAL_TIM_MODULE_ENABLED
+extern CommTimHandle htim2;
+#endif
 
 namespace HardwareMap {
 
@@ -16,6 +19,9 @@ CommUartHandle& uart_main = huart2;
 #endif
 #ifdef HAL_I2C_MODULE_ENABLED
 CommI2cHandle& i2c_main = hi2c1;
+#endif
+#ifdef HAL_TIM_MODULE_ENABLED
+CommTimHandle& pwm_main = htim2;
 #endif
 
 }  // namespace HardwareMap

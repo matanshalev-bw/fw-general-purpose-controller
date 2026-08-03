@@ -10,6 +10,7 @@
 #define MICRO_VAR_SLOT_COUNT 20
 #define MAX_TELEMETRY_BINDINGS 3
 #define MAX_TELEMETRY_FIELD_MAPPINGS 8
+#define MAX_TELEMETRY_PAYLOAD_BYTES 8
 
 struct BluelinkIdentityConfig {
   uint8_t component_id = 0;

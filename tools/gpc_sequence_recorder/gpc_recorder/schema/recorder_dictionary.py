@@ -41,7 +41,7 @@ _EXAMPLES: Dict[str, str] = {
     "dac_write": "dac_write(dac_instance=1, use_var=0, var_index=0, literal_value=2048)",
     "delay_ms": "delay_ms(100)",
     "can_transmit": "can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])",
-    "pwm_set": "pwm_set(timer_instance=1, channel=1, use_var=0, var_index=0, literal_duty=1000)",
+    "pwm_set": "pwm_set(frequency_hz=1000, duty_percent=50)",
     "uart_transmit": 'uart_transmit(uart_instance=1, length=5, data=[0x48, 0x45, 0x4C, 0x4C, 0x4F])  # or USB data: "HELLO"',
     "spi_transfer": "spi_transfer(spi_instance=1, tx_len=3, tx_data=[0x9F, 0x00, 0x00])",
     "i2c_write": "i2c_write(i2c_instance=1, device_addr=0x50, length=2, data=[0x00, 0x01])",
@@ -87,7 +87,7 @@ _DESCRIPTIONS: Dict[str, str] = {
     "dac_write": "Append a DAC write step using a literal value or a var slot (use_var=1). Uses DAC1 CH1 on PA4.",
     "delay_ms": "Append a delay step (milliseconds).",
     "can_transmit": "Append a CAN transmit step (bus, id, dlc, and up to 8 data bytes).",
-    "pwm_set": "Append a PWM duty step using a literal value or a var slot (use_var=1).",
+    "pwm_set": "Set PWM frequency and duty on PB11 (TIM2 CH4). duty_percent is 0–100, or from var_index when use_var=1.",
     "uart_transmit": "Append a UART transmit step.",
     "spi_transfer": "Append a SPI transfer step (TX data only).",
     "i2c_write": "Append an I2C write step.",
@@ -218,6 +218,12 @@ _PARAM_HINTS: Dict[str, Dict[str, str]] = {
         "dac_instance": "use 1 → PA4 (DAC1_OUT1)",
         "use_var": "1=value from var_index, 0=use literal_value",
         "literal_value": "12-bit code 0–4095",
+    },
+    "pwm_set": {
+        "frequency_hz": "Hz, e.g. 1000 = 1 kHz (output on PB11)",
+        "duty_percent": "0–100%",
+        "use_var": "1=duty from var_index, 0=use duty_percent",
+        "var_index": "var slot 0–19 when use_var=1",
     },
 }
 

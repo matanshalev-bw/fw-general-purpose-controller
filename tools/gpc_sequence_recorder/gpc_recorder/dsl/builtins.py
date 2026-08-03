@@ -418,20 +418,18 @@ class RecorderContext:
 
     def pwm_set(
         self,
-        timer_instance: int,
-        channel: int,
+        frequency_hz: int,
+        duty_percent: int,
         use_var: int = 0,
         var_index: int = 0,
-        literal_duty: int = 0,
     ) -> None:
         self._add_step(
             "pwm_set",
             {
-                "timer_instance": timer_instance,
-                "channel": channel,
+                "frequency_hz": frequency_hz,
+                "duty_percent": duty_percent,
                 "use_var": use_var,
                 "var_index": var_index,
-                "literal_duty": literal_duty,
             },
         )
 

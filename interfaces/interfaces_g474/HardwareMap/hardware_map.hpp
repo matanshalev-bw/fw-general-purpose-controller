@@ -24,6 +24,9 @@ extern CommSpiHandle& spi_main;
 #ifdef HAL_I2C_MODULE_ENABLED
 extern CommI2cHandle& i2c_main;
 #endif
+#ifdef HAL_TIM_MODULE_ENABLED
+extern CommTimHandle& pwm_main;
+#endif
 
 }  // namespace HardwareMap
 

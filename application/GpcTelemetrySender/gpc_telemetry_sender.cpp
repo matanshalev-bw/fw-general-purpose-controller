@@ -1,15 +1,5 @@
 #include "gpc_telemetry_sender.hpp"
 
-#include <cstring>
-
-#include "bluelink_messages.hpp"
-#include "bluewhite_can_comm.hpp"
-#include "bluewhite_usb_comm.hpp"
-#include "distributed_can_id.hpp"
-#include "gpc_controller.hpp"
-#include "micro_var_store.hpp"
-#include "non_volatile_memory_interface.hpp"
-
 void GpcTelemetrySender::initialize(MicroVarStore* var_store, BluewhiteCanComm* can_comm,
                                     BluewhiteUsbComm* usb_comm, GpcController* gpc_controller) {
   var_store_ = var_store;
@@ -23,17 +13,29 @@ void GpcTelemetrySender::initialize(MicroVarStore* var_store, BluewhiteCanComm* 
   controller_state_scheduler_ =
       std::make_unique<SchedulerMainClock>(static_cast<float>(CONTROLLER_STATE_TELEMETRY_RATE_HZ));
 
+  if (!NonVolatileMemoryInterface::isConfigMemoryValid()) {
+    return;
+  }
+
   const volatile TelemetryConfig& telemetry_config =
       NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config.telemetry_config;
-  for (uint8_t i = 0; i < telemetry_config.binding_count && i < MAX_TELEMETRY_BINDINGS; ++i) {
-    const uint8_t rate_hz = telemetry_config.bindings[i].rate_hz;
-    if (rate_hz > 0) {
-      schedulers_[i] = std::make_unique<SchedulerMainClock>(static_cast<float>(rate_hz));
+  const uint8_t binding_count =
+      telemetry_config.binding_count > MAX_TELEMETRY_BINDINGS ? MAX_TELEMETRY_BINDINGS : telemetry_config.binding_count;
+  for (uint8_t i = 0; i < binding_count; ++i) {
+    const volatile TelemetryBinding& binding = telemetry_config.bindings[i];
+    if (binding.rate_hz == 0 || binding.payload_size == 0 ||
+        binding.payload_size > MAX_TELEMETRY_PAYLOAD_BYTES) {
+      continue;
     }
+    schedulers_[i] = std::make_unique<SchedulerMainClock>(static_cast<float>(binding.rate_hz));
   }
 }
 
 void GpcTelemetrySender::buildPayload(const volatile TelemetryBinding& binding, uint8_t* out) const {
+  if (out == nullptr || binding.payload_size == 0 || binding.payload_size > MAX_TELEMETRY_PAYLOAD_BYTES) {
+    return;
+  }
+
   memset(out, 0, binding.payload_size);
   if (var_store_ == nullptr) {
     return;
@@ -72,7 +74,8 @@ void GpcTelemetrySender::buildPayload(const volatile TelemetryBinding& binding, 
 }
 
 bool GpcTelemetrySender::sendBinding(const volatile TelemetryBinding& binding, const uint8_t* payload) {
-  if (can_comm_ == nullptr || usb_comm_ == nullptr) {
+  if (can_comm_ == nullptr || usb_comm_ == nullptr || payload == nullptr || binding.payload_size == 0 ||
+      binding.payload_size > MAX_TELEMETRY_PAYLOAD_BYTES) {
     return false;
   }
 
@@ -118,20 +121,26 @@ void GpcTelemetrySender::tick() {
     return;
   }
 
+  if (!NonVolatileMemoryInterface::isConfigMemoryValid()) {
+    return;
+  }
+
   const volatile TelemetryConfig& telemetry_config =
       NonVolatileMemoryInterface::CONFIG_MEMORY_.sequences_config.telemetry_config;
   if (telemetry_config.binding_count == 0) {
     return;
   }
 
-  uint8_t payload[8] = {};
-  for (uint8_t i = 0; i < telemetry_config.binding_count && i < MAX_TELEMETRY_BINDINGS; ++i) {
+  uint8_t payload[MAX_TELEMETRY_PAYLOAD_BYTES] = {};
+  const uint8_t binding_count =
+      telemetry_config.binding_count > MAX_TELEMETRY_BINDINGS ? MAX_TELEMETRY_BINDINGS : telemetry_config.binding_count;
+  for (uint8_t i = 0; i < binding_count; ++i) {
     if (schedulers_[i] == nullptr || not schedulers_[i]->isDue()) {
       continue;
     }
 
     const volatile TelemetryBinding& binding = telemetry_config.bindings[i];
-    if (binding.payload_size == 0 || binding.rate_hz == 0) {
+    if (binding.payload_size == 0 || binding.payload_size > MAX_TELEMETRY_PAYLOAD_BYTES || binding.rate_hz == 0) {
       continue;
     }
 

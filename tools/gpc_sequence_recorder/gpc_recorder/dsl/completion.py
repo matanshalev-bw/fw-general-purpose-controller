@@ -21,7 +21,7 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "dac_write": ["dac_instance=", "use_var=", "var_index=", "literal_value="],
     "delay_ms": ["delay_ms="],
     "can_transmit": ["can_bus=", "id=", "dlc=", "data="],
-    "pwm_set": ["timer_instance=", "channel=", "use_var=", "var_index=", "literal_duty="],
+    "pwm_set": ["frequency_hz=", "duty_percent=", "use_var=", "var_index="],
     "uart_transmit": ["uart_instance=", "length=", "data="],
     "trigger_safety": ["safety_en="],
     "spi_transfer": ["spi_instance=", "tx_len=", "tx_data="],
