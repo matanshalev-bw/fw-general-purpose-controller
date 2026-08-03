@@ -317,6 +317,28 @@
     }
     .state-card.type-command { border-color: #7a5a9a; background: #281e34; }
     .state-card.type-telemetry { border-color: #5a8a9a; background: #1e2a30; }
+    .state-card .card-delete {
+      position: absolute;
+      top: 0.35rem;
+      right: 0.35rem;
+      z-index: 6;
+      width: 1.35rem;
+      height: 1.35rem;
+      padding: 0;
+      border: 1px solid #6a4040;
+      border-radius: 4px;
+      background: #3a2024;
+      color: #e06c75;
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.55;
+    }
+    .state-card:hover .card-delete { opacity: 1; }
+    .state-card .card-delete:hover {
+      background: #5a2830;
+      border-color: #a05058;
+    }
     .state-card.type-main { border-color: #6a7a9a; }
     .state-card.type-powerup { border-color: #6a9a6a; }
 
@@ -383,8 +405,10 @@
       cursor: pointer;
     }
     .modal-header button.primary { background: #0e639c; }
+    .modal-header button.danger { background: #8b3038; }
     .modal-header button:hover { background: #666; }
     .modal-header button.primary:hover { background: #1177bb; }
+    .modal-header button.danger:hover { background: #a03842; }
 
     .modal-body {
       flex: 1;
@@ -555,6 +579,7 @@
       <div class="modal-header">
         <h2 id="modal-title">Sequence editor</h2>
         <span id="modal-limit" class="limit-hint" hidden></span>
+        <button type="button" id="btn-modal-remove" class="danger" hidden>Remove binding</button>
         <button type="button" id="btn-modal-save" class="primary">Save</button>
         <button type="button" id="btn-modal-close">Close</button>
       </div>
@@ -574,6 +599,7 @@
       <div class="modal-header">
         <h2 id="bind-modal-title">Add binding</h2>
         <span id="bind-modal-limit" class="limit-hint" hidden></span>
+        <button type="button" id="btn-bind-remove" class="danger" hidden>Remove</button>
         <button type="button" id="btn-bind-save" class="primary">Add</button>
         <button type="button" id="btn-bind-close">Cancel</button>
       </div>

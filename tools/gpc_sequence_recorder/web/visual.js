@@ -231,6 +231,48 @@ function containerPreview(container) {
   return steps.map(stepSummary).join(" → ");
 }
 
+function removeBinding(containerId) {
+  const c = appState.containers[containerId];
+  if (!c || (c.type !== "command" && c.type !== "telemetry")) return false;
+  const kind = c.type === "command" ? "command binding" : "telemetry binding";
+  const name = c.label || c.trigger || kind;
+  if (!confirm(`Remove ${kind} "${name}"? This cannot be undone.`)) return false;
+  delete appState.containers[containerId];
+  if (appState.activeContainerId === containerId) {
+    appState.activeContainerId = null;
+  }
+  renderBoard();
+  setStatus(`Removed ${kind}: ${name}`);
+  return true;
+}
+
+function makeBindingDeleteButton(containerId, label) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "card-delete";
+  btn.title = `Remove ${label}`;
+  btn.setAttribute("aria-label", `Remove ${label}`);
+  btn.textContent = "×";
+  btn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    removeBinding(containerId);
+  });
+  return btn;
+}
+
+function setEditorModalActions(container) {
+  const btnRemove = document.getElementById("btn-modal-remove");
+  if (btnRemove) btnRemove.hidden = !container || container.type !== "command";
+}
+
+function setBindModalActions(mode) {
+  const btnRemove = document.getElementById("btn-bind-remove");
+  const btnSave = document.getElementById("btn-bind-save");
+  const editing = mode === "telemetry-edit";
+  if (btnRemove) btnRemove.hidden = !editing;
+  if (btnSave) btnSave.textContent = editing ? "Save" : "Add";
+}
+
 function makeStateArrow(repeatable, arrowUp) {
   const arrow = document.createElement("div");
   if (repeatable) {
@@ -293,6 +335,7 @@ function renderBoard() {
       <div class="limit-hint ${limitClass(used, maxSteps)}">${formatBudget(used, maxSteps, "steps")}</div>
     `;
     card.appendChild(makeStateArrow(false));
+    card.appendChild(makeBindingDeleteButton(c.id, c.label || "command binding"));
     card.addEventListener("click", () => openEditor(c.id));
     commandZone.appendChild(card);
   }
@@ -332,6 +375,7 @@ function renderBoard() {
       <div class="limit-hint ${limitClass(fieldCount, fieldMax)}">${formatBudget(fieldCount, fieldMax, "fields")}</div>
     `;
     card.appendChild(makeStateArrow(true));
+    card.appendChild(makeBindingDeleteButton(c.id, c.label || "telemetry binding"));
     card.addEventListener("click", () => openTelemetryEditor(c.id));
     telemetryZone.appendChild(card);
   }
@@ -742,6 +786,7 @@ function openEditor(containerId) {
 
   appState.activeContainerId = containerId;
   document.getElementById("modal-title").textContent = `${container.label} — sequence editor`;
+  setEditorModalActions(container);
   document.getElementById("editor-modal").classList.add("open");
   renderModalPalette();
 
@@ -768,6 +813,7 @@ function closeEditor(save) {
     setStatus(`Saved ${container.label} (${steps.length} steps)`);
   }
   appState.activeContainerId = null;
+  setEditorModalActions(null);
   document.getElementById("editor-modal").classList.remove("open");
   const modalLimit = document.getElementById("modal-limit");
   if (modalLimit) modalLimit.hidden = true;
@@ -786,6 +832,7 @@ function openTelemetryEditor(containerId) {
     "fields"
   );
   renderBindForm(container);
+  setBindModalActions("telemetry-edit");
   document.getElementById("bind-modal").classList.add("open");
 }
 
@@ -810,6 +857,7 @@ function openBindModal(mode) {
     );
   }
   renderBindForm(null);
+  setBindModalActions(mode);
   document.getElementById("bind-modal").classList.add("open");
 }
 
@@ -952,6 +1000,7 @@ function closeBindModal(save) {
     setStatus("Binding added");
   }
   appState.bindMode = null;
+  setBindModalActions(null);
   document.getElementById("bind-modal").classList.remove("open");
   const bindLimit = document.getElementById("bind-modal-limit");
   if (bindLimit) bindLimit.hidden = true;
@@ -1328,8 +1377,18 @@ function wireEvents() {
   document.getElementById("btn-flash").addEventListener("click", flashConfig);
   document.getElementById("btn-modal-save").addEventListener("click", () => closeEditor(true));
   document.getElementById("btn-modal-close").addEventListener("click", () => closeEditor(false));
+  document.getElementById("btn-modal-remove").addEventListener("click", () => {
+    const id = appState.activeContainerId;
+    if (!id) return;
+    if (removeBinding(id)) closeEditor(false);
+  });
   document.getElementById("btn-bind-save").addEventListener("click", () => closeBindModal(true));
   document.getElementById("btn-bind-close").addEventListener("click", () => closeBindModal(false));
+  document.getElementById("btn-bind-remove").addEventListener("click", () => {
+    const id = appState.activeContainerId;
+    if (!id) return;
+    if (removeBinding(id)) closeBindModal(false);
+  });
   document.getElementById("btn-live-refresh").addEventListener("click", refreshUsbPorts);
   document.getElementById("btn-live-open").addEventListener("click", usbOpen);
   document.getElementById("btn-live-close").addEventListener("click", usbClose);
