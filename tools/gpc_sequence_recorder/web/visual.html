@@ -27,6 +27,26 @@
       flex-shrink: 0;
     }
     header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+    .config-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+      align-items: center;
+      font-size: 0.85rem;
+      margin-right: auto;
+      margin-left: 1rem;
+    }
+    .config-row label { color: #aaa; }
+    .config-row input, .config-row select {
+      background: #3c3c3c;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 3px;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.85rem;
+    }
+    .config-row input { width: 11rem; }
+    .config-row select { max-width: 22rem; }
     .actions { display: flex; gap: 0.5rem; align-items: center; }
     .actions a {
       color: #9cdcfe;
@@ -525,6 +545,12 @@
 <body>
   <header>
     <h1>GPC Visual Recorder</h1>
+    <div class="config-row">
+      <label for="config-name">Config name</label>
+      <input id="config-name" type="text" spellcheck="false" title="Exported config struct name" />
+      <label for="config-component">Component ID</label>
+      <select id="config-component" title="bluelink::ComponentId for this device"></select>
+    </div>
     <div class="actions">
       <a href="/terminal">Terminal UI</a>
       <button id="btn-load" type="button" class="secondary">Load</button>

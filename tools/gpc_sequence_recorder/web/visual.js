@@ -128,6 +128,7 @@ const appState = {
   usbMicroOps: [],
   usbControllerCmds: [],
   usbOpen: false,
+  componentIds: [],
   activeContainerId: null,
   bindMode: null,
   commandCounter: 0,
@@ -147,6 +148,46 @@ let selectedNodeId = null;
 
 function setStatus(msg) {
   document.getElementById("status").textContent = msg;
+}
+
+function formatComponentOptionLabel(item) {
+  const name = typeof item === "string" ? item : item.name;
+  const value = typeof item === "string" ? null : item.value;
+  if (value === null || value === undefined) return name;
+  return `${name} (0x${Number(value).toString(16).toUpperCase().padStart(2, "0")})`;
+}
+
+function renderConfigControls() {
+  const nameEl = document.getElementById("config-name");
+  const componentEl = document.getElementById("config-component");
+  if (!nameEl || !componentEl) return;
+
+  nameEl.value = appState.config.name || "G474_GPC_CONFIG";
+
+  const prev = appState.config.component;
+  componentEl.innerHTML = "";
+  const items = appState.componentIds.length
+    ? appState.componentIds
+    : [{ name: appState.config.component || "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER", value: 0x11 }];
+  for (const item of items) {
+    const opt = document.createElement("option");
+    opt.value = typeof item === "string" ? item : item.name;
+    opt.textContent = formatComponentOptionLabel(item);
+    componentEl.appendChild(opt);
+  }
+  if (prev && [...componentEl.options].some((o) => o.value === prev)) {
+    componentEl.value = prev;
+  } else if (appState.config.component) {
+    componentEl.value = appState.config.component;
+  }
+}
+
+function syncConfigFromControls() {
+  const nameEl = document.getElementById("config-name");
+  const componentEl = document.getElementById("config-component");
+  if (!nameEl || !componentEl) return;
+  appState.config.name = nameEl.value.trim() || "G474_GPC_CONFIG";
+  appState.config.component = componentEl.value;
 }
 
 function friendlyName(command) {
@@ -1086,6 +1127,7 @@ function applyLoadedGraph(graph) {
   appState.commandCounter = 0;
   appState.telemetryCounter = 0;
   ensureFixedContainers();
+  renderConfigControls();
 
   for (const c of graph.containers || []) {
     if (c.type === "command") {
@@ -1123,6 +1165,7 @@ async function loadGraph() {
 }
 
 async function exportGraph() {
+  syncConfigFromControls();
   const graph = buildGraphPayload();
   if (!graph.containers.length) {
     setStatus("Nothing to export — add at least one sequence or binding");
@@ -1184,6 +1227,8 @@ async function loadDictionaries() {
   for (const cmd of rec.recorder_commands || []) {
     appState.commandMeta[cmd.name] = cmd;
   }
+  appState.componentIds = rec.component_ids || [];
+  renderConfigControls();
 
   appState.bluelinkCommands = bl.commands || [];
   appState.telemetryStructs = bl.telemetries || [];
@@ -1399,6 +1444,8 @@ async function usbSendController() {
 }
 
 function wireEvents() {
+  document.getElementById("config-name")?.addEventListener("change", syncConfigFromControls);
+  document.getElementById("config-component")?.addEventListener("change", syncConfigFromControls);
   document.getElementById("btn-load").addEventListener("click", loadGraph);
   document.getElementById("btn-export").addEventListener("click", exportGraph);
   document.getElementById("btn-flash").addEventListener("click", flashConfig);

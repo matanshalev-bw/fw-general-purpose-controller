@@ -4,6 +4,7 @@ import re
 from typing import Dict, List
 
 from gpc_recorder.schema.cpp_parser import Schema
+from gpc_recorder.schema.component_ids import selectable_component_ids
 
 # Builtin call -> keyword argument names (with trailing '=')
 FUNCTION_KEYWORDS: Dict[str, List[str]] = {
@@ -123,6 +124,10 @@ def _payload_types(schema: Schema, _namespace_keys: List[str], prefix: str) -> L
     )
 
 
+def _component_id_values(schema: Schema, prefix: str) -> List[str]:
+    return sorted(name for name in selectable_component_ids(schema) if name.startswith(prefix))
+
+
 def _values_for_kwarg(
     schema: Schema,
     namespace_keys: List[str],
@@ -131,6 +136,8 @@ def _values_for_kwarg(
 ) -> List[str]:
     if kw == "trigger":
         return _payload_types(schema, namespace_keys, prefix)
+    if kw == "component":
+        return _component_id_values(schema, prefix)
     return sorted(name for name in namespace_keys if name.startswith(prefix))
 
 

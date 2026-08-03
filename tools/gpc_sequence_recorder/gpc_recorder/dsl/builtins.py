@@ -10,6 +10,7 @@ from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session, TelemetryBindingState
 from gpc_recorder.paths import CONTROLLER_STATE_SEQUENCE_FIELDS, CONTROLLER_STATE_TICK_FIELDS, DEFAULT_EXPORT_BIN_PATH, DEFAULT_EXPORT_PATH
 from gpc_recorder.schema.loader import get_schema
+from gpc_recorder.schema.component_ids import selectable_component_ids
 from gpc_recorder.paths import MICRO_SEQUENCE_MAX_STEPS
 from gpc_recorder.validate import (
     validate_binding_count,
@@ -784,7 +785,7 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
     for ename, edef in schema.enums.items():
         for vname, vval in edef.values.items():
             ns[vname] = vname
-    for cid in schema.component_ids:
+    for cid in selectable_component_ids(schema):
         ns[cid] = cid
     for sname in schema.command_structs:
 

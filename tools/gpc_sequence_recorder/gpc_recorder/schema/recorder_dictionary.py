@@ -6,6 +6,7 @@ import inspect
 from typing import Any, Dict, List
 
 from gpc_recorder.dsl.builtins import RecorderContext
+from gpc_recorder.schema.component_ids import selectable_component_id_enum_values
 
 
 def _is_public_method(name: str, value: Any) -> bool:
@@ -281,6 +282,27 @@ def _enrich_params_with_pin_hints(name: str, params: List[Dict[str, Any]]) -> No
             p["hint"] = hint
 
 
+def _component_id_enum_values() -> List[Dict[str, Any]]:
+    try:
+        from gpc_recorder.schema.loader import get_schema
+
+        schema = get_schema()
+    except Exception:
+        return []
+    return selectable_component_id_enum_values(schema)
+
+
+def _enrich_params_with_component_ids(name: str, params: List[Dict[str, Any]]) -> None:
+    if name != "config":
+        return
+    enum_values = _component_id_enum_values()
+    if not enum_values:
+        return
+    for p in params:
+        if p["name"] == "component":
+            p["enum_values"] = enum_values
+
+
 def recorder_commands_dictionary() -> Dict[str, Any]:
     """
     Returns a stable list of DSL builtins available in the REPL.
@@ -311,6 +333,7 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
                 params.append(_param_to_dict(p))
         _enrich_params_with_payload_limits(name, params)
         _enrich_params_with_pin_hints(name, params)
+        _enrich_params_with_component_ids(name, params)
         out.append(
             {
                 "name": name,
@@ -325,6 +348,7 @@ def recorder_commands_dictionary() -> Dict[str, Any]:
 
     return {
         "recorder_commands": out,
+        "component_ids": _component_id_enum_values(),
         "controller_states": list(CONTROLLER_STATE_SEQUENCE_FIELDS.keys())
         + list(CONTROLLER_STATE_TICK_FIELDS.keys()),
         "controller_one_shot_states": list(CONTROLLER_STATE_SEQUENCE_FIELDS.keys()),

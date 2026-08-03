@@ -943,24 +943,44 @@
       const wrap = document.createElement("div");
       wrap.className = "field";
       const label = document.createElement("label");
-      const input = document.createElement("input");
-      input.id = `rec-field-${p.name}`;
+      label.textContent = isListParam(p) ? `${p.name}[]` : p.name;
+
+      const isList = isListParam(p);
+      let input;
+      if (p.enum_values && p.enum_values.length) {
+        input = document.createElement("select");
+        input.id = `rec-field-${p.name}`;
+        p.enum_values.forEach((ev) => {
+          const opt = document.createElement("option");
+          const name = typeof ev === "string" ? ev : ev.name;
+          const value = typeof ev === "string" ? null : ev.value;
+          opt.value = name;
+          opt.textContent =
+            value === null || value === undefined
+              ? name
+              : `${name} (0x${Number(value).toString(16).toUpperCase().padStart(2, "0")})`;
+          input.appendChild(opt);
+        });
+        if (p.has_default && p.default !== null && p.default !== undefined && p.default !== "") {
+          input.value = String(p.default);
+        }
+      } else {
+        input = document.createElement("input");
+        input.id = `rec-field-${p.name}`;
+        if (isList) {
+          input.classList.add("wide");
+          input.placeholder = "comma-separated";
+        } else if (!p.has_default) {
+          input.placeholder = "required";
+        }
+        if (p.has_default && p.default !== null && p.default !== undefined) {
+          input.value = String(p.default);
+        }
+      }
       input.dataset.param = p.name;
       input.dataset.annotation = p.annotation || "";
       input.dataset.hasDefault = p.has_default ? "1" : "0";
-
-      const isList = isListParam(p);
-      label.textContent = isList ? `${p.name}[]` : p.name;
       label.htmlFor = `rec-field-${p.name}`;
-      if (isList) {
-        input.classList.add("wide");
-        input.placeholder = "comma-separated";
-      } else if (!p.has_default) {
-        input.placeholder = "required";
-      }
-      if (p.has_default && p.default !== null && p.default !== undefined) {
-        input.value = String(p.default);
-      }
 
       wrap.appendChild(label);
       wrap.appendChild(input);
