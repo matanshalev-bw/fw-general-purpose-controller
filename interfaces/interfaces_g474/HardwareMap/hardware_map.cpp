@@ -1,6 +1,8 @@
 #include "hardware_map.hpp"
 
+#ifdef HAL_SPI_MODULE_ENABLED
 extern CommSpiHandle hspi1;
+#endif
 #ifdef HAL_UART_MODULE_ENABLED
 extern CommUartHandle huart2;
 #endif
@@ -13,7 +15,9 @@ extern CommTimHandle htim2;
 
 namespace HardwareMap {
 
+#ifdef HAL_SPI_MODULE_ENABLED
 CommSpiHandle& spi_main = hspi1;
+#endif
 #ifdef HAL_UART_MODULE_ENABLED
 CommUartHandle& uart_main = huart2;
 #endif

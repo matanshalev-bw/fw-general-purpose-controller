@@ -20,7 +20,9 @@ constexpr GpioPinNumber SAFETY_EN_PIN = GpioPinNumber::PIN_1;
 #ifdef HAL_UART_MODULE_ENABLED
 extern CommUartHandle& uart_main;
 #endif
+#ifdef HAL_SPI_MODULE_ENABLED
 extern CommSpiHandle& spi_main;
+#endif
 #ifdef HAL_I2C_MODULE_ENABLED
 extern CommI2cHandle& i2c_main;
 #endif

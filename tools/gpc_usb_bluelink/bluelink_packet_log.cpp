@@ -32,14 +32,14 @@ std::string componentIdName(uint8_t component_id) {
       return "HLC";
     case bluelink::ComponentId::COMPONENT_ID_LLC:
       return "LLC";
-    case bluelink::ComponentId::COMPONENT_ID_REVERSER_DRIVER:
-      return "REVERSER_DRIVER";
-    case bluelink::ComponentId::COMPONENT_ID_IMPLEMENT_DRIVER:
-      return "IMPLEMENT_DRIVER";
-    case bluelink::ComponentId::COMPONENT_ID_POWER_PANEL_DRIVER:
-      return "POWER_PANEL_DRIVER";
-    case bluelink::ComponentId::COMPONENT_ID_STEERING_DRIVER:
-      return "STEERING_DRIVER";
+    case bluelink::ComponentId::COMPONENT_ID_REVERSER_CONTROLLER:
+      return "REVERSER_CONTROLLER";
+    case bluelink::ComponentId::COMPONENT_ID_IMPLEMENT_CONTROLLER:
+      return "IMPLEMENT_CONTROLLER";
+    case bluelink::ComponentId::COMPONENT_ID_POWER_PANEL_CONTROLLER:
+      return "POWER_PANEL_CONTROLLER";
+    case bluelink::ComponentId::COMPONENT_ID_STEERING_CONTROLLER:
+      return "STEERING_CONTROLLER";
     case bluelink::ComponentId::COMPONENT_ID_REVERSER_AUX:
       return "REVERSER_AUX";
     case bluelink::ComponentId::COMPONENT_ID_POWER_PANEL_AUX:
@@ -48,6 +48,12 @@ std::string componentIdName(uint8_t component_id) {
       return "POWER_PANEL_TESTER";
     case bluelink::ComponentId::COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER:
       return "GENERAL_PURPOSE_CONTROLLER";
+    case bluelink::ComponentId::COMPONENT_ID_BRAKES_CONTROLLER:
+      return "BRAKES_CONTROLLER";
+    case bluelink::ComponentId::COMPONENT_ID_THROTTLE_CONTROLLER:
+      return "THROTTLE_CONTROLLER";
+    case bluelink::ComponentId::COMPONENT_ID_HANDBRAKE_CONTROLLER:
+      return "HANDBRAKE_CONTROLLER";
     case bluelink::ComponentId::COMPONENT_ID_BROADCAST:
       return "BROADCAST";
     default:
@@ -233,8 +239,9 @@ std::string formatPayloadDetails(bluelink::PayloadTypeIds type, const uint8_t* p
       if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::ControllerStateTelemetry>(
               payload, payload_len, oss,
               [](const bluelink::TelemetryPayload::ControllerStateTelemetry& v, std::ostringstream& out) {
-                out << "controller_id=" << static_cast<unsigned>(v.controller_id)
-                    << " controller_state=" << static_cast<unsigned>(v.controller_state);
+                out << "controller_id=" << static_cast<unsigned>(v.controller_id) << " ("
+                    << componentIdName(v.controller_id) << ") controller_state="
+                    << static_cast<unsigned>(v.controller_state);
               })) {
         return oss.str();
       }

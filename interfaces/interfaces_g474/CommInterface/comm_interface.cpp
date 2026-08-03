@@ -86,6 +86,7 @@ InterfaceStatus CommI2c::read(uint8_t* data, const uint16_t size) {
 }
 #endif  // HAL_I2C_MODULE_ENABLED
 
+#ifdef HAL_SPI_MODULE_ENABLED
 ///////////////////////////////// SPI  /////////////////////////////////
 
 CommSpi* CommSpi::spi_instance_ = nullptr;
@@ -401,6 +402,7 @@ void CommSpi::incrementErrorCount() {
 bool CommSpi::isErrorThresholdExceeded() const {
     return consecutive_error_count_ >= MAX_CONSECUTIVE_ERRORS_;
 }
+#endif  // HAL_SPI_MODULE_ENABLED
 
 ///////////////////////////////// CAN  /////////////////////////////////
 
@@ -940,11 +942,23 @@ void CommCan::setupTxHeader(CommCanTxHeader& tx_header, const bluelink::J1939Can
     }
 }
 
+void CommCan::setTransmitComplete() {
+	tx_fifo_ready_ = true;
+	can_state_ = CanState::READY;
+	
+	if (transmit_flag_) {
+		*transmit_flag_ = true;
+	}
 
+	if (tx_complete_callback_ != nullptr) {
+		tx_complete_callback_();
+	}
+}
 
 extern "C" {
 void Error_Handler();
 
+#ifdef HAL_SPI_MODULE_ENABLED
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
     CommSpi* spi_instance = CommSpi::getInstance();
     if (spi_instance != nullptr) {
@@ -969,11 +983,13 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
 }
 
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
+    (void)hspi;
     CommSpi* spi_instance = CommSpi::getInstance();
     if (spi_instance != nullptr) {
         spi_instance->handleSpiError();
     }
 }
+#endif  // HAL_SPI_MODULE_ENABLED
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
 	CommCan* instance = CommCan::getInstance(hfdcan);
@@ -987,19 +1003,6 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
     if (instance != nullptr and (RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE)) {
     	instance->handleInterruptRxMessage();
     }
-}
-
-void CommCan::setTransmitComplete() {
-	tx_fifo_ready_ = true;
-	can_state_ = CanState::READY;
-	
-	if (transmit_flag_) {
-		*transmit_flag_ = true;
-	}
-
-	if (tx_complete_callback_ != nullptr) {
-		tx_complete_callback_();
-	}
 }
 
 void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan) {

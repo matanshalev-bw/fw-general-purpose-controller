@@ -55,6 +55,7 @@ Core/Src/interfaces_g474/CommInterface \
 Core/Src/interfaces_g474/GpioInterface \
 Core/Src/interfaces_g474/HardwareMap \
 Core/Src/interfaces_g474/NonVolatileMemoryInterface \
+Core/Src/interfaces_g474/PwmInterface \
 Core/Src/interfaces_g474/SchedulerInterface \
 Core/Src/interfaces_g474/SystemInterface \
 Core/Startup \

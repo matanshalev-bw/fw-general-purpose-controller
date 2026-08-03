@@ -16,8 +16,6 @@
 #include "usbd_def.h"
 #include "distributed_can_id.hpp"
 
-using CommSpiHandle = SPI_HandleTypeDef;
-
 class CommInterface {
  protected:
   static constexpr uint32_t TIMEOUT_DEFAULT_ = 100U;
@@ -67,6 +65,7 @@ class CommUsb : public CommInterface {
   InterfaceStatus deInit() override;
 };
 
+#ifdef HAL_SPI_MODULE_ENABLED
 ///////////////////////////////// SPI  /////////////////////////////////
 
 class CommSpi : public CommInterface {
@@ -150,6 +149,7 @@ class CommSpi : public CommInterface {
   void prepareSlaveForNextTransaction();
   InterfaceStatus validateSlaveBuffers();
 };
+#endif  // HAL_SPI_MODULE_ENABLED
 
 #ifdef HAL_UART_MODULE_ENABLED
 ///////////////////////////////// UART /////////////////////////////////

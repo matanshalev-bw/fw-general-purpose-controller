@@ -17,6 +17,7 @@ RM := rm -rf
 -include Core/Startup/subdir.mk
 -include Core/Src/interfaces_g474/SystemInterface/subdir.mk
 -include Core/Src/interfaces_g474/SchedulerInterface/subdir.mk
+-include Core/Src/interfaces_g474/PwmInterface/subdir.mk
 -include Core/Src/interfaces_g474/NonVolatileMemoryInterface/subdir.mk
 -include Core/Src/interfaces_g474/HardwareMap/subdir.mk
 -include Core/Src/interfaces_g474/GpioInterface/subdir.mk

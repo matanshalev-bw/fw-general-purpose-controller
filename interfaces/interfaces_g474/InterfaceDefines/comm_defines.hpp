@@ -17,6 +17,10 @@ using CommUartHandle = UART_HandleTypeDef;
 using CommI2cHandle = I2C_HandleTypeDef;
 #endif
 
+#ifdef HAL_SPI_MODULE_ENABLED
+using CommSpiHandle = SPI_HandleTypeDef;
+#endif
+
 #ifdef HAL_DMA_MODULE_ENABLED
 using CommDmaHandle = DMA_HandleTypeDef;
 #endif
