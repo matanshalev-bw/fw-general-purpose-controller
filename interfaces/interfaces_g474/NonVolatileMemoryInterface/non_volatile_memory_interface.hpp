@@ -27,6 +27,7 @@ class NonVolatileMemoryInterface {
 
   public:
   static bool isConfigMemoryValid();
+  static bluelink::ComponentId getEffectiveComponentId();
   static InterfaceStatus rewriteMetaData();
   static InterfaceStatus updateProgrammingStateOnMetaData(const ProgrammingState new_state);
   static InterfaceStatus updateBootloaderVersionOnMetaData();

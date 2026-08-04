@@ -242,7 +242,7 @@ void BootloaderMain::handlePendingUsbReplies() {
     if (is_metadata_send_requested_ && metadata_response_transport_ == BootloaderTransport::USB_BLUELINK) {
         static const auto& meta = NonVolatileMemoryInterface::META_DATA_;
         bluelink::TelemetryPayload::ControllerMetaData data = {
-            .component_id = meta.MY_COMPONENT_ID,
+            .component_id = static_cast<uint8_t>(NonVolatileMemoryInterface::getEffectiveComponentId()),
             .bootloader_version = {meta.BOOTLOADER_VERSION.major, meta.BOOTLOADER_VERSION.minor},
             .app_version = {meta.APPLICATION_VERSION.major, meta.APPLICATION_VERSION.minor},
             .config_version = {meta.CONFIGURATION_VERSION.major, meta.CONFIGURATION_VERSION.minor},
@@ -273,7 +273,7 @@ void BootloaderMain::handlePendingMetadataRequest() {
 
     static const auto& meta = NonVolatileMemoryInterface::META_DATA_;
     bluelink::TelemetryPayload::ControllerMetaData data = {
-        .component_id = meta.MY_COMPONENT_ID,
+        .component_id = static_cast<uint8_t>(NonVolatileMemoryInterface::getEffectiveComponentId()),
         .bootloader_version = {meta.BOOTLOADER_VERSION.major, meta.BOOTLOADER_VERSION.minor},
         .app_version = {meta.APPLICATION_VERSION.major, meta.APPLICATION_VERSION.minor},
         .config_version = {meta.CONFIGURATION_VERSION.major, meta.CONFIGURATION_VERSION.minor},

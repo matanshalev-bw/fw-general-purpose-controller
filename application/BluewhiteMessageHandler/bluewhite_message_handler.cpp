@@ -91,7 +91,7 @@ void BluewhiteMessageHandler::requestMetaDataSend(uint8_t destination_id) {
 bluelink::TelemetryPayload::ControllerMetaData BluewhiteMessageHandler::buildControllerMetaData() const {
   const volatile MetaData& meta = NonVolatileMemoryInterface::META_DATA_;
   return bluelink::TelemetryPayload::ControllerMetaData{
-      .component_id = meta.MY_COMPONENT_ID,
+      .component_id = static_cast<uint8_t>(NonVolatileMemoryInterface::getEffectiveComponentId()),
       .bootloader_version = {meta.BOOTLOADER_VERSION.major, meta.BOOTLOADER_VERSION.minor},
       .app_version = {meta.APPLICATION_VERSION.major, meta.APPLICATION_VERSION.minor},
       .config_version = {meta.CONFIGURATION_VERSION.major, meta.CONFIGURATION_VERSION.minor},

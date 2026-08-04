@@ -33,6 +33,13 @@ bool NonVolatileMemoryInterface::isConfigMemoryValid() {
 	return true;
 }
 
+bluelink::ComponentId NonVolatileMemoryInterface::getEffectiveComponentId() {
+	if (isConfigMemoryValid() && CONFIG_MEMORY_.bluelink_identity_config.component_id != 0) {
+		return static_cast<bluelink::ComponentId>(CONFIG_MEMORY_.bluelink_identity_config.component_id);
+	}
+	return bluelink::ComponentId::COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER;
+}
+
 InterfaceStatus NonVolatileMemoryInterface::writeDataToFlash(const void* data, size_t size) {
 
 	// Prepare to erase the FLASH page
@@ -207,6 +214,7 @@ InterfaceStatus NonVolatileMemoryInterface::rewriteMetaData() {
 	if (isConfigMemoryValid()) {
 		memcpy(&updated_meta_data.config_type, const_cast<const ConfigType*>(&CONFIG_MEMORY_.config_type), sizeof(CONFIG_MEMORY_.config_type));
 	}
+	updated_meta_data.MY_COMPONENT_ID = getEffectiveComponentId();
 	updated_meta_data.BOOTLOADER_VERSION = preserved_bootloader_version;
 
 	return writeDataToFlash(&updated_meta_data, sizeof(MetaData));
