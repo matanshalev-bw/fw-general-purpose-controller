@@ -292,6 +292,7 @@ class CommCan : public CommInterface {
 
   InterfaceStatus abortAllTransmissions();
   InterfaceStatus prepareForBootloader();
+  bool recoverStuckTransmit(bool force = false);
   
   void setupTxHeader(CommCanTxHeader& tx_header, const bluelink::J1939CanIdStruct& can_id, uint8_t data_size);
 

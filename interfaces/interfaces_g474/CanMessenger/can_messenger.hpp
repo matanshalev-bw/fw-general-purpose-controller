@@ -42,7 +42,7 @@ class CanMessenger {
  private:
   static constexpr uint8_t TX_QUEUE_SIZE_ = 32;
   static constexpr uint8_t RX_QUEUE_SIZE_ = 16;
-  static constexpr uint8_t MAX_INTERRUPT_SENDS_ = 2;
+  static constexpr uint8_t MAX_INTERRUPT_SENDS_ = 1;
 
  public:
   struct TxQueueItem {
@@ -114,6 +114,7 @@ class CanMessenger {
 
   inline const Statistics& getStatistics() const { return stats_; }
   void resetStatistics();
+  void clearTxQueue();
 
   static RxPriority determineRxPriority(uint8_t payload_type_id);
   static TxPriority determineTxPriority(uint8_t payload_type_id);
@@ -142,6 +143,8 @@ class CanMessenger {
   
   InterfaceStatus sendQueuedMessage(const TxQueueItem& item);
   
+  void clearTxQueueLocked();
+
   void enterCriticalSection();
   void exitCriticalSection();
 };

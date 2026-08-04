@@ -42,7 +42,14 @@ bool CanMessenger::enqueueTxMessage(const CommCanTxHeader& tx_header, const uint
     const bluelink::J1939CanIdStruct* can_id = 
         reinterpret_cast<const bluelink::J1939CanIdStruct*>(&tx_header.Identifier);
     
-    //enterCriticalSection();
+    enterCriticalSection();
+    
+    if (isTxQueueFull()) {
+        clearTxQueueLocked();
+        if (comm_can_ != nullptr) {
+            comm_can_->recoverStuckTransmit(true);
+        }
+    }
     
     if (isTxQueueFull()) {
         stats_.tx_queue_full_drops++;
@@ -63,7 +70,7 @@ bool CanMessenger::enqueueTxMessage(const CommCanTxHeader& tx_header, const uint
     
     stats_.tx_messages_enqueued++;
     
-    //exitCriticalSection();
+    exitCriticalSection();
     return true;
 }
 
@@ -175,6 +182,14 @@ void CanMessenger::processQueueFromTick() {
         return;
     }
 
+    if (not comm_can_->isTransmitAvailable()) {
+        comm_can_->recoverStuckTransmit();
+    }
+
+    if (not comm_can_->isTransmitAvailable()) {
+        return;
+    }
+
     while (not isTxQueueEmpty() and messages_processed < MAX_TICK_MESSAGES) {
         TxQueueItem item;
         
@@ -204,6 +219,10 @@ void CanMessenger::processQueueFromTick() {
         } else if (result == InterfaceStatus::INTERFACE_OK) {
             stats_.tx_messages_sent++;
             stats_.tx_tick_sends++;
+        } else {
+            insertTxWithPriority(item);
+            comm_can_->recoverStuckTransmit(true);
+            break;
         }
         
         messages_processed++;
@@ -229,6 +248,12 @@ void CanMessenger::processQueueFromInterrupt() {
             stats_.tx_messages_sent++;
             stats_.tx_interrupt_sends++;
             messages_sent++;
+        } else {
+            insertTxWithPriority(item);
+            if (comm_can_ != nullptr) {
+                comm_can_->recoverStuckTransmit(true);
+            }
+            break;
         }
     }
 }
@@ -443,6 +468,18 @@ void CanMessenger::resetStatistics() {
     stats_.rx_tick_processes = 0;
     
     exitCriticalSection();
+}
+
+void CanMessenger::clearTxQueue() {
+    enterCriticalSection();
+    clearTxQueueLocked();
+    exitCriticalSection();
+}
+
+void CanMessenger::clearTxQueueLocked() {
+    tx_queue_head_ = 0;
+    tx_queue_tail_ = 0;
+    tx_queue_count_ = 0;
 }
 
 void CanMessenger::enterCriticalSection() {

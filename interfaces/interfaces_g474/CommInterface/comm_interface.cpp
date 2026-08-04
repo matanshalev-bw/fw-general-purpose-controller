@@ -607,27 +607,34 @@ InterfaceStatus CommCan::startTransmitInterrupt(const uint8_t* data, const uint1
     if (can_state_ == CanState::ERROR) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
-    
-    if (data == nullptr) {
+
+    if (can_state_ == CanState::BUSY_TX) {
+        return InterfaceStatus::INTERFACE_BUSY;
+    }
+
+    if (data == nullptr || fdcan_handler_ == nullptr) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
-    
-    InterfaceStatus status = static_cast<InterfaceStatus>(HAL_FDCAN_AddMessageToTxFifoQ(fdcan_handler_, &tx_header_, 
-                                                    const_cast<uint8_t*>(data)));
-    
-    if (status == InterfaceStatus::INTERFACE_OK) {
+
+    (void)size;
+
+    fdcan_handler_->ErrorCode = HAL_FDCAN_ERROR_NONE;
+    const HAL_StatusTypeDef hal_status =
+        HAL_FDCAN_AddMessageToTxFifoQ(fdcan_handler_, &tx_header_, const_cast<uint8_t*>(data));
+
+    if (hal_status == HAL_OK) {
         tx_timeout_start_ = HAL_GetTick();
         can_state_ = CanState::BUSY_TX;
         *transmit_flag_ = false;
         resetErrorCount();
         return InterfaceStatus::INTERFACE_OK;
     }
-    else if (status == static_cast<InterfaceStatus>(HAL_FDCAN_ERROR_FIFO_FULL)) {
+
+    if ((fdcan_handler_->ErrorCode & HAL_FDCAN_ERROR_FIFO_FULL) != 0U) {
         return InterfaceStatus::INTERFACE_BUSY;
     }
-    
-    can_state_ = CanState::ERROR;
-    return handleCanError(status);
+
+    return handleCanError(static_cast<InterfaceStatus>(hal_status));
 }
 
 InterfaceStatus CommCan::deInit() {
@@ -749,6 +756,26 @@ InterfaceStatus CommCan::abortAllTransmissions() {
     }
 
     return handleCanError(status);
+}
+
+bool CommCan::recoverStuckTransmit(bool force) {
+    if (fdcan_handler_ == nullptr) {
+        return false;
+    }
+
+    const bool tx_timed_out = (can_state_ == CanState::BUSY_TX) &&
+                              ((HAL_GetTick() - tx_timeout_start_) >= CAN_TX_TIMEOUT_);
+    const bool in_error = (can_state_ == CanState::ERROR);
+
+    if (!force && !tx_timed_out && !in_error) {
+        return false;
+    }
+
+    abortAllTransmissions();
+    can_state_ = CanState::READY;
+    resetErrorCount();
+    kickStartTxInterrupts();
+    return true;
 }
 
 InterfaceStatus CommCan::prepareForBootloader() {
@@ -1006,10 +1033,7 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 }
 
 void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan) {
-    CommCan* instance = CommCan::getInstance(hfdcan);
-    if (instance != nullptr) {
-        instance->setTransmitComplete();
-    }
+    (void)hfdcan;
 }
 
 void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes) {
