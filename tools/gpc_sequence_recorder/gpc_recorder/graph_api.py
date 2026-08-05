@@ -53,6 +53,22 @@ _STATE_LABELS: Dict[str, str] = {
 }
 
 
+def _format_binding_fields_summary(fields: Dict[str, Any], max_fields: int = 4) -> str:
+    if not fields:
+        return ""
+    items = [f"{key}={value}" for key, value in fields.items() if value is not None and value != ""]
+    if not items:
+        return ""
+    preview = ", ".join(items[:max_fields])
+    if len(items) > max_fields:
+        preview += f", +{len(items) - max_fields}"
+    return f" ({preview})"
+
+
+def _format_command_binding_label(trigger: str, fields: Dict[str, Any]) -> str:
+    return f"COMMAND: {trigger}{_format_binding_fields_summary(fields)}"
+
+
 def _step_to_command(step: MicroOpStepState) -> Optional[Dict[str, Any]]:
     command = _UNION_TO_COMMAND.get(step.union_member)
     if command is None:
@@ -237,7 +253,7 @@ def session_to_graph(session: Session) -> Dict[str, Any]:
             {
                 "id": f"command_{i}",
                 "type": "command",
-                "label": f"COMMAND: {binding.payload_type}",
+                "label": _format_command_binding_label(binding.payload_type, binding.field_values),
                 "trigger": binding.payload_type,
                 "fields": binding.field_values,
                 "steps": _steps_to_commands(binding.steps),

@@ -194,6 +194,25 @@ function friendlyName(command) {
   return FRIENDLY_NAMES[command] || command.replace(/_/g, " ");
 }
 
+function formatBindingFieldSummary(fields, maxFields = 4) {
+  if (!fields || typeof fields !== "object") return "";
+  const keys = Object.keys(fields).filter(
+    (k) => fields[k] !== undefined && fields[k] !== null && fields[k] !== ""
+  );
+  if (!keys.length) return "";
+  const preview = keys
+    .slice(0, maxFields)
+    .map((k) => `${k}=${fields[k]}`)
+    .join(", ");
+  const extra = keys.length > maxFields ? `, +${keys.length - maxFields}` : "";
+  return ` (${preview}${extra})`;
+}
+
+function formatCommandBindingLabel(trigger, fields) {
+  const trig = trigger || "unknown";
+  return `COMMAND: ${trig}${formatBindingFieldSummary(fields)}`;
+}
+
 function limitClass(used, max) {
   if (used >= max) return "full";
   if (used >= Math.max(1, max - 3) || used / max >= 0.8) return "warn";
@@ -264,8 +283,9 @@ function containerPreview(container) {
   }
   if (container.type === "command") {
     const trig = container.trigger || "no trigger";
+    const fieldPart = formatBindingFieldSummary(container.fields || {});
     const n = (container.steps || []).length;
-    return `${trig} · ${n} step${n === 1 ? "" : "s"}`;
+    return `${trig}${fieldPart} · ${n} step${n === 1 ? "" : "s"}`;
   }
   const steps = container.steps || [];
   if (!steps.length) return "empty — click to edit";
@@ -1036,7 +1056,7 @@ function closeBindModal(save) {
       appState.containers[id] = {
         id,
         type: "command",
-        label: `COMMAND: ${trigger}`,
+        label: formatCommandBindingLabel(trigger, fields),
         trigger,
         fields,
         steps: [],
@@ -1132,7 +1152,14 @@ function applyLoadedGraph(graph) {
   for (const c of graph.containers || []) {
     if (c.type === "command") {
       const id = c.id || `command_${appState.commandCounter++}`;
-      appState.containers[id] = { ...c, id, steps: c.steps || [] };
+      const fields = c.fields || {};
+      const trigger = c.trigger || "";
+      appState.containers[id] = {
+        ...c,
+        id,
+        steps: c.steps || [],
+        label: formatCommandBindingLabel(trigger, fields),
+      };
       const n = parseInt(id.replace("command_", ""), 10);
       if (!Number.isNaN(n)) appState.commandCounter = Math.max(appState.commandCounter, n + 1);
     } else if (c.type === "telemetry") {

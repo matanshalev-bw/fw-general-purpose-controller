@@ -6,10 +6,48 @@ from gpc_recorder.graph_api import (
     build_context_from_graph,
     export_graph,
     session_to_graph,
+    _format_command_binding_label,
     _steps_to_commands,
 )
 from gpc_recorder.dsl.session import MicroOpStepState
 from gpc_recorder.schema.loader import get_schema
+
+
+def test_format_command_binding_label_includes_fields():
+    label = _format_command_binding_label(
+        "BRAKES_CONTINUOUS_COMMAND",
+        {
+            "brake_mode": "BRAKE_MODE_FULLY_RELEASED",
+            "desired_brakes_position_in_percentage": 0,
+        },
+    )
+    assert label == (
+        "COMMAND: BRAKES_CONTINUOUS_COMMAND "
+        "(brake_mode=BRAKE_MODE_FULLY_RELEASED, desired_brakes_position_in_percentage=0)"
+    )
+
+
+def test_session_to_graph_command_label_includes_fields():
+    engine = ReplEngine(auto_reload=False)
+    for line in (
+        "bind_command(trigger=BRAKES_CONTINUOUS_COMMAND,"
+        "BrakesContinuousCommand(brake_mode=BRAKE_MODE_FULLY_RELEASED))",
+        "gpio_write(port=1, pin=5, value=1)",
+        "end_binding()",
+        "bind_command(trigger=BRAKES_CONTINUOUS_COMMAND,"
+        "BrakesContinuousCommand(brake_mode=BRAKE_MODE_FULLY_PRESSED))",
+        "gpio_write(port=1, pin=6, value=0)",
+        "end_binding()",
+    ):
+        out, cont = engine.execute(line)
+        assert cont, out
+
+    graph = session_to_graph(engine.ctx.session)
+    command_labels = [c["label"] for c in graph["containers"] if c["type"] == "command"]
+    assert len(command_labels) == 2
+    assert "BRAKE_MODE_FULLY_RELEASED" in command_labels[0]
+    assert "BRAKE_MODE_FULLY_PRESSED" in command_labels[1]
+    assert command_labels[0] != command_labels[1]
 
 
 def test_steps_to_commands_if_block():
