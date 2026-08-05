@@ -15,21 +15,25 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
     },
     .sequences_config = {
         .powerup_sequence = {
-            .step_count = 0,
+            .step_count = 2,
             .steps = {
-            },
-        },
-        .main_tick_sequence = {
-            .step_count = 1,
-            .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {3, {0, 0, 0}, 2},
+                        },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
                             .pwm_set = {40, 0, 1, 3},
                         },
             },
         },
+        .main_tick_sequence = {
+            .step_count = 0,
+            .steps = {
+            },
+        },
         .init_state_sequence = {
-            .step_count = 16,
+            .step_count = 17,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
@@ -38,6 +42,10 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {3, {0, 0, 0}, 10},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
+                            .pwm_set = {40, 0, 1, 3},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
@@ -98,16 +106,12 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .manual_state_tick_sequence = {
-            .step_count = 1,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 2},
-                        },
             },
         },
         .disengagement_state_sequence = {
-            .step_count = 3,
+            .step_count = 4,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
@@ -121,14 +125,34 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {3, {0, 0, 0}, 2},
                         },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
+                            .pwm_set = {40, 0, 1, 3},
+                        },
             },
         },
         .engaged_state_tick_sequence = {
-            .step_count = 6,
+            .step_count = 9,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
                             .digital_gpio_write = {2, 15, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {10, {0, 0, 0}, 10},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {3, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LT), 10, 2},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {3, {0, 0, 0}, 10},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
+                            .pwm_set = {40, 0, 1, 3},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
@@ -146,14 +170,10 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
                             .uart_transmit = {1, 8, {101, 110, 103, 97, 103, 101, 32, 0}},
                         },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 10},
-                        },
             },
         },
         .power_up_bit_state_sequence = {
-            .step_count = 2,
+            .step_count = 3,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
@@ -162,6 +182,10 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {3, {0, 0, 0}, 2},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
+                            .pwm_set = {40, 0, 1, 3},
                         },
             },
         },
@@ -191,11 +215,27 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .error_state_tick_sequence = {
-            .step_count = 6,
+            .step_count = 9,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
                             .digital_gpio_write = {2, 15, 0},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {10, {0, 0, 0}, 10},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {3, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LT), 10, 2},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {3, {0, 0, 0}, 10},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
+                            .pwm_set = {40, 0, 1, 3},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
@@ -213,18 +253,26 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
                             .uart_transmit = {1, 8, {101, 114, 114, 111, 114, 32, 0, 0}},
                         },
+            },
+        },
+        .emergency_state_tick_sequence = {
+            .step_count = 4,
+            .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {10, {0, 0, 0}, 10},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {3, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LT), 10, 2},
+                        },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {3, {0, 0, 0}, 10},
                         },
-            },
-        },
-        .emergency_state_tick_sequence = {
-            .step_count = 1,
-            .steps = {
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 10},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
+                            .pwm_set = {40, 0, 1, 3},
                         },
             },
         },
@@ -237,11 +285,15 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_RELEASED), 0, 0, 0, 0, 0, 0, 0},
                 },
                 .sequence = {
-                    .step_count = 1,
+                    .step_count = 2,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {3, {0, 0, 0}, 2},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
+                            .pwm_set = {40, 0, 1, 3},
                         },
                     },
                 },
@@ -253,11 +305,15 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_PRESSED), 0, 0, 0, 0, 0, 0, 0},
                 },
                 .sequence = {
-                    .step_count = 1,
+                    .step_count = 2,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {3, {0, 0, 0}, 10},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
+                            .pwm_set = {40, 0, 1, 3},
                         },
                     },
                 },
