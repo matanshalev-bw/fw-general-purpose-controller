@@ -540,6 +540,63 @@
       border-radius: 3px;
       padding: 0.3rem 0.45rem;
     }
+
+    .flash-modal {
+      width: min(96vw, 42rem);
+      height: min(80vh, 28rem);
+    }
+    .flash-modal .modal-body {
+      flex-direction: column;
+      padding: 0.75rem;
+      gap: 0.65rem;
+    }
+    .flash-progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-shrink: 0;
+    }
+    .flash-progress-bar {
+      flex: 1;
+      height: 0.55rem;
+      background: #1a1a1a;
+      border: 1px solid #555;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .flash-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #388a34, #6fcf7f);
+      transition: width 0.15s ease-out;
+    }
+    .flash-progress-label {
+      min-width: 3.5rem;
+      text-align: right;
+      font-size: 0.85rem;
+      font-variant-numeric: tabular-nums;
+      color: #ccc;
+    }
+    .flash-log {
+      flex: 1;
+      min-height: 0;
+      margin: 0;
+      padding: 0.55rem 0.65rem;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      color: #d4d4d4;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .flash-modal .modal-header button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -616,6 +673,24 @@
           <h3>Properties</h3>
           <p class="props-empty">Select a node to edit parameters.</p>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="flash-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="flash-modal-title">
+    <div class="modal flash-modal">
+      <div class="modal-header">
+        <h2 id="flash-modal-title">Flashing config</h2>
+        <button type="button" id="btn-flash-close" disabled>Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="flash-progress-wrap">
+          <div class="flash-progress-bar" aria-hidden="true">
+            <div id="flash-progress-fill" class="flash-progress-fill"></div>
+          </div>
+          <span id="flash-progress-label" class="flash-progress-label">0%</span>
+        </div>
+        <pre id="flash-log" class="flash-log"></pre>
       </div>
     </div>
   </div>
