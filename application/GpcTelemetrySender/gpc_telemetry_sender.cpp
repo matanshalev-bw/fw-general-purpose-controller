@@ -81,10 +81,9 @@ bool GpcTelemetrySender::sendBinding(const volatile TelemetryBinding& binding, c
 
   const auto payload_type = static_cast<bluelink::PayloadTypeIds>(binding.payload_type);
   const uint8_t broadcast_dest = bluelink::ComponentId::COMPONENT_ID_BROADCAST;
-   const bool can_sent =
-       can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, binding.payload_size);
-  const bool usb_sent = usb_comm_->sendTelemetry(payload_type, payload, binding.payload_size);
-  return can_sent && usb_sent;
+   (void)can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, binding.payload_size);
+  (void)usb_comm_->sendTelemetry(payload_type, payload, binding.payload_size);
+  return true;
 }
 
 void GpcTelemetrySender::tickControllerStateTelemetry() {
@@ -102,11 +101,9 @@ void GpcTelemetrySender::tickControllerStateTelemetry() {
   static const auto payload_type = bluelink::PayloadTypeIds::CONTROLLER_STATE_TELEMETRY;
   static const uint8_t broadcast_dest = bluelink::ComponentId::COMPONENT_ID_BROADCAST;
 
-  const bool usb_sent = usb_comm_->sendTelemetry(payload_type, payload, payload_size);
-  const bool can_sent = can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, payload_size);
-  if (usb_sent || can_sent) {
-    controller_state_scheduler_->restart();
-  }
+  (void)usb_comm_->sendTelemetry(payload_type, payload, payload_size);
+  (void)can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, payload_size);
+  controller_state_scheduler_->restart();
 }
 
 void GpcTelemetrySender::tick() {

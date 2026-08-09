@@ -37,7 +37,7 @@ InterfaceStatus BluewhiteCanComm::initializeCanInterface() {
 
   const uint32_t notifications = static_cast<uint32_t>(CommCan::CanNotificationType::RX_FIFO0_MSG_PENDING) |
                                  static_cast<uint32_t>(CommCan::CanNotificationType::RX_FIFO1_MSG_PENDING) |
-                                 static_cast<uint32_t>(CommCan::CanNotificationType::TX_BUFFER_COMPLETE);
+                                 static_cast<uint32_t>(CommCan::CanNotificationType::TX_FIFO_EMPTY);
 
   status = comm_can_->activateNotifications(notifications);
   if (status != InterfaceStatus::INTERFACE_OK) {
