@@ -15,16 +15,8 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
     },
     .sequences_config = {
         .powerup_sequence = {
-            .step_count = 2,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 0, 1, 3},
-                        },
             },
         },
         .main_tick_sequence = {
@@ -33,19 +25,11 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .init_state_sequence = {
-            .step_count = 17,
+            .step_count = 15,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
                             .uart_transmit = {1, 8, {105, 110, 105, 116, 32, 0, 0, 0}},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 10},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 0, 1, 3},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
@@ -111,7 +95,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .disengagement_state_sequence = {
-            .step_count = 4,
+            .step_count = 2,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
@@ -121,38 +105,14 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
                             .uart_transmit = {1, 8, {100, 105, 115, 101, 110, 103, 32, 0}},
                         },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 0, 1, 3},
-                        },
             },
         },
         .engaged_state_tick_sequence = {
-            .step_count = 9,
+            .step_count = 5,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
                             .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {10, {0, 0, 0}, 10},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {3, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LT), 10, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 10},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 0, 1, 3},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
@@ -173,19 +133,11 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .power_up_bit_state_sequence = {
-            .step_count = 3,
+            .step_count = 1,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
                             .uart_transmit = {1, 8, {112, 111, 119, 101, 114, 117, 112, 32}},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 0, 1, 3},
                         },
             },
         },
@@ -285,7 +237,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_RELEASED), 0, 0, 0, 0, 0, 0, 0},
                 },
                 .sequence = {
-                    .step_count = 2,
+                    .step_count = 4,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
@@ -294,6 +246,14 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
                             .pwm_set = {40, 0, 1, 3},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {1, {0, 0, 0}, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {2, {0, 0, 0}, 1},
                         },
                     },
                 },
@@ -305,7 +265,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_PRESSED), 0, 0, 0, 0, 0, 0, 0},
                 },
                 .sequence = {
-                    .step_count = 2,
+                    .step_count = 4,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
@@ -315,6 +275,14 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
                             .pwm_set = {40, 0, 1, 3},
                         },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {1, {0, 0, 0}, 3},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {2, {0, 0, 0}, 3},
+                        },
                     },
                 },
             },
@@ -323,15 +291,13 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             .binding_count = 1,
             .bindings = {
             {
-                .payload_type = bluelink::PayloadTypeIds::RAW_SENSORS_TELEMETRY,
-                .payload_size = 4,
+                .payload_type = bluelink::PayloadTypeIds::HANDBRAKE_TELEMETRY,
+                .payload_size = 2,
                 .rate_hz = 1,
-                .field_count = 4,
+                .field_count = 2,
                 .fields = {
-                    { 0, 1, 3 },
-                    { 1, 1, 3 },
-                    { 2, 1, 3 },
-                    { 3, 1, 3 },
+                    { 0, 1, 1 },
+                    { 1, 1, 2 },
                 },
             },
             },

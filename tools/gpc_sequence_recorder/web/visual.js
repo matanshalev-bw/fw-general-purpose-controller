@@ -145,6 +145,7 @@ const appState = {
 
 let drawflowEditor = null;
 let selectedNodeId = null;
+let flashOutputBuffer = "";
 
 function setStatus(msg) {
   document.getElementById("status").textContent = msg;
@@ -1212,24 +1213,142 @@ async function exportGraph() {
   setStatus(`Exported ${data.path} and ${data.bin_path}`);
 }
 
+function normalizeFlashOutput(text) {
+  const lines = [];
+  let current = "";
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === "\r") {
+      current = "";
+    } else if (ch === "\n") {
+      if (current) lines.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.join("\n");
+}
+
+function extractFlashPercent(text) {
+  const matches = [...text.matchAll(/\]\s+(\d+(?:\.\d+)?)%/g)];
+  if (matches.length === 0) return null;
+  return parseFloat(matches[matches.length - 1][1]);
+}
+
+function setFlashProgress(percent) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const fill = document.getElementById("flash-progress-fill");
+  const label = document.getElementById("flash-progress-label");
+  if (fill) fill.style.width = `${clamped}%`;
+  if (label) label.textContent = `${clamped.toFixed(1)}%`;
+}
+
+function openFlashModal(port) {
+  const modal = document.getElementById("flash-modal");
+  const logEl = document.getElementById("flash-log");
+  const closeBtn = document.getElementById("btn-flash-close");
+  const title = document.getElementById("flash-modal-title");
+  flashOutputBuffer = "";
+  if (title) title.textContent = `Flashing config to ${port}`;
+  if (logEl) logEl.textContent = "";
+  setFlashProgress(0);
+  if (closeBtn) closeBtn.disabled = true;
+  if (modal) modal.classList.add("open");
+}
+
+function closeFlashModal() {
+  const modal = document.getElementById("flash-modal");
+  if (modal) modal.classList.remove("open");
+}
+
+function appendFlashOutput(rawText) {
+  const logEl = document.getElementById("flash-log");
+  if (!logEl) return;
+
+  flashOutputBuffer += rawText;
+
+  const percent = extractFlashPercent(flashOutputBuffer);
+  if (percent !== null) setFlashProgress(percent);
+
+  logEl.textContent = normalizeFlashOutput(flashOutputBuffer);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function flashConfigViaUsb(port) {
+  flashOutputBuffer = "";
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  return new Promise((resolve, reject) => {
+    const flashWs = new WebSocket(`${proto}//${location.host}/ws/flash`);
+    let settled = false;
+
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      fn(value);
+    };
+
+    flashWs.onopen = () => {
+      appendFlashOutput(`[Flash] Starting programmer on ${port}…\n`);
+      flashWs.send(JSON.stringify({ port }));
+    };
+
+    flashWs.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "output" && msg.text) {
+        appendFlashOutput(msg.text);
+        return;
+      }
+      if (msg.type === "done") {
+        appendFlashOutput("\n[Flash] Complete\n");
+        setFlashProgress(100);
+        flashWs.close();
+        finish(resolve, msg);
+        return;
+      }
+      if (msg.type === "error") {
+        appendFlashOutput(`\n[Flash] ${msg.message || "Flash failed"}\n`);
+        flashWs.close();
+        finish(reject, new Error(msg.message || "Flash failed"));
+      }
+    };
+
+    flashWs.onerror = () => {
+      flashWs.close();
+      finish(reject, new Error("Flash WebSocket connection failed"));
+    };
+
+    flashWs.onclose = () => {
+      if (!settled) {
+        finish(reject, new Error("Flash connection closed before completion"));
+      }
+    };
+  });
+}
+
 async function flashConfig() {
   const port = document.getElementById("live-port").value;
   if (!port) {
     setStatus("Select a USB port before flashing");
     return;
   }
+
+  const btnFlash = document.getElementById("btn-flash");
+  const closeBtn = document.getElementById("btn-flash-close");
+  btnFlash.disabled = true;
+  openFlashModal(port);
   setStatus("Flashing…");
-  const res = await fetch("/api/flash", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ port }),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    setStatus(`Flash failed: ${data.error}`);
-    return;
+
+  try {
+    const data = await flashConfigViaUsb(port);
+    setStatus(`Flashed ${data.bin_path} to ${data.port}`);
+  } catch (e) {
+    setStatus(`Flash failed: ${e.message}`);
+  } finally {
+    btnFlash.disabled = false;
+    if (closeBtn) closeBtn.disabled = false;
   }
-  setStatus(data.message || "Flash complete");
 }
 
 async function loadDictionaries() {
@@ -1476,6 +1595,7 @@ function wireEvents() {
   document.getElementById("btn-load").addEventListener("click", loadGraph);
   document.getElementById("btn-export").addEventListener("click", exportGraph);
   document.getElementById("btn-flash").addEventListener("click", flashConfig);
+  document.getElementById("btn-flash-close").addEventListener("click", closeFlashModal);
   document.getElementById("btn-modal-save").addEventListener("click", () => closeEditor(true));
   document.getElementById("btn-modal-close").addEventListener("click", () => closeEditor(false));
   document.getElementById("btn-modal-remove").addEventListener("click", () => {
