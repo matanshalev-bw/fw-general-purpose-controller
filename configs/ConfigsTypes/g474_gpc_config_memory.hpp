@@ -15,8 +15,12 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
     },
     .sequences_config = {
         .powerup_sequence = {
-            .step_count = 0,
+            .step_count = 1,
             .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::MOVE_TO_ERROR_STATE,
+                            .move_to_error_state = {{0, 0, 0, 0}},
+                        },
             },
         },
         .main_tick_sequence = {
