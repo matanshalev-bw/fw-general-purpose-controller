@@ -170,8 +170,38 @@ void BluewhiteCanComm::processTxQueue() {
   }
 }
 
+bool BluewhiteCanComm::sendCanMessageDirect(uint8_t destination_id, bluelink::PayloadTypeIds payload_type,
+                                            const void* data, size_t data_size) {
+  if (data == nullptr || data_size == 0 || data_size > 8) {
+    return false;
+  }
+
+  if (not comm_can_->isTransmitAvailable()) {
+    comm_can_->recoverStuckTransmit();
+    if (not comm_can_->isTransmitAvailable()) {
+      return false;
+    }
+  }
+
+  const uint8_t component_id = NonVolatileMemoryInterface::CONFIG_MEMORY_.bluelink_identity_config.component_id;
+  const bluelink::J1939CanIdStruct can_id(static_cast<bluelink::ComponentId>(component_id), destination_id,
+                                            payload_type);
+
+  comm_can_->setTxCanIdType(CommCan::CanIdType::CAN_ID_TYPE_EXT);
+  comm_can_->setTxCanId(CONVERT_CAN_ID_TO_UINT32(can_id));
+  comm_can_->setTxDlc(data_size);
+  comm_can_->setTxRtrType(CommCan::CanRtrType::CAN_RTR_DATA_TYPE);
+
+  return comm_can_->startTransmitInterrupt(reinterpret_cast<const uint8_t*>(data),
+                                           static_cast<uint16_t>(data_size)) == InterfaceStatus::INTERFACE_OK;
+}
+
 bool BluewhiteCanComm::sendCanMessage(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data,
                                       size_t data_size) {
+  if (payload_type == bluelink::PayloadTypeIds::CONTROLLER_STATE_TELEMETRY) {
+    return sendCanMessageDirect(destination_id, payload_type, data, data_size);
+  }
+
   CommCanTxHeader tx_header;
   const uint8_t component_id = NonVolatileMemoryInterface::CONFIG_MEMORY_.bluelink_identity_config.component_id;
   const bluelink::J1939CanIdStruct can_id(static_cast<bluelink::ComponentId>(component_id), destination_id,

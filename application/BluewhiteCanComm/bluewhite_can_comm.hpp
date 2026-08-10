@@ -38,6 +38,8 @@ class BluewhiteCanComm {
   void directEnqueueRxFromInterrupt(const CommCanRxHeader& header, const uint8_t* data, uint8_t length);
 
   bool sendCanMessage(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data, size_t data_size);
+  bool sendCanMessageDirect(uint8_t destination_id, bluelink::PayloadTypeIds payload_type, const void* data,
+                            size_t data_size);
 };
 
 #endif  // BLUEWHITE_CAN_COMM_HPP_

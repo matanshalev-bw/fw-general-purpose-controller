@@ -101,9 +101,11 @@ void GpcTelemetrySender::tickControllerStateTelemetry() {
   static const auto payload_type = bluelink::PayloadTypeIds::CONTROLLER_STATE_TELEMETRY;
   static const uint8_t broadcast_dest = bluelink::ComponentId::COMPONENT_ID_BROADCAST;
 
-  (void)usb_comm_->sendTelemetry(payload_type, payload, payload_size);
-  (void)can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, payload_size);
-  controller_state_scheduler_->restart();
+  const bool usb_sent = usb_comm_->sendTelemetry(payload_type, payload, payload_size);
+  const bool can_sent = can_comm_->sendTelemetry(broadcast_dest, payload_type, payload, payload_size);
+  if (usb_sent || can_sent) {
+    controller_state_scheduler_->restart();
+  }
 }
 
 void GpcTelemetrySender::tick() {
