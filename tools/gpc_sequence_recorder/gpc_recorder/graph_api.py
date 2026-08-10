@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from gpc_recorder.codegen.config_loader import load_config_hpp
 from gpc_recorder.dsl.builtins import RecorderContext
 from gpc_recorder.dsl.session import MicroOpStepState, Session
+from gpc_recorder.dsl.pack import _field_size
 from gpc_recorder.paths import (
     CONTROLLER_STATE_SEQUENCE_FIELDS,
     CONTROLLER_STATE_TICK_FIELDS,
@@ -26,6 +27,8 @@ _UNION_TO_COMMAND: Dict[str, str] = {
     "spi_transfer": "spi_transfer",
     "i2c_write": "i2c_write",
     "var_set": "var_set",
+    "var_mul": "var_mul",
+    "var_add": "var_add",
     "if_condition": "if_condition",
     "move_to_error_state": "move_to_error_state",
     "move_to_emergency_state": "move_to_emergency_state",
@@ -200,6 +203,7 @@ def export_graph(graph: Dict[str, Any]) -> str:
 
 
 def session_to_graph(session: Session) -> Dict[str, Any]:
+    schema = get_schema()
     containers: List[Dict[str, Any]] = []
 
     if session.powerup_steps:
@@ -249,18 +253,33 @@ def session_to_graph(session: Session) -> Dict[str, Any]:
             )
 
     for i, binding in enumerate(session.bindings):
+        fields = dict(binding.field_values)
+        struct_def = schema.command_structs.get(binding.struct_name)
+        if struct_def:
+            for extract_field in binding.extract_fields:
+                field_name = extract_field.get("field_name")
+                if not field_name:
+                    offset = extract_field.get("byte_offset", 0)
+                    cursor = 0
+                    for field in struct_def.fields:
+                        field_size = _field_size(schema, field)
+                        if cursor == offset:
+                            field_name = field.name
+                            break
+                        cursor += field_size
+                if field_name:
+                    fields[f"{field_name}_var_index"] = extract_field["var_index"]
         containers.append(
             {
                 "id": f"command_{i}",
                 "type": "command",
                 "label": _format_command_binding_label(binding.payload_type, binding.field_values),
                 "trigger": binding.payload_type,
-                "fields": binding.field_values,
+                "fields": fields,
                 "steps": _steps_to_commands(binding.steps),
             }
         )
 
-    schema = get_schema()
     for i, tb in enumerate(session.telemetry_bindings):
         struct_def = schema.telemetry_structs.get(tb.struct_name)
         struct_fields = struct_def.fields if struct_def else []

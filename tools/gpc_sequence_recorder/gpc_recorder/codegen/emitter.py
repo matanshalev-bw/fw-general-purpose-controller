@@ -16,29 +16,54 @@ from gpc_recorder.paths import (
 from gpc_recorder.dsl.pack import resolve_array_size
 
 
-def _format_data_array(data: List[int], struct_name: str, field_values: Dict[str, Any], schema) -> str:
+def _enum_byte_init(schema, enum_type: str, wire_byte: int, enum_val: Any) -> str:
+    from gpc_recorder.dsl.pack import _normalize_type
+
+    t = _normalize_type(enum_type)
+    if isinstance(enum_val, str):
+        enum_name = enum_val.split("::")[-1]
+        return f"static_cast<uint8_t>(bluelink::{enum_name})"
+
+    if t in schema.enums:
+        for name, value in schema.enums[t].values.items():
+            if value == enum_val:
+                return f"static_cast<uint8_t>(bluelink::{name})"
+        for ev in schema.enums.values():
+            for name, value in ev.values.items():
+                if value == enum_val:
+                    return f"static_cast<uint8_t>(bluelink::{name})"
+
+    return str(wire_byte)
+
+
+def _format_data_array(
+    data: List[int], struct_name: str, field_values: Dict[str, Any], schema, data_size: int
+) -> str:
     """Format trigger data with static_cast for enum bytes where needed."""
+    if data_size <= 0:
+        return ", ".join(["0"] * 8)
+
     struct_def = schema.command_structs.get(struct_name)
     if not struct_def:
-        return ", ".join(str(b) for b in data)
+        parts = [str(b) for b in data[:data_size]]
+        while len(parts) < 8:
+            parts.append("0")
+        return ", ".join(parts[:8])
 
     parts: List[str] = []
     offset = 0
     for field in struct_def.fields:
         from gpc_recorder.dsl.pack import _field_size, _normalize_type
 
+        if offset >= data_size:
+            break
+
         sz = _field_size(schema, field)
         chunk = data[offset : offset + sz]
         offset += sz
         t = _normalize_type(field.cpp_type)
         if t in schema.enums and len(chunk) == 1:
-            val = chunk[0]
-            enum_val = field_values.get(field.name)
-            if isinstance(enum_val, str):
-                enum_name = enum_val.split("::")[-1]
-            else:
-                enum_name = str(enum_val)
-            parts.append(f"static_cast<uint8_t>(bluelink::{enum_name})")
+            parts.append(_enum_byte_init(schema, t, chunk[0], field_values.get(field.name, chunk[0])))
         else:
             parts.extend(str(b) for b in chunk)
 
@@ -155,8 +180,10 @@ def emit_config_hpp(
                 "payload_type": b["payload_type"],
                 "data_size": b["data_size"],
                 "data_init": _format_data_array(
-                    b["data"], b["struct_name"], b["field_values"], schema
+                    b["data"], b["struct_name"], b["field_values"], schema, b["data_size"]
                 ),
+                "extract_field_count": len(b.get("extract_fields", [])),
+                "extract_fields": b.get("extract_fields", []),
                 "step_count": len(steps_out),
                 "steps": steps_out,
             }

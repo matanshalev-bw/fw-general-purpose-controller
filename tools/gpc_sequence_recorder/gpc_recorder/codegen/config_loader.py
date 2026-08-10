@@ -37,6 +37,8 @@ _OP_TYPE_TO_MEMBER = {
     "SPI_RECEIVE": "spi_receive",
     "I2C_READ": "i2c_read",
     "VAR_SET": "var_set",
+    "VAR_MUL": "var_mul",
+    "VAR_ADD": "var_add",
     "IF_CONDITION": "if_condition",
     "MOVE_TO_ERROR_STATE": "move_to_error_state",
     "MOVE_TO_EMERGENCY_STATE": "move_to_emergency_state",
@@ -237,6 +239,18 @@ def _parse_bindings(block: str, schema: Schema) -> List[BindingState]:
         if struct_name is None:
             raise ValueError(f"No command struct mapped for {payload_type}")
         field_values = unpack_trigger_data(schema, struct_name, data, data_size)
+        extract_fields: List[Dict[str, Any]] = []
+        extract_fields_match = re.search(r"\.extract_fields\s*=\s*\{", binding_inner)
+        if extract_fields_match:
+            extract_inner, _ = _find_braced_block(binding_inner, extract_fields_match.end() - 1)
+            for field_match in re.finditer(r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}", extract_inner):
+                extract_fields.append(
+                    {
+                        "byte_offset": int(field_match.group(1)),
+                        "byte_size": int(field_match.group(2)),
+                        "var_index": int(field_match.group(3)),
+                    }
+                )
         seq_match = re.search(r"\.sequence\s*=\s*\{", binding_inner)
         if not seq_match:
             raise ValueError(f"Binding for {payload_type} missing sequence block")
@@ -249,6 +263,7 @@ def _parse_bindings(block: str, schema: Schema) -> List[BindingState]:
                 field_values=field_values,
                 data=data,
                 data_size=data_size,
+                extract_fields=extract_fields,
                 steps=steps,
             )
         )

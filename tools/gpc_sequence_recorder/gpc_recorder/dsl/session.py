@@ -27,6 +27,7 @@ class BindingState:
     field_values: Dict[str, Any]
     data: List[int]
     data_size: int
+    extract_fields: List[Dict[str, Any]] = field(default_factory=list)
     steps: List[MicroOpStepState] = field(default_factory=list)
 
 
@@ -67,6 +68,7 @@ class Session:
                     "field_values": b.field_values,
                     "data": b.data,
                     "data_size": b.data_size,
+                    "extract_fields": b.extract_fields,
                     "steps": _steps_to_dict(b.steps),
                 }
             )
@@ -79,6 +81,7 @@ class Session:
                     "field_values": cb.field_values,
                     "data": cb.data,
                     "data_size": cb.data_size,
+                    "extract_fields": cb.extract_fields,
                     "steps": _steps_to_dict(cb.steps),
                 }
             )

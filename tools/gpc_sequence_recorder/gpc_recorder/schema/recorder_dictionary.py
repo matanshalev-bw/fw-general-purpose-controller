@@ -51,6 +51,8 @@ _EXAMPLES: Dict[str, str] = {
     "spi_receive": "spi_receive(spi_instance=1, rx_len=3, var_index=0)",
     "i2c_read": "i2c_read(i2c_instance=1, device_addr=0x50, length=2, var_index=0)",
     "var_set": "var_set(var_index=1, value=3343114)  # or value=[0x0A, 0x03, 0x33] (LE → uint64)",
+    "var_mul": "var_mul(dest_var_index=0, src_var_index=0, numerator=1, denominator=10)",
+    "var_add": "var_add(dest_var_index=0, src_var_index=0, addend=5)",
     "if_condition": "if_condition(first_var_index=0, comparing_type=\">=\", second_var_index=1)",
     "end_condition": "end_condition()",
     "move_to_error_state": "move_to_error_state()",
@@ -73,7 +75,7 @@ _DESCRIPTIONS: Dict[str, str] = {
     "clear_state": "Remove the saved one-shot sequence for the given state.",
     "bind_state_tick": "Resume or start a looping tick sequence for MANUAL, ENGAGED, OPERATIONAL, ERROR, or EMERGENCY; appends to existing steps. Use clear_state_tick() to wipe first.",
     "clear_state_tick": "Remove the saved tick sequence for the given state.",
-    "bind_command": "Start a trigger binding: choose payload type and command fields, then append micro-op steps.",
+    "bind_command": "Start a trigger binding: match fields set the trigger bytes; {field}_var_index extracts live payload bytes into a var slot.",
     "bind_telemetry": (
         "Bind periodic telemetry (max 3, payload ≤8 bytes): set rate Hz, telemetry type, "
         "and {field}_var_index for each struct field. Saves immediately (no end_binding)."
@@ -100,6 +102,8 @@ _DESCRIPTIONS: Dict[str, str] = {
         "Set a var slot (0–19) to a uint64: raw integer, or a byte array packed little-endian "
         "the same way COMM RX stores into the var (e.g. [0x0A, 0x03, 0x33] → 0x33030A)."
     ),
+    "var_mul": "Multiply src var by numerator/denominator and store in dest var.",
+    "var_add": "Add addend to src var and store in dest var.",
     "if_condition": "Start a conditional block; compare two var slots (==, !=, >, >=, <, <=).",
     "end_condition": "Close the active if_condition block and record its body step count.",
     "move_to_error_state": "Transition the controller to CONTROLLER_STATE_ERROR.",
@@ -151,6 +155,8 @@ _RECORDER_COMMAND_GROUPS: List[tuple[str, List[str]]] = [
             "spi_receive",
             "i2c_read",
             "var_set",
+            "var_mul",
+            "var_add",
             "if_condition",
             "end_condition",
             "move_to_error_state",

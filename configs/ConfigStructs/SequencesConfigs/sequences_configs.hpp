@@ -11,6 +11,7 @@
 #define MAX_TELEMETRY_BINDINGS 3
 #define MAX_TELEMETRY_FIELD_MAPPINGS 8
 #define MAX_TELEMETRY_PAYLOAD_BYTES 8
+#define MAX_COMMAND_EXTRACT_FIELDS 4
 
 struct BluelinkIdentityConfig {
   uint8_t component_id = 0;
@@ -27,8 +28,16 @@ struct MicroSequence {
   bluelink::MicroOpsPayload::MicroOpStep steps[MICRO_SEQUENCE_MAX_STEPS] = {};
 } __attribute__((packed));
 
+struct CommandExtractField {
+  uint8_t byte_offset = 0;
+  uint8_t byte_size = 0;
+  uint8_t var_index = 0;
+} __attribute__((packed));
+
 struct CommandSequenceBinding {
   CommandTrigger trigger;
+  uint8_t extract_field_count = 0;
+  CommandExtractField extract_fields[MAX_COMMAND_EXTRACT_FIELDS] = {};
   MicroSequence sequence;
 } __attribute__((packed));
 

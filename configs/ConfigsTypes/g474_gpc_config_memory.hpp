@@ -224,17 +224,11 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     .size = 2,
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_RELEASED), 0, 0, 0, 0, 0, 0, 0},
                 },
+                .extract_field_count = 0,
+                .extract_fields = {},
                 .sequence = {
-                    .step_count = 4,
+                    .step_count = 2,
                     .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 0, 1, 3},
-                        },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {1, {0, 0, 0}, 1},
@@ -252,17 +246,11 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     .size = 2,
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_PRESSED), 0, 0, 0, 0, 0, 0, 0},
                 },
+                .extract_field_count = 0,
+                .extract_fields = {},
                 .sequence = {
-                    .step_count = 6,
+                    .step_count = 2,
                     .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 10},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 0, 1, 3},
-                        },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {1, {0, 0, 0}, 3},
@@ -270,14 +258,6 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {2, {0, 0, 0}, 3},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {1000},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 2, 0, 0},
                         },
                     },
                 },

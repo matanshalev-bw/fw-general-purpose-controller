@@ -90,6 +90,8 @@ const FRIENDLY_NAMES = {
   spi_receive: "SPI rx",
   i2c_read: "I2C read",
   var_set: "var set",
+  var_mul: "var mul",
+  var_add: "var add",
   move_to_error_state: "move to error",
   move_to_emergency_state: "move to emergency",
   trigger_safety: "trigger safety",
@@ -151,6 +153,20 @@ function setStatus(msg) {
   document.getElementById("status").textContent = msg;
 }
 
+function showBindModalError(message) {
+  const el = document.getElementById("bind-modal-error");
+  if (!el) return;
+  el.textContent = message;
+  el.hidden = false;
+}
+
+function clearBindModalError() {
+  const el = document.getElementById("bind-modal-error");
+  if (!el) return;
+  el.textContent = "";
+  el.hidden = true;
+}
+
 function formatComponentOptionLabel(item) {
   const name = typeof item === "string" ? item : item.name;
   const value = typeof item === "string" ? null : item.value;
@@ -203,7 +219,13 @@ function formatBindingFieldSummary(fields, maxFields = 4) {
   if (!keys.length) return "";
   const preview = keys
     .slice(0, maxFields)
-    .map((k) => `${k}=${fields[k]}`)
+    .map((k) => {
+      if (k.endsWith("_var_index")) {
+        const base = k.slice(0, -"_var_index".length);
+        return `${base}→var${fields[k]}`;
+      }
+      return `${k}=${fields[k]}`;
+    })
     .join(", ");
   const extra = keys.length > maxFields ? `, +${keys.length - maxFields}` : "";
   return ` (${preview}${extra})`;
@@ -335,11 +357,20 @@ function setBindModalActions(mode) {
   if (btnSave) btnSave.textContent = editing ? "Save" : "Add";
 }
 
-function buildBindCommandFieldHtml(field, value) {
+function isBindCommandEnumField(field) {
+  return !!(field.enum_values && field.enum_values.length);
+}
+
+function buildBindCommandFieldInputHtml(field, isExtract, constVal, extractVal) {
+  if (isExtract && !isBindCommandEnumField(field)) {
+    const varVal = extractVal ?? 0;
+    return `<input id="bind-${field.name}-value" data-field="${field.name}_var_index" type="number" min="0" max="${appState.limits.max_var_slots - 1}" value="${varVal}" />`;
+  }
+
   if (field.enum_values && field.enum_values.length) {
     const first =
       typeof field.enum_values[0] === "string" ? field.enum_values[0] : field.enum_values[0].name;
-    const resolved = value ?? field.default ?? first;
+    const resolved = constVal ?? field.default ?? first;
     const options = field.enum_values
       .map((ev) => {
         const name = typeof ev === "string" ? ev : ev.name;
@@ -347,19 +378,72 @@ function buildBindCommandFieldHtml(field, value) {
         return `<option value="${name}"${selected}>${name}</option>`;
       })
       .join("");
-    return `
-      <div class="field">
-        <label for="bind-${field.name}">${field.name}</label>
-        <select id="bind-${field.name}" data-field="${field.name}" data-is-enum="1">${options}</select>
-      </div>`;
+    return `<select id="bind-${field.name}-value" data-field="${field.name}" data-is-enum="1">${options}</select>`;
   }
 
-  const displayVal = value ?? field.default ?? 0;
-  return `
-    <div class="field">
-      <label for="bind-${field.name}">${field.name}</label>
-      <input id="bind-${field.name}" data-field="${field.name}" value="${displayVal}" />
+  const displayVal = constVal ?? field.default ?? 0;
+  return `<input id="bind-${field.name}-value" data-field="${field.name}" value="${displayVal}" />`;
+}
+
+function buildBindCommandFieldRowHtml(field, existingFields) {
+  const varIndexKey = `${field.name}_var_index`;
+  const isEnum = isBindCommandEnumField(field);
+  const isExtract =
+    !isEnum &&
+    existingFields?.[varIndexKey] !== undefined &&
+    existingFields?.[varIndexKey] !== null &&
+    existingFields?.[varIndexKey] !== "";
+  const constVal = existingFields?.[field.name];
+  const extractVal = existingFields?.[varIndexKey] ?? 0;
+
+  if (isEnum) {
+    return `
+    <div class="field bind-command-field" data-bind-field="${field.name}">
+      <label for="bind-${field.name}-value">${field.name}</label>
+      <div class="bind-field-value" id="bind-${field.name}-value-wrap">
+        ${buildBindCommandFieldInputHtml(field, false, constVal, extractVal)}
+      </div>
     </div>`;
+  }
+
+  return `
+    <div class="field bind-command-field" data-bind-field="${field.name}">
+      <div class="bind-field-header">
+        <label for="bind-${field.name}-value">${field.name}</label>
+        <label class="bind-mode-toggle">
+          <input type="checkbox" id="bind-${field.name}-extract" data-bind-extract="${field.name}"${isExtract ? " checked" : ""} />
+          store to var index
+        </label>
+      </div>
+      <div class="bind-field-value" id="bind-${field.name}-value-wrap">
+        ${buildBindCommandFieldInputHtml(field, isExtract, constVal, extractVal)}
+      </div>
+    </div>`;
+}
+
+function initBindCommandFieldToggles(triggerDef) {
+  const fieldMap = Object.fromEntries((triggerDef?.fields || []).map((f) => [f.name, f]));
+
+  document.querySelectorAll("[data-bind-extract]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const fieldName = cb.dataset.bindExtract;
+      const field = fieldMap[fieldName];
+      if (!field || isBindCommandEnumField(field)) return;
+
+      const wrap = document.getElementById(`bind-${fieldName}-value-wrap`);
+      const currentEl = wrap?.querySelector("[data-field]");
+      let constVal = field.default ?? 0;
+      let extractVal = 0;
+      if (currentEl) {
+        if (cb.checked) {
+          constVal = currentEl.dataset.isEnum === "1" ? currentEl.value : currentEl.value;
+        } else {
+          extractVal = parseInt(currentEl.value, 10) || 0;
+        }
+      }
+      wrap.innerHTML = buildBindCommandFieldInputHtml(field, cb.checked, constVal, extractVal);
+    });
+  });
 }
 
 function makeStateArrow(repeatable, arrowUp) {
@@ -909,6 +993,7 @@ function closeEditor(save) {
 }
 
 function openTelemetryEditor(containerId) {
+  clearBindModalError();
   const container = appState.containers[containerId];
   if (!container) return;
   appState.bindMode = "telemetry-edit";
@@ -926,6 +1011,7 @@ function openTelemetryEditor(containerId) {
 }
 
 function openBindModal(mode) {
+  clearBindModalError();
   appState.bindMode = mode;
   appState.activeContainerId = null;
   document.getElementById("bind-modal-title").textContent =
@@ -951,6 +1037,7 @@ function openBindModal(mode) {
 }
 
 function renderBindForm(existing) {
+  clearBindModalError();
   const form = document.getElementById("bind-form");
   const isCommand = appState.bindMode === "command" || (existing && existing.type === "command");
   const isTelemetry = !isCommand;
@@ -984,16 +1071,16 @@ function renderBindForm(existing) {
   if (triggerDef) {
     const fields = triggerDef.fields || [];
     for (const f of fields) {
-      const key = isTelemetry ? `${f.name}_var_index` : f.name;
-      const val = existing?.fields?.[key] ?? (isTelemetry ? 0 : f.default ?? 0);
+      const varIndexKey = `${f.name}_var_index`;
       if (isTelemetry) {
+        const val = existing?.fields?.[varIndexKey] ?? 0;
         extraFields += `
           <div class="field">
-            <label for="bind-${key}">${f.name} var_index</label>
-            <input id="bind-${key}" data-field="${key}" type="number" min="0" max="${appState.limits.max_var_slots - 1}" value="${val}" />
+            <label for="bind-${varIndexKey}">${f.name} var_index</label>
+            <input id="bind-${varIndexKey}" data-field="${varIndexKey}" type="number" min="0" max="${appState.limits.max_var_slots - 1}" value="${val}" />
           </div>`;
       } else {
-        extraFields += buildBindCommandFieldHtml(f, existing?.fields?.[f.name]);
+        extraFields += buildBindCommandFieldRowHtml(f, existing?.fields || {});
       }
     }
   }
@@ -1007,6 +1094,7 @@ function renderBindForm(existing) {
   `;
 
   document.getElementById("bind-trigger").addEventListener("change", () => {
+    clearBindModalError();
     const trig = document.getElementById("bind-trigger").value;
     const partial = existing ? { ...existing, trigger: trig, fields: {} } : null;
     if (partial) partial.trigger = trig;
@@ -1016,6 +1104,10 @@ function renderBindForm(existing) {
     }
     renderBindForm(partial);
   });
+
+  if (isCommand && triggerDef) {
+    initBindCommandFieldToggles(triggerDef);
+  }
 }
 
 function closeBindModal(save) {
@@ -1029,7 +1121,9 @@ function closeBindModal(save) {
         fields[key] = val;
         return;
       }
-      if (el.type === "number") val = parseInt(val, 10) || 0;
+      if (el.type === "number") {
+        val = parseInt(val, 10) || 0;
+      }
       else if (val === "true" || val === "false") val = val === "true";
       else if (/^\d+$/.test(val)) val = parseInt(val, 10);
       fields[key] = val;
@@ -1038,8 +1132,8 @@ function closeBindModal(save) {
     if (appState.bindMode === "telemetry-edit" && appState.activeContainerId) {
       const fieldCount = Object.keys(fields).length;
       if (fieldCount > appState.limits.max_telemetry_fields) {
-        setStatus(
-          `Cannot save: ${fieldCount} fields, max is ${appState.limits.max_telemetry_fields}`
+        showBindModalError(
+          `Too many telemetry fields (${fieldCount}). Maximum is ${appState.limits.max_telemetry_fields}.`
         );
         return;
       }
@@ -1049,8 +1143,36 @@ function closeBindModal(save) {
       c.fields = fields;
       c.label = `TELEMETRY: ${trigger}`;
     } else if (appState.bindMode === "command") {
+      const triggerDef =
+        appState.bluelinkCommands.find((t) => (t.payload_type || t.name) === trigger) ||
+        appState.bluelinkCommands[0];
+      const enumFieldNames = new Set(
+        (triggerDef?.fields || []).filter(isBindCommandEnumField).map((f) => f.name)
+      );
+      for (const key of Object.keys(fields)) {
+        if (!key.endsWith("_var_index")) continue;
+        const fieldName = key.slice(0, -"_var_index".length);
+        if (enumFieldNames.has(fieldName)) {
+          showBindModalError(
+            `Field '${fieldName}' is an enum and must be a match value. ` +
+              "Only non-enum fields can use 'store to var index'."
+          );
+          return;
+        }
+      }
+      const hasMatchField = Object.keys(fields).some((key) => !key.endsWith("_var_index"));
+      if (!hasMatchField) {
+        showBindModalError(
+          "Cannot add this command binding: every field uses 'store to var index'. " +
+            "Uncheck that box on at least one field (for example brake_mode) and set a match value " +
+            "so the GPC knows when to run this sequence."
+        );
+        return;
+      }
       if (countByType("command") >= appState.limits.max_command_bindings) {
-        setStatus(`No room for more command bindings (max ${appState.limits.max_command_bindings})`);
+        showBindModalError(
+          `No room for more command bindings (maximum is ${appState.limits.max_command_bindings}).`
+        );
         return;
       }
       const id = `command_${appState.commandCounter++}`;
@@ -1064,13 +1186,15 @@ function closeBindModal(save) {
       };
     } else if (appState.bindMode === "telemetry") {
       if (countByType("telemetry") >= appState.limits.max_telemetry_bindings) {
-        setStatus(`No room for more telemetry bindings (max ${appState.limits.max_telemetry_bindings})`);
+        showBindModalError(
+          `No room for more telemetry bindings (maximum is ${appState.limits.max_telemetry_bindings}).`
+        );
         return;
       }
       const fieldCount = Object.keys(fields).length;
       if (fieldCount > appState.limits.max_telemetry_fields) {
-        setStatus(
-          `Cannot add: ${fieldCount} fields, max is ${appState.limits.max_telemetry_fields}`
+        showBindModalError(
+          `Too many telemetry fields (${fieldCount}). Maximum is ${appState.limits.max_telemetry_fields}.`
         );
         return;
       }
@@ -1088,6 +1212,7 @@ function closeBindModal(save) {
     renderBoard();
     setStatus("Binding added");
   }
+  clearBindModalError();
   appState.bindMode = null;
   setBindModalActions(null);
   document.getElementById("bind-modal").classList.remove("open");

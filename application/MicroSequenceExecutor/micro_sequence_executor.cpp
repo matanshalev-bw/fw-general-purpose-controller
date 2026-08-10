@@ -98,6 +98,61 @@ bool MicroSequenceExecutor::executeImmediateOp(const bluelink::MicroOpsPayload::
   return executeStep(step);
 }
 
+bool MicroSequenceExecutor::runSequenceImmediate(const volatile MicroSequence& sequence) {
+  if (sequence.step_count == 0 || sequence.step_count > MICRO_SEQUENCE_MAX_STEPS) {
+    return false;
+  }
+
+  stop();
+  return runStepsImmediate(sequence.steps, sequence.step_count);
+}
+
+bool MicroSequenceExecutor::runStepsImmediate(const volatile bluelink::MicroOpsPayload::MicroOpStep* steps,
+                                            uint8_t step_count) {
+  if (steps == nullptr) {
+    return false;
+  }
+
+  uint8_t step_index = 0;
+  while (step_index < step_count) {
+    bluelink::MicroOpsPayload::MicroOpStep step{};
+    memcpy(&step, const_cast<const void*>(static_cast<const volatile void*>(&steps[step_index])), sizeof(step));
+
+    if (step.op_type == bluelink::MicroOpsPayload::MicroOpType::DELAY_MS) {
+      const auto* delay_op = reinterpret_cast<const bluelink::MicroOpsPayload::MicroDelayMs*>(step.params);
+      SystemInterface::delay(delay_op->delay_ms);
+      step_index++;
+      continue;
+    }
+
+    if (step.op_type == bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION) {
+      const auto* if_op = reinterpret_cast<const bluelink::MicroOpsPayload::MicroIfCondition*>(step.params);
+      if (if_op->first_var_index >= MICRO_VAR_SLOT_COUNT || if_op->second_var_index >= MICRO_VAR_SLOT_COUNT ||
+          if_op->compare_type > static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE) ||
+          var_store_ == nullptr) {
+        return false;
+      }
+      if (step_index + if_op->step_count >= step_count) {
+        return false;
+      }
+      if (not evaluateCondition(*if_op)) {
+        step_index += if_op->step_count + 1;
+        continue;
+      }
+      step_index++;
+      continue;
+    }
+
+    if (not executeStep(step)) {
+      return false;
+    }
+
+    step_index++;
+  }
+
+  return true;
+}
+
 bool MicroSequenceExecutor::start(const volatile MicroSequence& sequence, bool loop_on_complete) {
   if (isRunning()) {
     return false;
@@ -229,6 +284,10 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
       return executeI2cRead(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroI2cRead*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::VAR_SET:
       return executeVarSet(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarSet*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::VAR_MUL:
+      return executeVarMul(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarMul*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::VAR_ADD:
+      return executeVarAdd(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarAdd*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::MOVE_TO_ERROR_STATE:
       return executeMoveToErrorState(
           *reinterpret_cast<const bluelink::MicroOpsPayload::MicroMoveToErrorState*>(step.params));
@@ -469,6 +528,30 @@ bool MicroSequenceExecutor::executeVarSet(const bluelink::MicroOpsPayload::Micro
   }
 
   var_store_->set(op.var_index, op.value);
+  return true;
+}
+
+bool MicroSequenceExecutor::executeVarMul(const bluelink::MicroOpsPayload::MicroVarMul& op) {
+  if (op.dest_var_index >= MICRO_VAR_SLOT_COUNT || op.src_var_index >= MICRO_VAR_SLOT_COUNT ||
+      op.denominator == 0 || var_store_ == nullptr) {
+    return false;
+  }
+
+  const uint64_t src = var_store_->get(op.src_var_index);
+  const uint64_t result = (src * static_cast<uint64_t>(op.numerator)) / static_cast<uint64_t>(op.denominator);
+  var_store_->set(op.dest_var_index, result);
+  return true;
+}
+
+bool MicroSequenceExecutor::executeVarAdd(const bluelink::MicroOpsPayload::MicroVarAdd& op) {
+  if (op.dest_var_index >= MICRO_VAR_SLOT_COUNT || op.src_var_index >= MICRO_VAR_SLOT_COUNT ||
+      var_store_ == nullptr) {
+    return false;
+  }
+
+  const int64_t result =
+      static_cast<int64_t>(var_store_->get(op.src_var_index)) + static_cast<int64_t>(op.addend);
+  var_store_->set(op.dest_var_index, static_cast<uint64_t>(result));
   return true;
 }
 

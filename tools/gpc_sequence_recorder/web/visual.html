@@ -540,6 +540,39 @@
       border-radius: 3px;
       padding: 0.3rem 0.45rem;
     }
+    .bind-command-field .bind-field-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.5rem;
+    }
+    .bind-command-field .bind-field-header > label:first-child {
+      margin-right: 0.15rem;
+    }
+    .bind-command-field .bind-mode-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: #9ab;
+      font-size: 0.75rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .bind-command-field .bind-mode-toggle input {
+      margin: 0;
+      cursor: pointer;
+    }
+    .bind-modal-error {
+      margin: 0 0.75rem 0.5rem;
+      padding: 0.55rem 0.65rem;
+      border-radius: 4px;
+      background: #4a2020;
+      border: 1px solid #c55;
+      color: #fdd;
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
 
     .flash-modal {
       width: min(96vw, 42rem);
@@ -704,6 +737,7 @@
         <button type="button" id="btn-bind-save" class="primary">Add</button>
         <button type="button" id="btn-bind-close">Cancel</button>
       </div>
+      <div id="bind-modal-error" class="bind-modal-error" hidden></div>
       <div class="bind-form" id="bind-form"></div>
     </div>
   </div>

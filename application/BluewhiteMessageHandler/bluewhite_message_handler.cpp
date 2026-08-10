@@ -4,9 +4,32 @@
 
 #include "main.h"
 #include "meta_data.hpp"
+#include "micro_var_store.hpp"
 #include "non_volatile_memory_interface.hpp"
 #include "sequences_configs.hpp"
 #include "system_interface.hpp"
+
+static bool extractCommandFields(MicroVarStore* store, const volatile CommandExtractField* fields, uint8_t count,
+                                 const uint8_t* payload, uint8_t length) {
+  if (store == nullptr || fields == nullptr || payload == nullptr) {
+    return false;
+  }
+
+  for (uint8_t i = 0; i < count && i < MAX_COMMAND_EXTRACT_FIELDS; ++i) {
+    const volatile CommandExtractField& field = fields[i];
+    if (field.byte_size == 0 || field.byte_size > 8 ||
+        static_cast<uint16_t>(field.byte_offset) + field.byte_size > length ||
+        field.var_index >= MICRO_VAR_SLOT_COUNT) {
+      return false;
+    }
+
+    uint64_t value = 0;
+    memcpy(&value, payload + field.byte_offset, field.byte_size);
+    store->set(field.var_index, value);
+  }
+
+  return true;
+}
 
 BluewhiteMessageHandler::BluewhiteMessageHandler(MicroSequenceExecutor* sequence_executor,
                                                    CommCan* comm_for_bootloader,
@@ -176,7 +199,7 @@ bool BluewhiteMessageHandler::tryExecuteMicroCommand(bluelink::PayloadTypeIds pa
 
 bool BluewhiteMessageHandler::tryStartSequenceForMessage(uint8_t payload_type_id, const uint8_t* payload,
                                                          uint8_t length) {
-  if (sequence_executor_ == nullptr || sequence_executor_->isRunning() || payload == nullptr) {
+  if (sequence_executor_ == nullptr || payload == nullptr) {
     return false;
   }
 
@@ -197,7 +220,14 @@ bool BluewhiteMessageHandler::tryStartSequenceForMessage(uint8_t payload_type_id
       continue;
     }
 
-    if (sequence_executor_->start(binding.sequence)) {
+    MicroVarStore* var_store = sequence_executor_->getVarStore();
+    if (binding.extract_field_count > 0) {
+      if (not extractCommandFields(var_store, binding.extract_fields, binding.extract_field_count, payload, length)) {
+        return false;
+      }
+    }
+
+    if (sequence_executor_->runSequenceImmediate(binding.sequence)) {
       return true;
     }
   }

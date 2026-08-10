@@ -119,6 +119,8 @@ def test_round_trip_if_condition_steps(ns, tmp_path):
 def test_schema_includes_new_micro_ops():
     schema = get_schema()
     assert "var_set" in schema.micro_ops
+    assert "var_mul" in schema.micro_ops
+    assert "var_add" in schema.micro_ops
     assert "if_condition" in schema.micro_ops
     assert "end_condition" not in schema.micro_ops
     assert "move_to_error_state" in schema.micro_ops

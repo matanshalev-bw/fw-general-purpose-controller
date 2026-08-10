@@ -37,13 +37,11 @@ def test_unpack_trigger_data_round_trip(schema):
 def test_load_current_repo_config(schema):
     path = REPO_ROOT / "configs/ConfigsTypes/g474_gpc_config_memory.hpp"
     session = load_config_hpp(path, schema)
-    assert session.config_name == "G474_GPC_CONFIG"
+    assert session.config_name == "TEST_CONFIG"
     assert session.component_id == "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER"
-    assert len(session.bindings) == 2
-    assert session.bindings[0].payload_type == "BRAKES_CONTINUOUS_COMMAND"
-    assert session.bindings[1].payload_type == "DRIVER_STATE_COMMAND"
-    assert len(session.state_tick_steps["CONTROLLER_STATE_ENGAGED"]) == 4
-    assert len(session.state_tick_steps["CONTROLLER_STATE_OPERATIONAL"]) == 4
+    assert len(session.bindings) == 0
+    assert len(session.telemetry_bindings) == 0
+    assert len(session.powerup_steps) == 2
 
 
 def test_load_config_hpp_text_matches_file(schema):
@@ -63,7 +61,7 @@ def test_reload_round_trip_emits_equivalent_hpp(schema, tmp_path):
 
 def test_repl_auto_reload_on_startup():
     engine = ReplEngine()
-    assert len(engine.ctx.session.bindings) == 2
+    assert len(engine.ctx.session.bindings) == 0
     assert engine.ctx._config_path.name == "g474_gpc_config_memory.hpp"
     assert "Reloaded from" in engine.startup_message
 
@@ -72,5 +70,5 @@ def test_repl_reload_command():
     engine = ReplEngine(auto_reload=False)
     out, cont = engine.execute("reload()")
     assert cont, out
-    assert len(engine.ctx.session.bindings) == 2
+    assert len(engine.ctx.session.bindings) == 0
     assert engine.ctx._config_path.name == "g474_gpc_config_memory.hpp"

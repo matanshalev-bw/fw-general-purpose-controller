@@ -66,6 +66,8 @@ class RecorderContext:
 
     def bind_command(self, trigger: str, command_struct: Any = None, **kwargs: Any) -> None:
         self._ensure_not_recording("bind_command()")
+        from gpc_recorder.dsl.pack import _field_size, pack_match_trigger_data, _normalize_type
+
         payload_type = trigger.split("::")[-1] if isinstance(trigger, str) else str(trigger)
         if payload_type not in self.schema.payload_type_ids:
             raise ValueError(f"Unknown PayloadTypeIds::{payload_type}")
@@ -74,18 +76,51 @@ class RecorderContext:
         if struct_name is None:
             raise ValueError(f"No command struct mapped for {payload_type}")
 
-        field_values = _extract_struct_fields(command_struct, struct_name, kwargs)
+        raw_fields = _extract_struct_fields(command_struct, struct_name, kwargs)
         struct_def = self.schema.command_structs[struct_name]
-        field_values = fill_struct_fields(self.schema, struct_def, field_values)
-        data, data_size = pack_trigger_data(self.schema, struct_name, field_values)
+
+        extract_field_names: Dict[str, int] = {}
+        match_field_values: Dict[str, Any] = {}
+        for field in struct_def.fields:
+            var_kw = f"{field.name}_var_index"
+            if var_kw in raw_fields:
+                field_type = _normalize_type(field.cpp_type)
+                if field_type in self.schema.enums:
+                    raise ValueError(
+                        f"Field {field.name!r} is an enum and must be used as a match value, "
+                        f"not '{var_kw}' (store to var index is only for non-enum fields)"
+                    )
+                var_index = int(raw_fields.pop(var_kw))
+                validate_var_index(var_index)
+                extract_field_names[field.name] = var_index
+            if field.name in raw_fields:
+                match_field_values[field.name] = raw_fields.pop(field.name)
+
+        if raw_fields:
+            raise ValueError(f"Unknown kwargs: {sorted(raw_fields.keys())}")
+
+        data, data_size, extract_fields = pack_match_trigger_data(
+            self.schema, struct_name, match_field_values, extract_field_names
+        )
+        if data_size == 0:
+            extract_only = sorted(extract_field_names.keys())
+            field_hint = ", ".join(extract_only) if extract_only else "at least one struct field"
+            raise ValueError(
+                f"Cannot save {payload_type} binding: all fields are set to extract-only "
+                f"({field_hint}). Uncheck 'store to var index' on at least one field so the "
+                f"binding has a match/trigger value and the GPC knows when to run the sequence."
+            )
+        field_values = fill_struct_fields(self.schema, struct_def, match_field_values)
         self.session.current_binding = BindingState(
             payload_type=payload_type,
             struct_name=struct_name,
             field_values=field_values,
             data=data,
             data_size=data_size,
+            extract_fields=extract_fields,
         )
-        print(f"Binding started: {payload_type} ({struct_name}), {data_size} bytes packed")
+        extract_msg = f", {len(extract_fields)} extract field(s)" if extract_fields else ""
+        print(f"Binding started: {payload_type} ({struct_name}), {data_size} bytes packed{extract_msg}")
 
     def bind_telemetry(self, rate: int, trigger: str, **kwargs: Any) -> None:
         self._ensure_not_recording("bind_telemetry()")
@@ -356,6 +391,10 @@ class RecorderContext:
             validate_var_index(int(values["first_var_index"]))
         if "second_var_index" in values:
             validate_var_index(int(values["second_var_index"]))
+        if "dest_var_index" in values:
+            validate_var_index(int(values["dest_var_index"]))
+        if "src_var_index" in values:
+            validate_var_index(int(values["src_var_index"]))
         if len(target) >= MICRO_SEQUENCE_MAX_STEPS:
             raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_STEPS} steps per {label}")
         target.append(
@@ -420,7 +459,7 @@ class RecorderContext:
     def pwm_set(
         self,
         frequency_hz: int,
-        duty_percent: int,
+        duty_percent: int = 0,
         use_var: int = 0,
         var_index: int = 0,
     ) -> None:
@@ -510,6 +549,33 @@ class RecorderContext:
                 "var_index": var_index,
                 "reserved": [0, 0, 0],
                 "value": coerce_var_set_value(value),
+            },
+        )
+
+    def var_mul(self, dest_var_index: int, src_var_index: int, numerator: int, denominator: int) -> None:
+        validate_var_index(dest_var_index)
+        validate_var_index(src_var_index)
+        if denominator == 0:
+            raise ValueError("denominator must be non-zero")
+        self._add_step(
+            "var_mul",
+            {
+                "dest_var_index": dest_var_index,
+                "src_var_index": src_var_index,
+                "numerator": int(numerator),
+                "denominator": int(denominator),
+            },
+        )
+
+    def var_add(self, dest_var_index: int, src_var_index: int, addend: int) -> None:
+        validate_var_index(dest_var_index)
+        validate_var_index(src_var_index)
+        self._add_step(
+            "var_add",
+            {
+                "dest_var_index": dest_var_index,
+                "src_var_index": src_var_index,
+                "addend": int(addend),
             },
         )
 
@@ -771,6 +837,8 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "spi_receive": ctx.spi_receive,
         "i2c_read": ctx.i2c_read,
         "var_set": ctx.var_set,
+        "var_mul": ctx.var_mul,
+        "var_add": ctx.var_add,
         "if_condition": ctx.if_condition,
         "end_condition": ctx.end_condition,
         "move_to_error_state": ctx.move_to_error_state,

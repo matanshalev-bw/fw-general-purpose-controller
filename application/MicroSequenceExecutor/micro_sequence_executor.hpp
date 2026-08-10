@@ -26,12 +26,16 @@ class MicroSequenceExecutor {
   void setGpcController(GpcController* gpc_controller);
   void setSafetyFeatures(SafetyFeatures* safety_features);
 
+  MicroVarStore* getVarStore() { return var_store_; }
+  const MicroVarStore* getVarStore() const { return var_store_; }
+
   bool isRunning() const;
   State getState() const;
 
   bool start(const volatile MicroSequence& sequence, bool loop_on_complete = false);
   void stop();
   bool executeImmediateOp(const bluelink::MicroOpsPayload::MicroOpStep& step);
+  bool runSequenceImmediate(const volatile MicroSequence& sequence);
   void tick();
 
  private:
@@ -53,10 +57,13 @@ class MicroSequenceExecutor {
   bool executeSpiReceive(const bluelink::MicroOpsPayload::MicroSpiReceive& op);
   bool executeI2cRead(const bluelink::MicroOpsPayload::MicroI2cRead& op);
   bool executeVarSet(const bluelink::MicroOpsPayload::MicroVarSet& op);
+  bool executeVarMul(const bluelink::MicroOpsPayload::MicroVarMul& op);
+  bool executeVarAdd(const bluelink::MicroOpsPayload::MicroVarAdd& op);
   bool executeMoveToErrorState(const bluelink::MicroOpsPayload::MicroMoveToErrorState& op);
   bool executeMoveToEmergencyState(const bluelink::MicroOpsPayload::MicroMoveToEmergencyState& op);
   bool executeTriggerSafety(const bluelink::MicroOpsPayload::MicroTriggerSafety& op);
   bool evaluateCondition(const bluelink::MicroOpsPayload::MicroIfCondition& op) const;
+  bool runStepsImmediate(const volatile bluelink::MicroOpsPayload::MicroOpStep* steps, uint8_t step_count);
 
   RawCanInterface* raw_can_ = nullptr;
   MicroVarStore* var_store_ = nullptr;

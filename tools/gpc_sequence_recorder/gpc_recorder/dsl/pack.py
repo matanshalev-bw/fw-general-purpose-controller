@@ -218,6 +218,43 @@ def pack_trigger_data(
     return padded, len(raw)
 
 
+def pack_match_trigger_data(
+    schema: Schema,
+    struct_name: str,
+    field_values: Dict[str, Any],
+    extract_field_names: Dict[str, int],
+    size: int = 8,
+) -> Tuple[List[int], int, List[Dict[str, Any]]]:
+    """Pack match-only trigger bytes and build extract field mappings."""
+    struct_def = schema.command_structs[struct_name]
+    match_values = fill_struct_fields(schema, struct_def, field_values)
+    out = bytearray()
+    extract_fields: List[Dict[str, Any]] = []
+    offset = 0
+    for field in struct_def.fields:
+        field_size = _field_size(schema, field)
+        if field.name in extract_field_names:
+            extract_fields.append(
+                {
+                    "field_name": field.name,
+                    "byte_offset": offset,
+                    "byte_size": field_size,
+                    "var_index": extract_field_names[field.name],
+                }
+            )
+        else:
+            out.extend(_pack_field(schema, field, match_values[field.name]))
+        offset += field_size
+
+    raw = bytes(out)
+    if len(raw) > size:
+        raise ValueError(
+            f"{struct_name} match fields pack to {len(raw)} bytes, max trigger data is {size}"
+        )
+    padded = list(raw) + [0] * (size - len(raw))
+    return padded, len(raw), extract_fields
+
+
 def _unpack_field(schema: Schema, field: FieldDef, chunk: bytes) -> Any:
     t = _normalize_type(field.cpp_type)
     if t == "bool":

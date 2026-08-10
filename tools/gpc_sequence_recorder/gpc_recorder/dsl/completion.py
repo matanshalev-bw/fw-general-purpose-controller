@@ -32,6 +32,8 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "spi_receive": ["spi_instance=", "rx_len=", "var_index="],
     "i2c_read": ["i2c_instance=", "device_addr=", "length=", "var_index="],
     "var_set": ["var_index=", "value="],
+    "var_mul": ["dest_var_index=", "src_var_index=", "numerator=", "denominator="],
+    "var_add": ["dest_var_index=", "src_var_index=", "addend="],
     "reload": ["path="],
     "export": ["path="],
 }
