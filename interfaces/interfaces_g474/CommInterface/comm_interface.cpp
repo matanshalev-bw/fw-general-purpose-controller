@@ -426,15 +426,11 @@ InterfaceStatus CommCan::initCanPeripheral(bool perform_reset) {
     }
 
     if (perform_reset) {
-        __HAL_RCC_FDCAN_FORCE_RESET();
-        HAL_Delay(10);
-        __HAL_RCC_FDCAN_RELEASE_RESET();
-
         InterfaceStatus status = static_cast<InterfaceStatus>(HAL_FDCAN_DeInit(fdcan_handler_));
         if (status != InterfaceStatus::INTERFACE_OK) {
             return status;
         }
-        
+
         InterfaceStatus init_status = static_cast<InterfaceStatus>(HAL_FDCAN_Init(fdcan_handler_));
         if (init_status != InterfaceStatus::INTERFACE_OK) {
             return init_status;
@@ -481,10 +477,46 @@ InterfaceStatus CommCan::startPeripheral(CommCanHandle* handler) {
     return static_cast<InterfaceStatus>(HAL_FDCAN_Start(handler));
 }
 
+InterfaceStatus CommCan::initAndStartPeripheral(CommCanHandle* handler) {
+    if (handler == nullptr) {
+        return InterfaceStatus::INTERFACE_ERROR;
+    }
+
+    if (handler->State == HAL_FDCAN_STATE_BUSY) {
+        (void)HAL_FDCAN_AbortTxRequest(handler, FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2);
+        return InterfaceStatus::INTERFACE_OK;
+    }
+
+    if (handler->State != HAL_FDCAN_STATE_READY) {
+        if (HAL_FDCAN_Init(handler) != HAL_OK) {
+            return InterfaceStatus::INTERFACE_ERROR;
+        }
+    }
+
+    InterfaceStatus status = startPeripheral(handler);
+    if (status != InterfaceStatus::INTERFACE_OK) {
+        return status;
+    }
+
+    (void)HAL_FDCAN_AbortTxRequest(handler, FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2);
+    return InterfaceStatus::INTERFACE_OK;
+}
+
 InterfaceStatus CommCan::transmitStandard(CommCanHandle* handler, uint32_t id, const uint8_t* data,
                                           uint8_t dlc) {
     if (handler == nullptr || data == nullptr || dlc == 0 || dlc > 8) {
         return InterfaceStatus::INTERFACE_ERROR;
+    }
+
+    if (handler->State != HAL_FDCAN_STATE_BUSY) {
+        return InterfaceStatus::INTERFACE_ERROR;
+    }
+
+    const uint32_t slot_wait_start = HAL_GetTick();
+    while (HAL_FDCAN_GetTxFifoFreeLevel(handler) == 0U) {
+        if ((HAL_GetTick() - slot_wait_start) >= CAN_TX_TIMEOUT_) {
+            return InterfaceStatus::INTERFACE_ERROR;
+        }
     }
 
     CommCanTxHeader tx_header{};
@@ -513,8 +545,24 @@ InterfaceStatus CommCan::transmitStandard(CommCanHandle* handler, uint32_t id, c
         tx_data[i] = data[i];
     }
 
+    handler->ErrorCode = HAL_FDCAN_ERROR_NONE;
     if (HAL_FDCAN_AddMessageToTxFifoQ(handler, &tx_header, tx_data) != HAL_OK) {
+        if ((handler->ErrorCode & HAL_FDCAN_ERROR_FIFO_FULL) != 0U) {
+            return InterfaceStatus::INTERFACE_BUSY;
+        }
         return InterfaceStatus::INTERFACE_ERROR;
+    }
+
+    const uint32_t tx_buffer = HAL_FDCAN_GetLatestTxFifoQRequestBuffer(handler);
+    if (tx_buffer == 0U) {
+        return InterfaceStatus::INTERFACE_OK;
+    }
+
+    const uint32_t complete_wait_start = HAL_GetTick();
+    while (HAL_FDCAN_IsTxBufferMessagePending(handler, tx_buffer) != 0U) {
+        if ((HAL_GetTick() - complete_wait_start) >= CAN_TX_TIMEOUT_) {
+            return InterfaceStatus::INTERFACE_ERROR;
+        }
     }
 
     return InterfaceStatus::INTERFACE_OK;

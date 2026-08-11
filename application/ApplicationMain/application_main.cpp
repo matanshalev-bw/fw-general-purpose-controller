@@ -44,10 +44,7 @@ void applicationInit(void) {
 
   g_sequence_executor = std::make_unique<MicroSequenceExecutor>();
   g_gpc_controller = std::make_unique<GpcController>();
-  g_raw_can = std::make_unique<RawCanInterface>(&hfdcan3);
-  g_sequence_executor->setRawCanInterface(g_raw_can.get());
   g_sequence_executor->setVarStore(g_var_store.get());
-  g_gpc_controller->setRawCanInterface(g_raw_can.get());
   g_gpc_controller->setVarStore(g_var_store.get());
   g_sequence_executor->setGpcController(g_gpc_controller.get());
   g_sequence_executor->setSafetyFeatures(g_safety_features.get());
@@ -73,6 +70,9 @@ void applicationInit(void) {
 
   g_bluewhite_can =
       std::make_unique<BluewhiteCanComm>(&hfdcan2, g_sequence_executor.get(), g_gpc_controller.get());
+  g_raw_can = std::make_unique<RawCanInterface>(&hfdcan3);
+  g_sequence_executor->setRawCanInterface(g_raw_can.get());
+  g_gpc_controller->setRawCanInterface(g_raw_can.get());
   g_bluewhite_usb = std::make_unique<BluewhiteUsbComm>(g_sequence_executor.get(), g_bluewhite_can->bootloaderComm(),
                                                       g_gpc_controller.get());
   g_bluewhite_usb->initialize();

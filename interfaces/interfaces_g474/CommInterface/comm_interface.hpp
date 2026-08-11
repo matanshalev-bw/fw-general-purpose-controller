@@ -243,6 +243,7 @@ class CommCan : public CommInterface {
   };
 
   static InterfaceStatus startPeripheral(CommCanHandle* handler);
+  static InterfaceStatus initAndStartPeripheral(CommCanHandle* handler);
   static InterfaceStatus transmitStandard(CommCanHandle* handler, uint32_t id, const uint8_t* data,
                                           uint8_t dlc);
   // dlc: in = max bytes to copy (1..8), out = actual bytes copied from matching frame.

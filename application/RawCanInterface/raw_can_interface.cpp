@@ -3,7 +3,7 @@
 #include "comm_interface.hpp"
 
 RawCanInterface::RawCanInterface(CommCanHandle* fdcan_handler) : handler_(fdcan_handler) {
-  CommCan::startPeripheral(handler_);
+  CommCan::initAndStartPeripheral(handler_);
 }
 
 InterfaceStatus RawCanInterface::transmitStandard(uint32_t id, const uint8_t* data, uint8_t dlc) {
