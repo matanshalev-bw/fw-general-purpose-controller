@@ -205,7 +205,11 @@ class Schema:
             try:
                 size = struct_packed_size(self, struct_def)
             except ValueError:
-                continue
+                # BrakesTelemetry embeds BrakesActuatorTelemetry; GPC lite configs publish
+                # only the first four scalar bytes (modes + percentages).
+                if name != "BrakesTelemetry":
+                    continue
+                size = 4
             self.telemetry_structs[name] = struct_def
             self.telemetry_struct_sizes[name] = size
             pid = _struct_name_to_telemetry_payload_id(name, self.payload_type_ids)
