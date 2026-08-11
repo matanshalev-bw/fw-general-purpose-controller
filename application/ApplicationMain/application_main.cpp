@@ -70,12 +70,13 @@ void applicationInit(void) {
 
   g_bluewhite_can =
       std::make_unique<BluewhiteCanComm>(&hfdcan2, g_sequence_executor.get(), g_gpc_controller.get());
-  g_raw_can = std::make_unique<RawCanInterface>(&hfdcan3);
-  g_sequence_executor->setRawCanInterface(g_raw_can.get());
-  g_gpc_controller->setRawCanInterface(g_raw_can.get());
   g_bluewhite_usb = std::make_unique<BluewhiteUsbComm>(g_sequence_executor.get(), g_bluewhite_can->bootloaderComm(),
                                                       g_gpc_controller.get());
   g_bluewhite_usb->initialize();
+
+  g_raw_can = std::make_unique<RawCanInterface>(&hfdcan3);
+  g_sequence_executor->setRawCanInterface(g_raw_can.get());
+  g_gpc_controller->setRawCanInterface(g_raw_can.get());
 
   g_telemetry_sender = std::make_unique<GpcTelemetrySender>();
   g_telemetry_sender->initialize(g_var_store.get(), g_bluewhite_can.get(), g_bluewhite_usb.get(),

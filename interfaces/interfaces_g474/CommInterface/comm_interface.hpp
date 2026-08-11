@@ -196,16 +196,24 @@ class CommCan : public CommInterface {
   CommCanHandle* fdcan_handler_;
   CommCanTxHeader tx_header_{};
 
-  static CommCanRxHeader interrupt_rx_header_;
-  static uint8_t interrupt_rx_buffer_[CAN_RX_BUFFER_SIZE_];
+  CommCanRxHeader interrupt_rx_header_{};
+  uint8_t interrupt_rx_buffer_[CAN_RX_BUFFER_SIZE_] = {0};
 
-  static CanState can_state_;
-  static uint8_t consecutive_error_count_;
-  static uint32_t last_error_time_;
-  static CommCan* can_instance_;
-  
-  static bool tx_fifo_ready_;
-  static uint32_t tx_timeout_start_;
+  CanState can_state_ = CanState::INIT;
+  uint8_t consecutive_error_count_ = 0;
+  uint32_t last_error_time_ = 0;
+
+  bool tx_fifo_ready_ = true;
+  uint32_t tx_timeout_start_ = 0;
+
+  void (*tx_complete_callback_)() = nullptr;
+  void (*rx_message_callback_)(const CommCanRxHeader&, const uint8_t*, uint8_t) = nullptr;
+
+  static CommCan* registered_instances_[2];
+  static uint8_t registered_instance_count_;
+
+  static void registerInstance(CommCan* instance);
+  static void unregisterInstance(CommCan* instance);
 
  public:
   enum class CanFilterMode : uint32_t {
@@ -243,7 +251,7 @@ class CommCan : public CommInterface {
   };
 
   static InterfaceStatus startPeripheral(CommCanHandle* handler);
-  static InterfaceStatus initAndStartPeripheral(CommCanHandle* handler);
+  static InterfaceStatus activateNotifications(CommCanHandle* handler, uint32_t notification_mask);
   static InterfaceStatus transmitStandard(CommCanHandle* handler, uint32_t id, const uint8_t* data,
                                           uint8_t dlc);
   // dlc: in = max bytes to copy (1..8), out = actual bytes copied from matching frame.
@@ -262,7 +270,7 @@ class CommCan : public CommInterface {
     tx_header_.MessageMarker = 0;
 
     initCanPeripheral(perform_reset);
-    can_instance_ = this;
+    registerInstance(this);
   }
 
   inline bool isCanReady() const { return can_state_ == CanState::READY; }
@@ -302,12 +310,12 @@ class CommCan : public CommInterface {
   void handleInterruptRxMessage();
   void setTransmitComplete();
   void processRxFifo(uint32_t fifo_number);
-  
-  static void (*tx_complete_callback_)();
+
   void setTxCompleteCallback(void (*callback)()) { tx_complete_callback_ = callback; }
-  
-  static void (*rx_message_callback_)(const CommCanRxHeader&, const uint8_t*, uint8_t);
-  void setRxMessageCallback(void (*callback)(const CommCanRxHeader&, const uint8_t*, uint8_t)) { rx_message_callback_ = callback; }
+
+  void setRxMessageCallback(void (*callback)(const CommCanRxHeader&, const uint8_t*, uint8_t)) {
+    rx_message_callback_ = callback;
+  }
 
  private:
   InterfaceStatus initCanPeripheral(bool perform_reset = true);

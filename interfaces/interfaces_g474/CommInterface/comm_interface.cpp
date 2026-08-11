@@ -406,19 +406,35 @@ bool CommSpi::isErrorThresholdExceeded() const {
 
 ///////////////////////////////// CAN  /////////////////////////////////
 
-CommCanRxHeader CommCan::interrupt_rx_header_{};
-uint8_t CommCan::interrupt_rx_buffer_[CAN_RX_BUFFER_SIZE_] = {0};
+CommCan* CommCan::registered_instances_[2] = {nullptr, nullptr};
+uint8_t CommCan::registered_instance_count_ = 0;
 
-CommCan::CanState CommCan::can_state_ = CanState::INIT;
-uint8_t CommCan::consecutive_error_count_ = 0;
-uint32_t CommCan::last_error_time_ = 0;
-CommCan* CommCan::can_instance_ = nullptr;
+void CommCan::registerInstance(CommCan* instance) {
+    if (instance == nullptr || registered_instance_count_ >= 2U) {
+        return;
+    }
 
-bool CommCan::tx_fifo_ready_ = true;
-uint32_t CommCan::tx_timeout_start_ = 0;
+    for (uint8_t i = 0; i < registered_instance_count_; ++i) {
+        if (registered_instances_[i] == instance) {
+            return;
+        }
+    }
 
-void (*CommCan::tx_complete_callback_)() = nullptr;
-void (*CommCan::rx_message_callback_)(const CommCanRxHeader&, const uint8_t*, uint8_t) = nullptr;
+    registered_instances_[registered_instance_count_++] = instance;
+}
+
+void CommCan::unregisterInstance(CommCan* instance) {
+    for (uint8_t i = 0; i < registered_instance_count_; ++i) {
+        if (registered_instances_[i] != instance) {
+            continue;
+        }
+
+        registered_instances_[i] = registered_instances_[registered_instance_count_ - 1U];
+        registered_instances_[registered_instance_count_ - 1U] = nullptr;
+        --registered_instance_count_;
+        return;
+    }
+}
 
 InterfaceStatus CommCan::initCanPeripheral(bool perform_reset) {
     if (fdcan_handler_ == nullptr) {
@@ -426,6 +442,10 @@ InterfaceStatus CommCan::initCanPeripheral(bool perform_reset) {
     }
 
     if (perform_reset) {
+        if (fdcan_handler_->State == HAL_FDCAN_STATE_BUSY) {
+            HAL_FDCAN_Stop(fdcan_handler_);
+        }
+
         InterfaceStatus status = static_cast<InterfaceStatus>(HAL_FDCAN_DeInit(fdcan_handler_));
         if (status != InterfaceStatus::INTERFACE_OK) {
             return status;
@@ -477,29 +497,12 @@ InterfaceStatus CommCan::startPeripheral(CommCanHandle* handler) {
     return static_cast<InterfaceStatus>(HAL_FDCAN_Start(handler));
 }
 
-InterfaceStatus CommCan::initAndStartPeripheral(CommCanHandle* handler) {
+InterfaceStatus CommCan::activateNotifications(CommCanHandle* handler, uint32_t notification_mask) {
     if (handler == nullptr) {
         return InterfaceStatus::INTERFACE_ERROR;
     }
 
-    if (handler->State == HAL_FDCAN_STATE_BUSY) {
-        (void)HAL_FDCAN_AbortTxRequest(handler, FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2);
-        return InterfaceStatus::INTERFACE_OK;
-    }
-
-    if (handler->State != HAL_FDCAN_STATE_READY) {
-        if (HAL_FDCAN_Init(handler) != HAL_OK) {
-            return InterfaceStatus::INTERFACE_ERROR;
-        }
-    }
-
-    InterfaceStatus status = startPeripheral(handler);
-    if (status != InterfaceStatus::INTERFACE_OK) {
-        return status;
-    }
-
-    (void)HAL_FDCAN_AbortTxRequest(handler, FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2);
-    return InterfaceStatus::INTERFACE_OK;
+    return static_cast<InterfaceStatus>(HAL_FDCAN_ActivateNotification(handler, notification_mask, 0));
 }
 
 InterfaceStatus CommCan::transmitStandard(CommCanHandle* handler, uint32_t id, const uint8_t* data,
@@ -541,9 +544,7 @@ InterfaceStatus CommCan::transmitStandard(CommCanHandle* handler, uint32_t id, c
     tx_header.MessageMarker = 0;
 
     uint8_t tx_data[8] = {};
-    for (uint8_t i = 0; i < dlc; ++i) {
-        tx_data[i] = data[i];
-    }
+    memcpy(tx_data, data, dlc);
 
     handler->ErrorCode = HAL_FDCAN_ERROR_NONE;
     if (HAL_FDCAN_AddMessageToTxFifoQ(handler, &tx_header, tx_data) != HAL_OK) {
@@ -686,7 +687,7 @@ InterfaceStatus CommCan::startTransmitInterrupt(const uint8_t* data, const uint1
 }
 
 InterfaceStatus CommCan::deInit() {
-    can_instance_ = nullptr;
+    unregisterInstance(this);
 
     InterfaceStatus status = static_cast<InterfaceStatus>(HAL_FDCAN_Stop(fdcan_handler_));
     if (status != InterfaceStatus::INTERFACE_OK) {
@@ -881,8 +882,18 @@ bool CommCan::isErrorThresholdExceeded() const {
 }
 
 CommCan* CommCan::getInstance(CommCanHandle* handle) {
-    (void)handle;
-    return can_instance_;
+    if (handle == nullptr) {
+        return nullptr;
+    }
+
+    for (uint8_t i = 0; i < registered_instance_count_; ++i) {
+        CommCan* instance = registered_instances_[i];
+        if (instance != nullptr && instance->fdcan_handler_ == handle) {
+            return instance;
+        }
+    }
+
+    return nullptr;
 }
 
 InterfaceStatus CommCan::configPayloadTypeFilters(uint32_t destination_id, const uint8_t* payload_types, uint8_t payload_count, bool use_fifo1, uint32_t start_filter_index) {
