@@ -11,16 +11,12 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
         .type = ConfigTypeEnum::GPC_CONFIG,
     },
     .bluelink_identity_config = {
-        .component_id = bluelink::ComponentId::COMPONENT_ID_HANDBRAKE_CONTROLLER,
+        .component_id = bluelink::ComponentId::COMPONENT_ID_BRAKES_CONTROLLER,
     },
     .sequences_config = {
         .powerup_sequence = {
-            .step_count = 1,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::MOVE_TO_ERROR_STATE,
-                            .move_to_error_state = {{0, 0, 0, 0}},
-                        },
             },
         },
         .main_tick_sequence = {
@@ -29,67 +25,31 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .init_state_sequence = {
-            .step_count = 15,
+            .step_count = 6,
             .steps = {
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
-                            .uart_transmit = {1, 8, {105, 110, 105, 116, 32, 0, 0, 0}},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {10, {0, 0, 0}, 0},
                         },
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {11, {0, 0, 0}, 33},
                         },
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {12, {0, 0, 0}, 66},
                         },
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {13, {0, 0, 0}, 100},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
+                            .delay_ms = {1000},
                         },
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {200},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 2, 0x0, {0x1, 0x20, 0, 0, 0, 0, 0, 0}},
                         },
             },
         },
@@ -99,124 +59,48 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .disengagement_state_sequence = {
-            .step_count = 2,
+            .step_count = 1,
             .steps = {
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
-                            .uart_transmit = {1, 8, {100, 105, 115, 101, 110, 103, 32, 0}},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0x2, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
                         },
             },
         },
         .engaged_state_tick_sequence = {
-            .step_count = 5,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {2000},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {500},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
-                            .uart_transmit = {1, 8, {101, 110, 103, 97, 103, 101, 32, 0}},
-                        },
             },
         },
         .power_up_bit_state_sequence = {
-            .step_count = 1,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
-                            .uart_transmit = {1, 8, {112, 111, 119, 101, 114, 117, 112, 32}},
-                        },
             },
         },
         .operational_state_tick_sequence = {
-            .step_count = 5,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {500},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
-                            .uart_transmit = {1, 8, {111, 112, 101, 114, 32, 0, 0, 0}},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {500},
-                        },
             },
         },
         .error_state_tick_sequence = {
-            .step_count = 5,
+            .step_count = 1,
             .steps = {
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 0},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {500},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE,
-                            .digital_gpio_write = {2, 15, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {500},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT,
-                            .uart_transmit = {1, 8, {101, 114, 114, 111, 114, 32, 0, 0}},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0x3, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
                         },
             },
         },
         .emergency_state_tick_sequence = {
-            .step_count = 4,
+            .step_count = 1,
             .steps = {
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {10, {0, 0, 0}, 10},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {3, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LT), 10, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, 10},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::PWM_SET,
-                            .pwm_set = {40, 0, 1, 3},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0x2, 0xFB, 0xFA, 0xC8, 0, 0, 0, 0}},
                         },
             },
         },
-        .binding_count = 2,
+        .binding_count = 3,
         .bindings = {
             {
                 .trigger = {
@@ -227,15 +111,19 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                 .extract_field_count = 0,
                 .extract_fields = {},
                 .sequence = {
-                    .step_count = 2,
+                    .step_count = 3,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {1, {0, 0, 0}, 1},
+                            .var_set = {0, {0, 0, 0}, 1},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {2, {0, 0, 0}, 1},
+                            .var_set = {1, {0, 0, 0}, 0},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0x2, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
                         },
                     },
                 },
@@ -249,33 +137,83 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                 .extract_field_count = 0,
                 .extract_fields = {},
                 .sequence = {
-                    .step_count = 2,
+                    .step_count = 3,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {1, {0, 0, 0}, 3},
+                            .var_set = {0, {0, 0, 0}, 3},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {2, {0, 0, 0}, 3},
+                            .var_set = {1, {0, 0, 0}, 100},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0x1, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
+                        },
+                    },
+                },
+            },
+            {
+                .trigger = {
+                    .payload_type = bluelink::PayloadTypeIds::BRAKES_CONTINUOUS_COMMAND,
+                    .size = 1,
+                    .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_ARMED), 0, 0, 0, 0, 0, 0, 0},
+                },
+                .extract_field_count = 1,
+                .extract_fields = {
+                    { 1, 1, 1 },
+                },
+                .sequence = {
+                    .step_count = 10,
+                    .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {0, {0, 0, 0}, 2},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE), 10, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0x2, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::GE), 13, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0x1, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE), 11, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0xE9, 0, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE), 12, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0xD2, 0x1, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0xBC, 0x2, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0}},
                         },
                     },
                 },
             },
         },
         .telemetry_config = {
-            .binding_count = 1,
+            .binding_count = 0,
             .bindings = {
-            {
-                .payload_type = bluelink::PayloadTypeIds::HANDBRAKE_TELEMETRY,
-                .payload_size = 2,
-                .rate_hz = 1,
-                .field_count = 2,
-                .fields = {
-                    { 0, 1, 1 },
-                    { 1, 1, 2 },
-                },
-            },
             },
         },
     },
