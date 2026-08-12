@@ -20,12 +20,20 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .main_tick_sequence = {
-            .step_count = 0,
+            .step_count = 2,
             .steps = {
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 1, 0x701, {0x5, 0, 0, 0, 0, 0, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {100},
+                        },
             },
         },
         .init_state_sequence = {
-            .step_count = 6,
+            .step_count = 18,
             .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
@@ -49,7 +57,55 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 2, 0x0, {0x80, 0x20, 0, 0, 0, 0, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {50},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x620, {0x2B, 0x15, 0x10, 0, 0xD0, 0x7, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {50},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x620, {0x23, 0x16, 0x10, 0x1, 0xF4, 0x1, 0x1, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {50},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x620, {0x2B, 0, 0x18, 0x5, 0x32, 0, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {50},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x620, {0x2B, 0, 0x40, 0x8, 0xBC, 0x2, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {50},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
                             .can_transmit = {1, 2, 0x0, {0x1, 0x20, 0, 0, 0, 0, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
+                            .delay_ms = {50},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
+                            .can_transmit = {1, 8, 0x220, {0x3, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
                         },
             },
         },
