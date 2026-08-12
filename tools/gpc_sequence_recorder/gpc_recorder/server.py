@@ -28,6 +28,7 @@ from gpc_recorder.graph_api import (
     list_example_configs,
     load_graph_from_config,
     resolve_example_path,
+    save_example_graph,
 )
 from gpc_recorder.schema.dictionary import bluelink_commands_dictionary
 from gpc_recorder.schema.recorder_dictionary import recorder_commands_dictionary
@@ -277,6 +278,25 @@ async def usb_log_ws(websocket: WebSocket) -> None:
 async def graph_examples() -> dict:
     try:
         return {"ok": True, "examples": list_example_configs()}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/graph/examples/save")
+async def graph_examples_save(body: dict) -> dict:
+    graph = body.get("graph")
+    example = body.get("example")
+    if graph is None:
+        return {"ok": False, "error": "Missing graph"}
+    if not example or not isinstance(example, str):
+        return {"ok": False, "error": "Missing example"}
+    try:
+        text = save_example_graph(graph, example)
+        _repl.ctx.session = build_context_from_graph(graph).session
+        path = resolve_example_path(example)
+        return {"ok": True, "path": str(path), "example": example, "hpp": text}
+    except (FileNotFoundError, ValueError) as e:
+        return {"ok": False, "error": str(e)}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

@@ -141,6 +141,47 @@ def test_load_graph_from_example(tmp_path):
     assert graph["config"]["component"] == "COMPONENT_ID_THROTTLE_CONTROLLER"
 
 
+def test_save_example_graph_writes_hpp(tmp_path):
+    from gpc_recorder.graph_api import save_example_graph
+
+    path = tmp_path / "throttle_config.hpp"
+    path.write_text(_MINIMAL_HPP)
+    graph = {
+        "config": {
+            "name": "SAVED_EXAMPLE",
+            "component": "COMPONENT_ID_THROTTLE_CONTROLLER",
+        },
+        "containers": [
+            {
+                "id": "powerup",
+                "type": "powerup",
+                "steps": [
+                    {"command": "delay_ms", "args": {"delay_ms": 25}},
+                ],
+            }
+        ],
+    }
+    text = save_example_graph(graph, "throttle_config.hpp", tmp_path)
+    assert "SAVED_EXAMPLE" in text
+    assert "COMPONENT_ID_THROTTLE_CONTROLLER" in text
+    assert "DELAY_MS" in path.read_text()
+    assert "25" in path.read_text()
+
+
+def test_save_example_graph_rejects_unknown(tmp_path):
+    from gpc_recorder.graph_api import save_example_graph
+
+    with pytest.raises(FileNotFoundError):
+        save_example_graph(
+            {
+                "config": {"name": "X", "component": "COMPONENT_ID_THROTTLE_CONTROLLER"},
+                "containers": [],
+            },
+            "missing_config.hpp",
+            tmp_path,
+        )
+
+
 def test_repo_examples_dir_has_expected_files():
     names = list_example_configs(EXAMPLES_DIR)
     assert "brakes_config.hpp" in names

@@ -135,6 +135,7 @@ const appState = {
   bindMode: null,
   commandCounter: 0,
   telemetryCounter: 0,
+  loadedExample: null,
   limits: {
     max_steps: 30,
     max_command_bindings: 16,
@@ -1305,6 +1306,21 @@ function applyLoadedGraph(graph) {
   renderBoard();
 }
 
+function updateSaveExampleButton() {
+  const btn = document.getElementById("btn-save-example");
+  if (!btn) return;
+  const name = appState.loadedExample;
+  btn.disabled = !name;
+  btn.title = name
+    ? `Save current graph to examples/${name}`
+    : "Load an example first to enable Save example";
+}
+
+function setLoadedExample(name) {
+  appState.loadedExample = name || null;
+  updateSaveExampleButton();
+}
+
 async function loadGraph(exampleName) {
   const isExample = typeof exampleName === "string" && exampleName.length > 0;
   setStatus(isExample ? `Loading example ${exampleName}…` : "Loading config…");
@@ -1318,11 +1334,34 @@ async function loadGraph(exampleName) {
     return;
   }
   applyLoadedGraph(data.graph);
+  setLoadedExample(isExample ? exampleName : null);
   if (isExample) {
     setStatus(`Loaded example ${exampleName}`);
   } else {
     setStatus(`Loaded ${(data.graph.containers || []).length} container(s)`);
   }
+}
+
+async function saveExample() {
+  const name = appState.loadedExample;
+  if (!name) {
+    setStatus("No example loaded — pick one from Examples first");
+    return;
+  }
+  syncConfigFromControls();
+  const graph = buildGraphPayload();
+  setStatus(`Saving example ${name}…`);
+  const res = await fetch("/api/graph/examples/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ graph, example: name }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    setStatus(`Save example failed: ${data.error}`);
+    return;
+  }
+  setStatus(`Saved example ${name}`);
 }
 
 function closeExamplesMenu() {
@@ -1786,6 +1825,7 @@ function wireEvents() {
     e.stopPropagation();
     toggleExamplesMenu();
   });
+  document.getElementById("btn-save-example").addEventListener("click", saveExample);
   document.addEventListener("click", (e) => {
     const wrap = document.querySelector(".examples-wrap");
     if (wrap && !wrap.contains(e.target)) closeExamplesMenu();
@@ -1794,6 +1834,7 @@ function wireEvents() {
     if (e.key === "Escape") closeExamplesMenu();
   });
   document.getElementById("btn-export").addEventListener("click", exportGraph);
+  updateSaveExampleButton();
   document.getElementById("btn-flash").addEventListener("click", flashConfig);
   document.getElementById("btn-flash-close").addEventListener("click", closeFlashModal);
   document.getElementById("btn-modal-save").addEventListener("click", () => closeEditor(true));

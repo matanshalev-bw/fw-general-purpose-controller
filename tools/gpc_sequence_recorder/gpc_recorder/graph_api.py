@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from gpc_recorder.codegen.config_loader import load_config_hpp
+from gpc_recorder.codegen.emitter import emit_config_hpp
 from gpc_recorder.dsl.builtins import RecorderContext
 from gpc_recorder.dsl.session import MicroOpStepState, Session
 from gpc_recorder.dsl.pack import _field_size
@@ -344,3 +345,14 @@ def resolve_example_path(name: str, examples_dir: Optional[Path] = None) -> Path
     if not path.is_file():
         raise FileNotFoundError(f"Example not found: {name}")
     return path
+
+
+def save_example_graph(
+    graph: Dict[str, Any],
+    name: str,
+    examples_dir: Optional[Path] = None,
+) -> str:
+    """Write graph as HPP into an existing example file (does not touch live export/bin)."""
+    path = resolve_example_path(name, examples_dir)
+    ctx = build_context_from_graph(graph)
+    return emit_config_hpp(ctx.session.to_dict(), ctx.schema, path, write=True)
