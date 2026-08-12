@@ -1305,16 +1305,80 @@ function applyLoadedGraph(graph) {
   renderBoard();
 }
 
-async function loadGraph() {
-  setStatus("Loading config…");
-  const res = await fetch("/api/graph/load");
+async function loadGraph(exampleName) {
+  const isExample = typeof exampleName === "string" && exampleName.length > 0;
+  setStatus(isExample ? `Loading example ${exampleName}…` : "Loading config…");
+  const url = isExample
+    ? `/api/graph/load?example=${encodeURIComponent(exampleName)}`
+    : "/api/graph/load";
+  const res = await fetch(url);
   const data = await res.json();
   if (!data.ok) {
     setStatus(`Load failed: ${data.error}`);
     return;
   }
   applyLoadedGraph(data.graph);
-  setStatus(`Loaded ${(data.graph.containers || []).length} container(s)`);
+  if (isExample) {
+    setStatus(`Loaded example ${exampleName}`);
+  } else {
+    setStatus(`Loaded ${(data.graph.containers || []).length} container(s)`);
+  }
+}
+
+function closeExamplesMenu() {
+  const menu = document.getElementById("examples-menu");
+  const btn = document.getElementById("btn-examples");
+  if (!menu || !btn) return;
+  menu.classList.remove("open");
+  menu.hidden = true;
+  btn.setAttribute("aria-expanded", "false");
+}
+
+function openExamplesMenu() {
+  const menu = document.getElementById("examples-menu");
+  const btn = document.getElementById("btn-examples");
+  if (!menu || !btn) return;
+  menu.hidden = false;
+  menu.classList.add("open");
+  btn.setAttribute("aria-expanded", "true");
+}
+
+async function toggleExamplesMenu() {
+  const menu = document.getElementById("examples-menu");
+  if (!menu) return;
+  if (menu.classList.contains("open")) {
+    closeExamplesMenu();
+    return;
+  }
+  setStatus("Loading examples…");
+  const res = await fetch("/api/graph/examples");
+  const data = await res.json();
+  if (!data.ok) {
+    setStatus(`Examples failed: ${data.error}`);
+    return;
+  }
+  const examples = data.examples || [];
+  menu.innerHTML = "";
+  if (!examples.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "No examples found";
+    menu.appendChild(empty);
+  } else {
+    for (const name of examples) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.role = "option";
+      item.textContent = name;
+      item.addEventListener("click", async () => {
+        closeExamplesMenu();
+        await loadGraph(name);
+      });
+      menu.appendChild(item);
+    }
+  }
+  openExamplesMenu();
+  setStatus("Ready");
 }
 
 async function exportGraph() {
@@ -1717,7 +1781,18 @@ async function usbSendController() {
 function wireEvents() {
   document.getElementById("config-name")?.addEventListener("change", syncConfigFromControls);
   document.getElementById("config-component")?.addEventListener("change", syncConfigFromControls);
-  document.getElementById("btn-load").addEventListener("click", loadGraph);
+  document.getElementById("btn-load").addEventListener("click", () => loadGraph());
+  document.getElementById("btn-examples").addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleExamplesMenu();
+  });
+  document.addEventListener("click", (e) => {
+    const wrap = document.querySelector(".examples-wrap");
+    if (wrap && !wrap.contains(e.target)) closeExamplesMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeExamplesMenu();
+  });
   document.getElementById("btn-export").addEventListener("click", exportGraph);
   document.getElementById("btn-flash").addEventListener("click", flashConfig);
   document.getElementById("btn-flash-close").addEventListener("click", closeFlashModal);

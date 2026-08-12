@@ -69,6 +69,9 @@ else:
     STM32CUBEIDE_WORKSPACE = REPO_ROOT / "out/stm32cubeide-ws"
     STM32CUBEIDE_ECLIPSE_CONFIG = REPO_ROOT / "out/stm32cubeide-eclipse-config"
 
+# Always read example configs from the repo (not the user-data export cache).
+EXAMPLES_DIR = REPO_ROOT / "configs/ConfigsTypes/examples"
+
 CMAKE_CONFIG_PRESET = "config-g474.Debug"
 
 PROGRAMMER_DIR = _INSTALLED_BIN_DIR if _repo_is_installed_read_only() else REPO_ROOT / "programmer/g474"

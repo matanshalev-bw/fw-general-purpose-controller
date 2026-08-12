@@ -70,6 +70,42 @@
     .actions button.flash { background: #388a34; }
     .actions button.flash:hover { background: #46a042; }
     .actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .examples-wrap { position: relative; display: inline-flex; }
+    .examples-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 14rem;
+      max-height: 16rem;
+      overflow: auto;
+      background: #2d2d2d;
+      border: 1px solid #555;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      z-index: 40;
+      padding: 0.25rem 0;
+    }
+    .examples-menu.open { display: block; }
+    .examples-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      color: #ddd;
+      border: none;
+      border-radius: 0;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.82rem;
+      font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+      cursor: pointer;
+    }
+    .examples-menu button:hover { background: #3a3a3a; }
+    .examples-menu .empty {
+      padding: 0.5rem 0.75rem;
+      color: #888;
+      font-size: 0.8rem;
+    }
 
     main {
       flex: 1;
@@ -644,6 +680,10 @@
     <div class="actions">
       <a href="/terminal">Terminal UI</a>
       <button id="btn-load" type="button" class="secondary">Load</button>
+      <div class="examples-wrap">
+        <button id="btn-examples" type="button" class="secondary" aria-haspopup="listbox" aria-expanded="false">Examples</button>
+        <div id="examples-menu" class="examples-menu" role="listbox" hidden></div>
+      </div>
       <button id="btn-export" type="button">Export</button>
       <button id="btn-flash" type="button" class="flash">Flash</button>
     </div>

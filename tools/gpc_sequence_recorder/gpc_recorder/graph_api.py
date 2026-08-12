@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 from gpc_recorder.codegen.config_loader import load_config_hpp
 from gpc_recorder.dsl.builtins import RecorderContext
@@ -12,6 +13,7 @@ from gpc_recorder.paths import (
     CONTROLLER_STATE_SEQUENCE_FIELDS,
     CONTROLLER_STATE_TICK_FIELDS,
     DEFAULT_EXPORT_PATH,
+    EXAMPLES_DIR,
 )
 from gpc_recorder.schema.loader import get_schema
 
@@ -314,8 +316,31 @@ def session_to_graph(session: Session) -> Dict[str, Any]:
     }
 
 
-def load_graph_from_config(path: Optional[str] = None) -> Dict[str, Any]:
+def load_graph_from_config(path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
     schema = get_schema()
     src = DEFAULT_EXPORT_PATH if not path else path
     session = load_config_hpp(src, schema)
     return session_to_graph(session)
+
+
+def list_example_configs(examples_dir: Optional[Path] = None) -> List[str]:
+    """Return sorted basenames of ``*.hpp`` example configs."""
+    root = EXAMPLES_DIR if examples_dir is None else examples_dir
+    if not root.is_dir():
+        return []
+    return sorted(p.name for p in root.glob("*.hpp") if p.is_file())
+
+
+def resolve_example_path(name: str, examples_dir: Optional[Path] = None) -> Path:
+    """Resolve an example basename under ``examples_dir`` (path-traversal safe)."""
+    root = (EXAMPLES_DIR if examples_dir is None else examples_dir).resolve()
+    if not name or name != Path(name).name or "/" in name or "\\" in name or name in (".", ".."):
+        raise ValueError(f"Invalid example name: {name!r}")
+    if not name.endswith(".hpp"):
+        raise ValueError(f"Invalid example name: {name!r}")
+    path = (root / name).resolve()
+    if not path.is_relative_to(root):
+        raise ValueError(f"Invalid example name: {name!r}")
+    if not path.is_file():
+        raise FileNotFoundError(f"Example not found: {name}")
+    return path

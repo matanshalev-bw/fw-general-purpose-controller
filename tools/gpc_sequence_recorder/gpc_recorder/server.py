@@ -22,7 +22,13 @@ from gpc_recorder.usb_bridge import (
     stop_usb_log,
     usb_log_stream,
 )
-from gpc_recorder.graph_api import build_context_from_graph, export_graph, load_graph_from_config
+from gpc_recorder.graph_api import (
+    build_context_from_graph,
+    export_graph,
+    list_example_configs,
+    load_graph_from_config,
+    resolve_example_path,
+)
 from gpc_recorder.schema.dictionary import bluelink_commands_dictionary
 from gpc_recorder.schema.recorder_dictionary import recorder_commands_dictionary
 from gpc_recorder.paths import (
@@ -267,13 +273,27 @@ async def usb_log_ws(websocket: WebSocket) -> None:
         await websocket.send_json({"type": "error", "message": str(e)})
 
 
-@app.get("/api/graph/load")
-async def graph_load() -> dict:
+@app.get("/api/graph/examples")
+async def graph_examples() -> dict:
     try:
-        graph = load_graph_from_config()
+        return {"ok": True, "examples": list_example_configs()}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/graph/load")
+async def graph_load(example: str | None = None) -> dict:
+    try:
+        if example:
+            path = resolve_example_path(example)
+            graph = load_graph_from_config(path)
+        else:
+            graph = load_graph_from_config()
         _repl.ctx.session = build_context_from_graph(graph).session
         return {"ok": True, "graph": graph}
     except FileNotFoundError as e:
+        if example:
+            return {"ok": False, "error": str(e)}
         return {
             "ok": True,
             "graph": {
@@ -285,6 +305,8 @@ async def graph_load() -> dict:
             },
             "note": str(e),
         }
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
