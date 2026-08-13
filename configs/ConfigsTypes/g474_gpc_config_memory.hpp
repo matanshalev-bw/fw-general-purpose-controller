@@ -161,11 +161,13 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             {
                 .trigger = {
                     .payload_type = bluelink::PayloadTypeIds::BRAKES_CONTINUOUS_COMMAND,
-                    .size = 2,
+                    .size = 1,
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_RELEASED), 0, 0, 0, 0, 0, 0, 0},
                 },
-                .extract_field_count = 0,
-                .extract_fields = {},
+                .extract_field_count = 1,
+                .extract_fields = {
+                    { 1, 1, 0 },
+                },
                 .sequence = {
                     .step_count = 3,
                     .steps = {
@@ -187,11 +189,13 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             {
                 .trigger = {
                     .payload_type = bluelink::PayloadTypeIds::BRAKES_CONTINUOUS_COMMAND,
-                    .size = 2,
+                    .size = 1,
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_PRESSED), 0, 0, 0, 0, 0, 0, 0},
                 },
-                .extract_field_count = 0,
-                .extract_fields = {},
+                .extract_field_count = 1,
+                .extract_fields = {
+                    { 1, 1, 0 },
+                },
                 .sequence = {
                     .step_count = 3,
                     .steps = {
