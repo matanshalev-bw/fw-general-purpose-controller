@@ -232,6 +232,22 @@ void MicroSequenceExecutor::tick() {
       continue;
     }
 
+    if (step.op_type == bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT) {
+      const InterfaceStatus can_status = executeCanTransmit(
+          *reinterpret_cast<const bluelink::MicroOpsPayload::MicroCanTransmit*>(step.params));
+      if (can_status == InterfaceStatus::INTERFACE_BUSY) {
+        // TX still contended after abort/retry — stay on this step and try next tick.
+        return;
+      }
+      if (can_status != InterfaceStatus::INTERFACE_OK) {
+        state_ = State::ERROR;
+        active_sequence_ = nullptr;
+        return;
+      }
+      step_index_++;
+      continue;
+    }
+
     if (not executeStep(step)) {
       state_ = State::ERROR;
       active_sequence_ = nullptr;
@@ -267,7 +283,9 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
     case bluelink::MicroOpsPayload::MicroOpType::PWM_SET:
       return executePwmSet(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroPwmSet*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT:
-      return executeCanTransmit(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroCanTransmit*>(step.params));
+      return executeCanTransmit(
+                 *reinterpret_cast<const bluelink::MicroOpsPayload::MicroCanTransmit*>(step.params)) ==
+             InterfaceStatus::INTERFACE_OK;
     case bluelink::MicroOpsPayload::MicroOpType::UART_TRANSMIT:
       return executeUartTransmit(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroUartTransmit*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::SPI_TRANSFER:
@@ -417,14 +435,14 @@ bool MicroSequenceExecutor::executePwmSet(const bluelink::MicroOpsPayload::Micro
 #endif
 }
 
-bool MicroSequenceExecutor::executeCanTransmit(const bluelink::MicroOpsPayload::MicroCanTransmit& op) {
+InterfaceStatus MicroSequenceExecutor::executeCanTransmit(const bluelink::MicroOpsPayload::MicroCanTransmit& op) {
   if (raw_can_ == nullptr) {
-    return false;
+    return InterfaceStatus::INTERFACE_ERROR;
   }
 
   const uint8_t dlc =
       op.dlc > bluelink::MicroOpsPayload::COMM_DATA_LENGTH ? bluelink::MicroOpsPayload::COMM_DATA_LENGTH : op.dlc;
-  return raw_can_->transmitStandard(op.id, op.data, dlc) == InterfaceStatus::INTERFACE_OK;
+  return raw_can_->transmitStandard(op.id, op.data, dlc);
 }
 
 bool MicroSequenceExecutor::executeUartTransmit(const bluelink::MicroOpsPayload::MicroUartTransmit& op) {

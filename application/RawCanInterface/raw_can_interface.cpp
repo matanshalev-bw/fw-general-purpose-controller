@@ -40,7 +40,12 @@ InterfaceStatus RawCanInterface::transmitStandard(uint32_t id, const uint8_t* da
   if (not comm_can_->isTransmitAvailable()) {
     comm_can_->recoverStuckTransmit();
     if (not comm_can_->isTransmitAvailable()) {
-      return InterfaceStatus::INTERFACE_BUSY;
+      // Soft recover only clears after TX timeout; force-abort so a newer
+      // frame (e.g. INIT) can replace a stuck heartbeat retransmission.
+      comm_can_->recoverStuckTransmit(true);
+      if (not comm_can_->isTransmitAvailable()) {
+        return InterfaceStatus::INTERFACE_BUSY;
+      }
     }
   }
 
@@ -49,6 +54,20 @@ InterfaceStatus RawCanInterface::transmitStandard(uint32_t id, const uint8_t* da
   comm_can_->setTxDlc(dlc);
   comm_can_->setTxRtrType(CommCan::CanRtrType::CAN_RTR_DATA_TYPE);
 
+  InterfaceStatus status = comm_can_->startTransmitInterrupt(data, dlc);
+  if (status != InterfaceStatus::INTERFACE_BUSY) {
+    return status;
+  }
+
+  comm_can_->recoverStuckTransmit(true);
+  if (not comm_can_->isTransmitAvailable()) {
+    return InterfaceStatus::INTERFACE_BUSY;
+  }
+
+  comm_can_->setTxCanIdType(CommCan::CanIdType::CAN_ID_TYPE_STD);
+  comm_can_->setTxCanId(id & 0x7FFU);
+  comm_can_->setTxDlc(dlc);
+  comm_can_->setTxRtrType(CommCan::CanRtrType::CAN_RTR_DATA_TYPE);
   return comm_can_->startTransmitInterrupt(data, dlc);
 }
 

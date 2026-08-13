@@ -61,7 +61,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {50},
+                            .delay_ms = {500},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
@@ -69,7 +69,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {50},
+                            .delay_ms = {500},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
@@ -77,7 +77,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {50},
+                            .delay_ms = {500},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
@@ -85,7 +85,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {50},
+                            .delay_ms = {500},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
@@ -93,7 +93,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {50},
+                            .delay_ms = {500},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
@@ -101,7 +101,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {50},
+                            .delay_ms = {500},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,

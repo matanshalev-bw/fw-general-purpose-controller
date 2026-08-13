@@ -2,6 +2,7 @@
 #define MICRO_SEQUENCE_EXECUTOR_HPP_
 
 #include <cstdint>
+#include "interface_status.hpp"
 #include "micro_var_store.hpp"
 #include "sequences_configs.hpp"
 
@@ -48,7 +49,7 @@ class MicroSequenceExecutor {
   bool executeAdcRead(const bluelink::MicroOpsPayload::MicroAdcRead& op);
   bool executeDacWrite(const bluelink::MicroOpsPayload::MicroDacWrite& op);
   bool executePwmSet(const bluelink::MicroOpsPayload::MicroPwmSet& op);
-  bool executeCanTransmit(const bluelink::MicroOpsPayload::MicroCanTransmit& op);
+  InterfaceStatus executeCanTransmit(const bluelink::MicroOpsPayload::MicroCanTransmit& op);
   bool executeUartTransmit(const bluelink::MicroOpsPayload::MicroUartTransmit& op);
   bool executeSpiTransfer(const bluelink::MicroOpsPayload::MicroSpiTransfer& op);
   bool executeI2cWrite(const bluelink::MicroOpsPayload::MicroI2cWrite& op);
