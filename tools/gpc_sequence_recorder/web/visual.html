@@ -442,6 +442,22 @@
       border-radius: 8px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
+    .modal.confirm-modal {
+      width: min(90vw, 22rem);
+      height: auto;
+      max-height: none;
+    }
+    .modal.confirm-modal .confirm-body {
+      padding: 0.75rem 0.9rem 0.9rem;
+      color: #ccc;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .modal.confirm-modal .confirm-body strong {
+      color: #e0e0e0;
+      font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+      font-weight: 600;
+    }
     .modal-header {
       display: flex;
       align-items: center;
@@ -684,7 +700,10 @@
         <button id="btn-examples" type="button" class="secondary" aria-haspopup="listbox" aria-expanded="false">Examples</button>
         <div id="examples-menu" class="examples-menu" role="listbox" hidden></div>
       </div>
-      <button id="btn-save-example" type="button" class="secondary" disabled title="Save to the currently loaded example file">Save example</button>
+      <div class="examples-wrap" id="save-example-wrap">
+        <button id="btn-save-example" type="button" class="secondary" aria-haspopup="listbox" aria-expanded="false" title="Save current config into an existing example file">Save to example</button>
+        <div id="save-example-menu" class="examples-menu" role="listbox" hidden></div>
+      </div>
       <button id="btn-export" type="button">Export</button>
       <button id="btn-flash" type="button" class="flash">Flash</button>
     </div>
@@ -780,6 +799,20 @@
       </div>
       <div id="bind-modal-error" class="bind-modal-error" hidden></div>
       <div class="bind-form" id="bind-form"></div>
+    </div>
+  </div>
+
+  <div id="confirm-save-example-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-save-example-title">
+    <div class="modal confirm-modal">
+      <div class="modal-header">
+        <h2 id="confirm-save-example-title">Save to example?</h2>
+        <button type="button" id="btn-confirm-save-example" class="danger">Overwrite</button>
+        <button type="button" id="btn-cancel-save-example">Cancel</button>
+      </div>
+      <div class="confirm-body">
+        Are you sure you want to overwrite <strong id="confirm-save-example-name"></strong>?
+        This will replace the existing example file with the current config.
+      </div>
     </div>
   </div>
 

@@ -89,7 +89,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x620, {0x2B, 0, 0x40, 0x8, 0xBC, 0x2, 0, 0}},
+                            .can_transmit = {1, 8, 0x620, {0x2B, 0, 0x40, 0x8, 0x90, 0x1, 0, 0}},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,

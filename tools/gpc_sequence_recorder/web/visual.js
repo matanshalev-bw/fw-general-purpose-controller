@@ -1306,19 +1306,8 @@ function applyLoadedGraph(graph) {
   renderBoard();
 }
 
-function updateSaveExampleButton() {
-  const btn = document.getElementById("btn-save-example");
-  if (!btn) return;
-  const name = appState.loadedExample;
-  btn.disabled = !name;
-  btn.title = name
-    ? `Save current graph to examples/${name}`
-    : "Load an example first to enable Save example";
-}
-
 function setLoadedExample(name) {
   appState.loadedExample = name || null;
-  updateSaveExampleButton();
 }
 
 async function loadGraph(exampleName) {
@@ -1342,15 +1331,10 @@ async function loadGraph(exampleName) {
   }
 }
 
-async function saveExample() {
-  const name = appState.loadedExample;
-  if (!name) {
-    setStatus("No example loaded — pick one from Examples first");
-    return;
-  }
+async function saveToExample(name) {
   syncConfigFromControls();
   const graph = buildGraphPayload();
-  setStatus(`Saving example ${name}…`);
+  setStatus(`Saving to example ${name}…`);
   const res = await fetch("/api/graph/examples/save", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1358,28 +1342,94 @@ async function saveExample() {
   });
   const data = await res.json();
   if (!data.ok) {
-    setStatus(`Save example failed: ${data.error}`);
+    setStatus(`Save to example failed: ${data.error}`);
     return;
   }
-  setStatus(`Saved example ${name}`);
+  setLoadedExample(name);
+  setStatus(`Saved to example ${name}`);
 }
 
-function closeExamplesMenu() {
-  const menu = document.getElementById("examples-menu");
-  const btn = document.getElementById("btn-examples");
+let pendingSaveExampleName = null;
+
+function openSaveExampleConfirm(name) {
+  pendingSaveExampleName = name;
+  const label = document.getElementById("confirm-save-example-name");
+  if (label) label.textContent = name;
+  document.getElementById("confirm-save-example-modal")?.classList.add("open");
+}
+
+function closeSaveExampleConfirm() {
+  pendingSaveExampleName = null;
+  document.getElementById("confirm-save-example-modal")?.classList.remove("open");
+}
+
+async function confirmSaveToExample() {
+  const name = pendingSaveExampleName;
+  closeSaveExampleConfirm();
+  if (!name) return;
+  await saveToExample(name);
+}
+
+function closeMenu(menuId, btnId) {
+  const menu = document.getElementById(menuId);
+  const btn = document.getElementById(btnId);
   if (!menu || !btn) return;
   menu.classList.remove("open");
   menu.hidden = true;
   btn.setAttribute("aria-expanded", "false");
 }
 
-function openExamplesMenu() {
-  const menu = document.getElementById("examples-menu");
-  const btn = document.getElementById("btn-examples");
+function openMenu(menuId, btnId) {
+  const menu = document.getElementById(menuId);
+  const btn = document.getElementById(btnId);
   if (!menu || !btn) return;
   menu.hidden = false;
   menu.classList.add("open");
   btn.setAttribute("aria-expanded", "true");
+}
+
+function closeExamplesMenu() {
+  closeMenu("examples-menu", "btn-examples");
+}
+
+function closeSaveExampleMenu() {
+  closeMenu("save-example-menu", "btn-save-example");
+}
+
+function closeAllExampleMenus() {
+  closeExamplesMenu();
+  closeSaveExampleMenu();
+}
+
+async function fetchExampleNames() {
+  const res = await fetch("/api/graph/examples");
+  const data = await res.json();
+  if (!data.ok) {
+    throw new Error(data.error || "Failed to list examples");
+  }
+  return data.examples || [];
+}
+
+function fillExamplesMenu(menu, examples, onPick) {
+  menu.innerHTML = "";
+  if (!examples.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "No examples found";
+    menu.appendChild(empty);
+    return;
+  }
+  for (const name of examples) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.role = "option";
+    item.textContent = name;
+    item.addEventListener("click", async () => {
+      closeAllExampleMenus();
+      await onPick(name);
+    });
+    menu.appendChild(item);
+  }
 }
 
 async function toggleExamplesMenu() {
@@ -1389,35 +1439,35 @@ async function toggleExamplesMenu() {
     closeExamplesMenu();
     return;
   }
+  closeSaveExampleMenu();
   setStatus("Loading examples…");
-  const res = await fetch("/api/graph/examples");
-  const data = await res.json();
-  if (!data.ok) {
-    setStatus(`Examples failed: ${data.error}`);
+  try {
+    const examples = await fetchExampleNames();
+    fillExamplesMenu(menu, examples, loadGraph);
+    openMenu("examples-menu", "btn-examples");
+    setStatus("Ready");
+  } catch (err) {
+    setStatus(`Examples failed: ${err.message}`);
+  }
+}
+
+async function toggleSaveExampleMenu() {
+  const menu = document.getElementById("save-example-menu");
+  if (!menu) return;
+  if (menu.classList.contains("open")) {
+    closeSaveExampleMenu();
     return;
   }
-  const examples = data.examples || [];
-  menu.innerHTML = "";
-  if (!examples.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty";
-    empty.textContent = "No examples found";
-    menu.appendChild(empty);
-  } else {
-    for (const name of examples) {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.role = "option";
-      item.textContent = name;
-      item.addEventListener("click", async () => {
-        closeExamplesMenu();
-        await loadGraph(name);
-      });
-      menu.appendChild(item);
-    }
+  closeExamplesMenu();
+  setStatus("Loading examples…");
+  try {
+    const examples = await fetchExampleNames();
+    fillExamplesMenu(menu, examples, openSaveExampleConfirm);
+    openMenu("save-example-menu", "btn-save-example");
+    setStatus("Ready");
+  } catch (err) {
+    setStatus(`Examples failed: ${err.message}`);
   }
-  openExamplesMenu();
-  setStatus("Ready");
 }
 
 async function exportGraph() {
@@ -1897,16 +1947,30 @@ function wireEvents() {
     e.stopPropagation();
     toggleExamplesMenu();
   });
-  document.getElementById("btn-save-example").addEventListener("click", saveExample);
+  document.getElementById("btn-save-example").addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleSaveExampleMenu();
+  });
+  document.getElementById("btn-confirm-save-example").addEventListener("click", confirmSaveToExample);
+  document.getElementById("btn-cancel-save-example").addEventListener("click", closeSaveExampleConfirm);
+  document.getElementById("confirm-save-example-modal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeSaveExampleConfirm();
+  });
   document.addEventListener("click", (e) => {
-    const wrap = document.querySelector(".examples-wrap");
-    if (wrap && !wrap.contains(e.target)) closeExamplesMenu();
+    const wraps = document.querySelectorAll(".examples-wrap");
+    const inside = Array.from(wraps).some((wrap) => wrap.contains(e.target));
+    if (!inside) closeAllExampleMenus();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeExamplesMenu();
+    if (e.key !== "Escape") return;
+    const confirmOpen = document.getElementById("confirm-save-example-modal")?.classList.contains("open");
+    if (confirmOpen) {
+      closeSaveExampleConfirm();
+      return;
+    }
+    closeAllExampleMenus();
   });
   document.getElementById("btn-export").addEventListener("click", exportGraph);
-  updateSaveExampleButton();
   document.getElementById("btn-flash").addEventListener("click", flashConfig);
   document.getElementById("btn-flash-close").addEventListener("click", closeFlashModal);
   document.getElementById("btn-modal-save").addEventListener("click", () => closeEditor(true));
