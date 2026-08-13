@@ -1625,6 +1625,65 @@ function renderLiveFields() {
   updateLiveFields();
 }
 
+function parseByteArrayInput(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return { bytes: [], fromQuotedString: false };
+  if (s.startsWith('"') && s.endsWith('"')) {
+    try {
+      const text = JSON.parse(s);
+      if (typeof text === "string") {
+        return {
+          bytes: [...text].map((c) => c.charCodeAt(0) & 0xff),
+          fromQuotedString: true,
+        };
+      }
+    } catch (_e) {
+      /* fall through to comma-separated parsing */
+    }
+  }
+  if (s.startsWith("'") && s.endsWith("'") && s.length >= 2) {
+    const text = s.slice(1, -1);
+    return {
+      bytes: [...text].map((c) => c.charCodeAt(0) & 0xff),
+      fromQuotedString: true,
+    };
+  }
+  return {
+    bytes: s
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean),
+    fromQuotedString: false,
+  };
+}
+
+function collectLiveMicroFieldValues(op) {
+  const values = {};
+  let uartDataFromQuotedString = false;
+  for (const f of op.fields || []) {
+    const input = document.getElementById(`live-field-${f.name}`);
+    if (!input) continue;
+    const raw = input.value.trim();
+    if (f.array_size) {
+      const parsed = parseByteArrayInput(raw);
+      values[f.name] = parsed.bytes;
+      if (op.union_member === "uart_transmit" && f.name === "data" && parsed.fromQuotedString) {
+        uartDataFromQuotedString = true;
+      }
+      continue;
+    }
+    if (/^0x[0-9a-fA-F]+$/.test(raw)) values[f.name] = raw;
+    else if (/^-?\d+$/.test(raw)) values[f.name] = parseInt(raw, 10);
+    else values[f.name] = raw;
+  }
+  if (uartDataFromQuotedString && Array.isArray(values.data)) {
+    values.length = values.data.length;
+    const lengthInput = document.getElementById("live-field-length");
+    if (lengthInput) lengthInput.value = String(values.length);
+  }
+  return values;
+}
+
 function updateLiveFields() {
   const unionMember = document.getElementById("live-micro").value;
   const op = appState.usbMicroOps.find((o) => o.union_member === unionMember);
@@ -1635,6 +1694,7 @@ function updateLiveFields() {
     const wrap = document.createElement("div");
     wrap.className = "field";
     const label = document.createElement("label");
+    label.htmlFor = `live-field-${f.name}`;
     const maxLen = f.max_len || (f.array_size ? parseInt(String(f.array_size), 10) : null);
     const maxValue = f.max_value;
     const hint = f.hint || (maxLen ? `max ${maxLen} bytes` : maxValue != null ? `max ${maxValue}` : null);
@@ -1644,18 +1704,21 @@ function updateLiveFields() {
       label.textContent = f.name;
     }
     const input = document.createElement("input");
+    input.id = `live-field-${f.name}`;
     input.dataset.field = f.name;
-    input.value = f.default ?? 0;
     if (maxLen || f.array_size) {
       input.className = "wide";
       input.placeholder = `comma-separated or "text", max ${maxLen || f.array_size} bytes`;
       input.dataset.maxLen = String(maxLen || f.array_size);
       if (Array.isArray(f.default)) input.value = f.default.join(",");
       else input.value = "";
-    } else if (maxValue) {
-      input.type = "number";
-      input.min = "0";
-      input.max = String(maxValue);
+    } else {
+      input.value = f.default !== undefined && f.default !== null ? String(f.default) : "0";
+      if (maxValue != null) {
+        input.type = "number";
+        input.min = "0";
+        input.max = String(maxValue);
+      }
     }
     wrap.appendChild(label);
     wrap.appendChild(input);
@@ -1720,20 +1783,29 @@ async function usbClose() {
 
 async function usbSendMicro() {
   const unionMember = document.getElementById("live-micro").value;
-  const values = {};
-  document.querySelectorAll("#live-fields [data-field]").forEach((el) => {
-    let v = el.value;
-    if (v.startsWith("0x")) v = parseInt(v, 16);
-    else if (/^\d+$/.test(v)) v = parseInt(v, 10);
-    values[el.dataset.field] = v;
-  });
+  const op = appState.usbMicroOps.find((o) => o.union_member === unionMember);
+  if (!op) {
+    setStatus("Select a micro command first");
+    return;
+  }
+  const values = collectLiveMicroFieldValues(op);
+  setStatus("Sending micro command…");
   const res = await fetch("/api/usb/send-micro", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ union_member: unionMember, values }),
+    body: JSON.stringify({
+      union_member: op.union_member,
+      values,
+      destination_component: "COMPONENT_ID_GENERAL_PURPOSE_CONTROLLER",
+      qos: "none",
+    }),
   });
   const data = await res.json();
-  setStatus(data.ok ? "Micro command sent" : `Send failed: ${data.error}`);
+  if (data.ok) {
+    setStatus(`Sent ${data.payload_type}${data.payload_hex ? ` (${data.payload_hex})` : ""}`);
+  } else {
+    setStatus(`Send failed: ${data.error}`);
+  }
 }
 
 function renderLiveControllerFields() {
