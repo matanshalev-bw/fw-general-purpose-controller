@@ -345,15 +345,39 @@ function makeBindingDeleteButton(containerId, label) {
   return btn;
 }
 
+function makeBindingEditButton(containerId, label) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "card-edit";
+  btn.title = `Edit ${label} params`;
+  btn.setAttribute("aria-label", `Edit ${label} params`);
+  btn.textContent = "✎";
+  btn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    openCommandBindingEditor(containerId);
+  });
+  return btn;
+}
+
+function makeBindingActionBar(...buttons) {
+  const wrap = document.createElement("div");
+  wrap.className = "card-actions";
+  for (const btn of buttons) wrap.appendChild(btn);
+  return wrap;
+}
+
 function setEditorModalActions(container) {
+  const isCommand = !!(container && container.type === "command");
+  const btnEdit = document.getElementById("btn-modal-edit-binding");
   const btnRemove = document.getElementById("btn-modal-remove");
-  if (btnRemove) btnRemove.hidden = !container || container.type !== "command";
+  if (btnEdit) btnEdit.hidden = !isCommand;
+  if (btnRemove) btnRemove.hidden = !isCommand;
 }
 
 function setBindModalActions(mode) {
   const btnRemove = document.getElementById("btn-bind-remove");
   const btnSave = document.getElementById("btn-bind-save");
-  const editing = mode === "telemetry-edit";
+  const editing = mode === "telemetry-edit" || mode === "command-edit";
   if (btnRemove) btnRemove.hidden = !editing;
   if (btnSave) btnSave.textContent = editing ? "Save" : "Add";
 }
@@ -509,7 +533,12 @@ function renderBoard() {
       <div class="limit-hint ${limitClass(used, maxSteps)}">${formatBudget(used, maxSteps, "steps")}</div>
     `;
     card.appendChild(makeStateArrow(false));
-    card.appendChild(makeBindingDeleteButton(c.id, c.label || "command binding"));
+    card.appendChild(
+      makeBindingActionBar(
+        makeBindingEditButton(c.id, c.label || "command binding"),
+        makeBindingDeleteButton(c.id, c.label || "command binding")
+      )
+    );
     card.addEventListener("click", () => openEditor(c.id));
     commandZone.appendChild(card);
   }
@@ -549,7 +578,9 @@ function renderBoard() {
       <div class="limit-hint ${limitClass(fieldCount, fieldMax)}">${formatBudget(fieldCount, fieldMax, "fields")}</div>
     `;
     card.appendChild(makeStateArrow(true));
-    card.appendChild(makeBindingDeleteButton(c.id, c.label || "telemetry binding"));
+    card.appendChild(
+      makeBindingActionBar(makeBindingDeleteButton(c.id, c.label || "telemetry binding"))
+    );
     card.addEventListener("click", () => openTelemetryEditor(c.id));
     telemetryZone.appendChild(card);
   }
@@ -1011,6 +1042,74 @@ function openTelemetryEditor(containerId) {
   document.getElementById("bind-modal").classList.add("open");
 }
 
+function openCommandBindingEditor(containerId) {
+  clearBindModalError();
+  const container = appState.containers[containerId];
+  if (!container || container.type !== "command") return;
+  // Leave sequence editor open underneath if we came from it; bind modal sits on top.
+  appState.bindMode = "command-edit";
+  appState.activeContainerId = containerId;
+  document.getElementById("bind-modal-title").textContent = `Edit command binding: ${container.trigger || container.label}`;
+  setLimitHint(
+    document.getElementById("bind-modal-limit"),
+    countByType("command"),
+    appState.limits.max_command_bindings,
+    "bindings"
+  );
+  renderBindForm(container);
+  setBindModalActions("command-edit");
+  document.getElementById("bind-modal").classList.add("open");
+}
+
+function collectBindFormFields() {
+  const fields = {};
+  document.querySelectorAll("#bind-form [data-field]").forEach((el) => {
+    const key = el.dataset.field;
+    let val = el.value;
+    if (el.dataset.isEnum === "1") {
+      fields[key] = val;
+      return;
+    }
+    if (el.type === "number") {
+      val = parseInt(val, 10) || 0;
+    } else if (val === "true" || val === "false") {
+      val = val === "true";
+    } else if (/^\d+$/.test(val)) {
+      val = parseInt(val, 10);
+    }
+    fields[key] = val;
+  });
+  return fields;
+}
+
+function validateCommandBindingFields(trigger, fields) {
+  const triggerDef =
+    appState.bluelinkCommands.find((t) => (t.payload_type || t.name) === trigger) ||
+    appState.bluelinkCommands[0];
+  const enumFieldNames = new Set(
+    (triggerDef?.fields || []).filter(isBindCommandEnumField).map((f) => f.name)
+  );
+  for (const key of Object.keys(fields)) {
+    if (!key.endsWith("_var_index")) continue;
+    const fieldName = key.slice(0, -"_var_index".length);
+    if (enumFieldNames.has(fieldName)) {
+      return (
+        `Field '${fieldName}' is an enum and must be a match value. ` +
+        "Only non-enum fields can use 'store to var index'."
+      );
+    }
+  }
+  const hasMatchField = Object.keys(fields).some((key) => !key.endsWith("_var_index"));
+  if (!hasMatchField) {
+    return (
+      "Cannot save this command binding: every field uses 'store to var index'. " +
+      "Uncheck that box on at least one field (for example brake_mode) and set a match value " +
+      "so the GPC knows when to run this sequence."
+    );
+  }
+  return null;
+}
+
 function openBindModal(mode) {
   clearBindModalError();
   appState.bindMode = mode;
@@ -1040,7 +1139,10 @@ function openBindModal(mode) {
 function renderBindForm(existing) {
   clearBindModalError();
   const form = document.getElementById("bind-form");
-  const isCommand = appState.bindMode === "command" || (existing && existing.type === "command");
+  const isCommand =
+    appState.bindMode === "command" ||
+    appState.bindMode === "command-edit" ||
+    (existing && existing.type === "command");
   const isTelemetry = !isCommand;
 
   const triggers = isCommand
@@ -1114,21 +1216,7 @@ function renderBindForm(existing) {
 function closeBindModal(save) {
   if (save) {
     const trigger = document.getElementById("bind-trigger")?.value;
-    const fields = {};
-    document.querySelectorAll("#bind-form [data-field]").forEach((el) => {
-      const key = el.dataset.field;
-      let val = el.value;
-      if (el.dataset.isEnum === "1") {
-        fields[key] = val;
-        return;
-      }
-      if (el.type === "number") {
-        val = parseInt(val, 10) || 0;
-      }
-      else if (val === "true" || val === "false") val = val === "true";
-      else if (/^\d+$/.test(val)) val = parseInt(val, 10);
-      fields[key] = val;
-    });
+    const fields = collectBindFormFields();
 
     if (appState.bindMode === "telemetry-edit" && appState.activeContainerId) {
       const fieldCount = Object.keys(fields).length;
@@ -1143,31 +1231,29 @@ function closeBindModal(save) {
       c.rate = parseInt(document.getElementById("bind-rate")?.value || "1", 10);
       c.fields = fields;
       c.label = `TELEMETRY: ${trigger}`;
-    } else if (appState.bindMode === "command") {
-      const triggerDef =
-        appState.bluelinkCommands.find((t) => (t.payload_type || t.name) === trigger) ||
-        appState.bluelinkCommands[0];
-      const enumFieldNames = new Set(
-        (triggerDef?.fields || []).filter(isBindCommandEnumField).map((f) => f.name)
-      );
-      for (const key of Object.keys(fields)) {
-        if (!key.endsWith("_var_index")) continue;
-        const fieldName = key.slice(0, -"_var_index".length);
-        if (enumFieldNames.has(fieldName)) {
-          showBindModalError(
-            `Field '${fieldName}' is an enum and must be a match value. ` +
-              "Only non-enum fields can use 'store to var index'."
-          );
-          return;
-        }
+      renderBoard();
+      setStatus(`Updated telemetry binding: ${c.label}`);
+    } else if (appState.bindMode === "command-edit" && appState.activeContainerId) {
+      const error = validateCommandBindingFields(trigger, fields);
+      if (error) {
+        showBindModalError(error);
+        return;
       }
-      const hasMatchField = Object.keys(fields).some((key) => !key.endsWith("_var_index"));
-      if (!hasMatchField) {
-        showBindModalError(
-          "Cannot add this command binding: every field uses 'store to var index'. " +
-            "Uncheck that box on at least one field (for example brake_mode) and set a match value " +
-            "so the GPC knows when to run this sequence."
-        );
+      const c = appState.containers[appState.activeContainerId];
+      c.trigger = trigger;
+      c.fields = fields;
+      c.label = formatCommandBindingLabel(trigger, fields);
+      // Keep existing steps; only binding match params change.
+      renderBoard();
+      const editorOpen = document.getElementById("editor-modal")?.classList.contains("open");
+      if (editorOpen) {
+        document.getElementById("modal-title").textContent = `${c.label} — sequence editor`;
+      }
+      setStatus(`Updated command binding: ${c.label}`);
+    } else if (appState.bindMode === "command") {
+      const error = validateCommandBindingFields(trigger, fields);
+      if (error) {
+        showBindModalError(error);
         return;
       }
       if (countByType("command") >= appState.limits.max_command_bindings) {
@@ -1185,6 +1271,8 @@ function closeBindModal(save) {
         fields,
         steps: [],
       };
+      renderBoard();
+      setStatus("Binding added");
     } else if (appState.bindMode === "telemetry") {
       if (countByType("telemetry") >= appState.limits.max_telemetry_bindings) {
         showBindModalError(
@@ -1209,16 +1297,27 @@ function closeBindModal(save) {
         fields,
         steps: [],
       };
+      renderBoard();
+      setStatus("Binding added");
     }
-    renderBoard();
-    setStatus("Binding added");
   }
+
+  const editingCommandFromEditor =
+    appState.bindMode === "command-edit" &&
+    document.getElementById("editor-modal")?.classList.contains("open");
+  const restoreContainerId = editingCommandFromEditor ? appState.activeContainerId : null;
+
   clearBindModalError();
   appState.bindMode = null;
   setBindModalActions(null);
   document.getElementById("bind-modal").classList.remove("open");
   const bindLimit = document.getElementById("bind-modal-limit");
   if (bindLimit) bindLimit.hidden = true;
+
+  // If we edited binding params while the sequence editor was open, keep that container active.
+  if (restoreContainerId) {
+    appState.activeContainerId = restoreContainerId;
+  }
 }
 
 function buildGraphPayload() {
@@ -1975,6 +2074,11 @@ function wireEvents() {
   document.getElementById("btn-flash-close").addEventListener("click", closeFlashModal);
   document.getElementById("btn-modal-save").addEventListener("click", () => closeEditor(true));
   document.getElementById("btn-modal-close").addEventListener("click", () => closeEditor(false));
+  document.getElementById("btn-modal-edit-binding").addEventListener("click", () => {
+    const id = appState.activeContainerId;
+    if (!id) return;
+    openCommandBindingEditor(id);
+  });
   document.getElementById("btn-modal-remove").addEventListener("click", () => {
     const id = appState.activeContainerId;
     if (!id) return;
@@ -1985,7 +2089,11 @@ function wireEvents() {
   document.getElementById("btn-bind-remove").addEventListener("click", () => {
     const id = appState.activeContainerId;
     if (!id) return;
-    if (removeBinding(id)) closeBindModal(false);
+    const editorWasOpen = document.getElementById("editor-modal")?.classList.contains("open");
+    if (removeBinding(id)) {
+      closeBindModal(false);
+      if (editorWasOpen) closeEditor(false);
+    }
   });
   document.getElementById("btn-live-refresh").addEventListener("click", refreshUsbPorts);
   document.getElementById("btn-live-open").addEventListener("click", usbOpen);
