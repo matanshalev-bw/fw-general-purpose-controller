@@ -130,6 +130,8 @@ const appState = {
   usbMicroOps: [],
   usbControllerCmds: [],
   usbOpen: false,
+  liveExprValues: [],
+  liveExprFresh: false,
   componentIds: [],
   activeContainerId: null,
   bindMode: null,
@@ -141,7 +143,7 @@ const appState = {
     max_command_bindings: 16,
     max_telemetry_bindings: 3,
     max_telemetry_fields: 8,
-    max_var_slots: 20,
+    max_var_slots: 15,
     comm_data_length: 8,
   },
 };
@@ -149,6 +151,7 @@ const appState = {
 let drawflowEditor = null;
 let selectedNodeId = null;
 let flashOutputBuffer = "";
+let liveExprWs = null;
 
 function setStatus(msg) {
   document.getElementById("status").textContent = msg;
@@ -614,13 +617,146 @@ function makePaletteItem(command, meta, targetParent) {
   return el;
 }
 
-function renderPalette() {
-  const bank = document.getElementById("palette-bank");
-  bank.innerHTML = "";
-  for (const cmd of appState.microCommands) {
-    if (PALETTE_SKIP.has(cmd.name)) continue;
-    makePaletteItem(cmd.name, cmd, bank);
+function renderLiveExpressionGrid() {
+  const grid = document.getElementById("live-expr-grid");
+  if (!grid) return;
+  const count = appState.limits.max_var_slots || 15;
+  if (!appState.liveExprValues.length) {
+    appState.liveExprValues = Array(count).fill("—");
   }
+  grid.innerHTML = "";
+  for (let i = 0; i < count; i++) {
+    const cell = document.createElement("div");
+    cell.className = "live-expr-cell";
+    cell.dataset.varIndex = String(i);
+    const idx = document.createElement("span");
+    idx.className = "idx";
+    idx.textContent = `v${i}`;
+    const val = document.createElement("span");
+    val.className = "val";
+    val.id = `live-expr-val-${i}`;
+    val.textContent = appState.liveExprValues[i] ?? "—";
+    cell.appendChild(idx);
+    cell.appendChild(val);
+    grid.appendChild(cell);
+  }
+  updateLiveExpressionStatus();
+}
+
+function updateLiveExpressionStatus() {
+  const el = document.getElementById("live-expr-status");
+  if (!el) return;
+  el.classList.remove("active", "stale");
+  if (!appState.usbOpen) {
+    el.textContent = "USB closed — open a port to stream variables";
+    return;
+  }
+  if (appState.liveExprFresh) {
+    el.classList.add("active");
+    el.textContent = "Streaming GPC variables (USB, ~2 Hz)";
+    return;
+  }
+  el.classList.add("stale");
+  el.textContent = "USB open — waiting for GPC_VARIABLES_TELEMETRY…";
+}
+
+function applyLiveExpressionValues(values) {
+  const count = appState.limits.max_var_slots || 15;
+  for (let i = 0; i < count; i++) {
+    appState.liveExprValues[i] = values[i] ?? "—";
+    const el = document.getElementById(`live-expr-val-${i}`);
+    if (el) el.textContent = appState.liveExprValues[i];
+  }
+  appState.liveExprFresh = true;
+  updateLiveExpressionStatus();
+}
+
+function clearLiveExpressionValues(markStale = true) {
+  const count = appState.limits.max_var_slots || 15;
+  appState.liveExprValues = Array(count).fill("—");
+  appState.liveExprFresh = false;
+  for (let i = 0; i < count; i++) {
+    const el = document.getElementById(`live-expr-val-${i}`);
+    if (el) el.textContent = "—";
+  }
+  if (markStale) updateLiveExpressionStatus();
+}
+
+/** Parse host log lines containing `gpc_vars v0=<u64> … vN=<u64>`. */
+function parseGpcVarsLogLine(text) {
+  const marker = text.indexOf("gpc_vars");
+  if (marker < 0) return null;
+  const segment = text.slice(marker);
+  const count = appState.limits.max_var_slots || 15;
+  const values = Array(count).fill("—");
+  let matched = 0;
+  const re = /\bv(\d+)=(\d+)\b/g;
+  let m;
+  while ((m = re.exec(segment)) !== null) {
+    const idx = Number(m[1]);
+    if (idx >= 0 && idx < count) {
+      values[idx] = m[2];
+      matched += 1;
+    }
+  }
+  return matched > 0 ? values : null;
+}
+
+function stopLiveExpressionStream() {
+  if (liveExprWs) {
+    try {
+      liveExprWs.onclose = null;
+      liveExprWs.onerror = null;
+      liveExprWs.onmessage = null;
+      liveExprWs.close();
+    } catch (_) {
+      /* ignore */
+    }
+    liveExprWs = null;
+  }
+  appState.liveExprFresh = false;
+  updateLiveExpressionStatus();
+}
+
+function startLiveExpressionStream() {
+  const port = document.getElementById("live-port")?.value || "";
+  if (!appState.usbOpen || !port) return;
+  stopLiveExpressionStream();
+
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  liveExprWs = new WebSocket(`${proto}//${location.host}/ws/usb-log`);
+  liveExprWs.onopen = () => {
+    liveExprWs.send(JSON.stringify({ port }));
+    updateLiveExpressionStatus();
+  };
+  liveExprWs.onmessage = (ev) => {
+    let msg;
+    try {
+      msg = JSON.parse(ev.data);
+    } catch (_) {
+      return;
+    }
+    if (msg.type === "output" && msg.text) {
+      const values = parseGpcVarsLogLine(msg.text);
+      if (values) applyLiveExpressionValues(values);
+    } else if (msg.type === "error" || msg.type === "done") {
+      stopLiveExpressionStream();
+      if (appState.usbOpen) {
+        appState.liveExprFresh = false;
+        updateLiveExpressionStatus();
+      }
+    }
+  };
+  liveExprWs.onclose = () => {
+    liveExprWs = null;
+    if (appState.usbOpen) {
+      appState.liveExprFresh = false;
+      updateLiveExpressionStatus();
+    }
+  };
+  liveExprWs.onerror = () => {
+    stopLiveExpressionStream();
+  };
 }
 
 function renderModalPalette() {
@@ -1756,7 +1892,7 @@ async function loadDictionaries() {
   appState.bluelinkCommands = bl.commands || [];
   appState.telemetryStructs = bl.telemetries || [];
 
-  renderPalette();
+  renderLiveExpressionGrid();
 }
 
 function renderLiveFields() {
@@ -1904,12 +2040,19 @@ async function refreshUsbStatus() {
   const res = await fetch("/api/usb/status");
   const data = await res.json();
   const opened = !!data.opened;
+  const wasOpen = appState.usbOpen;
   appState.usbOpen = opened;
   document.getElementById("live-status").textContent = opened ? `Open: ${data.port}` : "Closed";
   document.getElementById("btn-live-open").disabled = opened;
   document.getElementById("btn-live-close").disabled = !opened;
   document.getElementById("btn-live-send").disabled = !opened;
   document.getElementById("btn-live-send-controller").disabled = !opened;
+  if (!opened && wasOpen) {
+    stopLiveExpressionStream();
+    clearLiveExpressionValues();
+  } else {
+    updateLiveExpressionStatus();
+  }
 }
 
 async function usbOpen() {
@@ -1921,13 +2064,21 @@ async function usbOpen() {
     body: JSON.stringify({ port }),
   });
   const data = await res.json();
-  if (!data.ok) setStatus(`USB open failed: ${data.error}`);
+  if (!data.ok) {
+    setStatus(`USB open failed: ${data.error}`);
+    await refreshUsbStatus();
+    return;
+  }
   await refreshUsbStatus();
+  startLiveExpressionStream();
+  setStatus(`USB open on ${port}; Live Expression streaming`);
 }
 
 async function usbClose() {
+  stopLiveExpressionStream();
   await fetch("/api/usb/close", { method: "POST" });
   await refreshUsbStatus();
+  clearLiveExpressionValues();
 }
 
 async function usbSendMicro() {

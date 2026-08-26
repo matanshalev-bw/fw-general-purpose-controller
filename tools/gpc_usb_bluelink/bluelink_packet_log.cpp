@@ -246,6 +246,19 @@ std::string formatPayloadDetails(bluelink::PayloadTypeIds type, const uint8_t* p
         return oss.str();
       }
       break;
+    case bluelink::PayloadTypeIds::GPC_VARIABLES_TELEMETRY:
+      if (payload_len < sizeof(bluelink::TelemetryPayload::GpcVariablesTelemetry)) {
+        break;
+      }
+      {
+        bluelink::TelemetryPayload::GpcVariablesTelemetry vars{};
+        std::memcpy(&vars, payload, sizeof(vars));
+        oss << "gpc_vars";
+        for (uint8_t i = 0; i < bluelink::TelemetryPayload::GPC_VARIABLES_COUNT; ++i) {
+          oss << " v" << static_cast<unsigned>(i) << '=' << vars.variables[i];
+        }
+        return oss.str();
+      }
     case bluelink::PayloadTypeIds::LLC_SYSTEM_CONFIG_TELEMETRY:
       if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::LlcSystemConfigTelemetry>(
               payload, payload_len, oss,
@@ -524,6 +537,8 @@ std::string payloadTypeName(bluelink::PayloadTypeIds type) {
       return "LLC_STATE_TELEMETRY";
     case bluelink::PayloadTypeIds::CONTROLLER_STATE_TELEMETRY:
       return "CONTROLLER_STATE_TELEMETRY";
+    case bluelink::PayloadTypeIds::GPC_VARIABLES_TELEMETRY:
+      return "GPC_VARIABLES_TELEMETRY";
     case bluelink::PayloadTypeIds::TRANSM_OUT_SPD_TELEMETRY:
       return "TRANSM_OUT_SPD_TELEMETRY";
     case bluelink::PayloadTypeIds::PPI_PP_TELEMETRY:

@@ -12,6 +12,8 @@ void GpcTelemetrySender::initialize(MicroVarStore* var_store, BluewhiteCanComm* 
   }
   controller_state_scheduler_ =
       std::make_unique<SchedulerMainClock>(static_cast<float>(CONTROLLER_STATE_TELEMETRY_RATE_HZ));
+  gpc_variables_scheduler_ =
+      std::make_unique<SchedulerMainClock>(static_cast<float>(GPC_VARIABLES_TELEMETRY_RATE_HZ));
 
   if (!NonVolatileMemoryInterface::isConfigMemoryValid()) {
     return;
@@ -108,12 +110,29 @@ void GpcTelemetrySender::tickControllerStateTelemetry() {
   }
 }
 
+void GpcTelemetrySender::tickGpcVariablesTelemetry() {
+  if (gpc_variables_scheduler_ == nullptr || not gpc_variables_scheduler_->isDue() || var_store_ == nullptr ||
+      usb_comm_ == nullptr) {
+    return;
+  }
+
+  bluelink::TelemetryPayload::GpcVariablesTelemetry telemetry{};
+  for (uint8_t i = 0; i < bluelink::TelemetryPayload::GPC_VARIABLES_COUNT; ++i) {
+    telemetry.variables[i] = var_store_->get(i);
+  }
+
+  if (usb_comm_->sendGpcVariablesTelemetry(telemetry)) {
+    gpc_variables_scheduler_->restart();
+  }
+}
+
 void GpcTelemetrySender::tick() {
   if (can_comm_ == nullptr || usb_comm_ == nullptr) {
     return;
   }
 
   tickControllerStateTelemetry();
+  tickGpcVariablesTelemetry();
 
   if (var_store_ == nullptr) {
     return;

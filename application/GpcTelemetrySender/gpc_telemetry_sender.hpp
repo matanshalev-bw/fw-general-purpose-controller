@@ -28,10 +28,12 @@ class GpcTelemetrySender {
 
  private:
   static constexpr uint8_t CONTROLLER_STATE_TELEMETRY_RATE_HZ = 5;
+  static constexpr uint8_t GPC_VARIABLES_TELEMETRY_RATE_HZ = 2;
 
   void buildPayload(const volatile TelemetryBinding& binding, uint8_t* out) const;
   bool sendBinding(const volatile TelemetryBinding& binding, const uint8_t* payload);
   void tickControllerStateTelemetry();
+  void tickGpcVariablesTelemetry();
 
   MicroVarStore* var_store_ = nullptr;
   BluewhiteCanComm* can_comm_ = nullptr;
@@ -39,6 +41,7 @@ class GpcTelemetrySender {
   GpcController* gpc_controller_ = nullptr;
   std::unique_ptr<SchedulerMainClock> schedulers_[MAX_TELEMETRY_BINDINGS];
   std::unique_ptr<SchedulerMainClock> controller_state_scheduler_;
+  std::unique_ptr<SchedulerMainClock> gpc_variables_scheduler_;
 };
 
 #endif  // GPC_TELEMETRY_SENDER_HPP_

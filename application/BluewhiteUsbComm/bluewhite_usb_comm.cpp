@@ -69,6 +69,18 @@ bool BluewhiteUsbComm::sendTelemetry(bluelink::PayloadTypeIds payload_type, cons
   return bluelink_->writeMessageNow(packet) > 0;
 }
 
+bool BluewhiteUsbComm::sendGpcVariablesTelemetry(
+    const bluelink::TelemetryPayload::GpcVariablesTelemetry& telemetry) {
+  if (bluelink_ == nullptr || not UsbComm::instance().isHostConnected()) {
+    return false;
+  }
+
+  bluelink::Packet<bluelink::TelemetryPayload::GpcVariablesTelemetry> packet(
+      bluelink::PayloadTypeIds::GPC_VARIABLES_TELEMETRY, bluelink::ComponentId::COMPONENT_ID_BROADCAST);
+  packet.payload_data = telemetry;
+  return bluelink_->writeMessageNow(packet) > 0;
+}
+
 bool BluewhiteUsbComm::parsePayload(bluelink::PayloadTypeIds payload_type, const uint8_t* buffer) {
   if (instance_ == nullptr || buffer == nullptr) {
     return false;

@@ -132,8 +132,33 @@
     }
     .section-live { border-color: #3d8f4a; }
     .section-live .section-title { color: #6fcf7f; }
-    .section-bank { border-color: #c47a2c; }
-    .section-bank .section-title { color: #f0a050; }
+    .section-live-expr { border-color: #4a7ab8; }
+    .section-live-expr .section-title { color: #7eb0e8; }
+    .live-expr-meta {
+      font-size: 0.78rem;
+      color: #888;
+      margin: 0 0 0.45rem;
+    }
+    .live-expr-meta.active { color: #6fcf7f; }
+    .live-expr-meta.stale { color: #c9a227; }
+    .live-expr-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+      gap: 0.35rem 0.5rem;
+    }
+    .live-expr-cell {
+      display: flex;
+      align-items: baseline;
+      gap: 0.35rem;
+      padding: 0.3rem 0.45rem;
+      border: 1px solid #3a4a5c;
+      border-radius: 4px;
+      background: #1a222c;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.78rem;
+    }
+    .live-expr-cell .idx { color: #7eb0e8; min-width: 2.2rem; }
+    .live-expr-cell .val { color: #e0e0e0; word-break: break-all; }
 
     .live-row {
       display: flex;
@@ -755,9 +780,10 @@
       </div>
     </section>
 
-    <section class="section section-bank">
-      <p class="section-title">Micro Commands Bank</p>
-      <div class="palette" id="palette-bank"></div>
+    <section class="section section-live-expr" id="live-expr-section">
+      <p class="section-title">Live Expression</p>
+      <p class="live-expr-meta" id="live-expr-status">USB closed — open a port to stream variables</p>
+      <div class="live-expr-grid" id="live-expr-grid"></div>
     </section>
 
     <div class="board-legend">
