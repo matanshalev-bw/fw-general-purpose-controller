@@ -145,6 +145,7 @@ const appState = {
   usbOpen: false,
   liveExprValues: [],
   liveExprCasts: [],
+  liveFieldFormats: {},
   liveExprFresh: false,
   /** Live GPC FSM state name from CONTROLLER_STATE_TELEMETRY, or null when unknown. */
   liveControllerState: null,
@@ -643,34 +644,272 @@ function makePaletteItem(command, meta, targetParent) {
   return el;
 }
 
-const LIVE_EXPR_CAST_OPTIONS = [
-  { value: "int64", label: "int64" },
-  { value: "uint64", label: "uint64" },
+const VALUE_FORMAT_OPTIONS = [
+  { value: "dec", label: "dec" },
   { value: "hex", label: "hex" },
-  { value: "bin", label: "bin" },
-  { value: "uint32", label: "uint32" },
-  { value: "int32", label: "int32" },
-  { value: "uint16", label: "uint16" },
-  { value: "int16", label: "int16" },
-  { value: "uint8", label: "uint8" },
-  { value: "int8", label: "int8" },
-  { value: "bool", label: "bool" },
+  { value: "str", label: "str" },
 ];
+
+function escapeHtmlAttr(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
+function normalizeValueFormat(mode) {
+  if (mode === "hex" || mode === "str") return mode;
+  return "dec";
+}
+
+function migrateLegacyValueFormat(mode) {
+  if (!mode || mode === "dec" || mode === "hex" || mode === "str") return normalizeValueFormat(mode);
+  if (mode === "hex" || mode === "bin" || mode === "float_bits_hex") return "hex";
+  return "dec";
+}
+
+function int64ToLeBytes(value) {
+  let v = typeof value === "bigint" ? value : BigInt(Math.trunc(Number(value)));
+  v = BigInt.asIntN(64, v);
+  const bytes = [];
+  for (let i = 0; i < 8; i++) {
+    bytes.push(Number((v >> BigInt(8 * i)) & 0xffn));
+  }
+  return bytes;
+}
+
+function leBytesToInt64(bytes) {
+  let value = 0n;
+  for (let i = 0; i < bytes.length && i < 8; i++) {
+    value |= BigInt(bytes[i] & 0xff) << BigInt(8 * i);
+  }
+  return BigInt.asIntN(64, value);
+}
+
+function leBytesToInt64Number(bytes) {
+  const bi = leBytesToInt64(bytes);
+  const n = Number(bi);
+  if (!Number.isSafeInteger(n)) {
+    throw new Error("value exceeds safe integer range; use hex or shorter byte list");
+  }
+  return n;
+}
+
+function unwrapQuotedString(text) {
+  const s = String(text ?? "").trim();
+  if (s.startsWith('"') && s.endsWith('"')) {
+    try {
+      const parsed = JSON.parse(s);
+      if (typeof parsed === "string") return parsed;
+    } catch (_) {
+      return s.slice(1, -1);
+    }
+  }
+  if (s.startsWith("'") && s.endsWith("'") && s.length >= 2) {
+    return s.slice(1, -1);
+  }
+  return s;
+}
+
+function bytesToAsciiString(bytes) {
+  let end = bytes.length;
+  while (end > 0 && bytes[end - 1] === 0) end -= 1;
+  return bytes.slice(0, end).map((b) => String.fromCharCode(b & 0xff)).join("");
+}
+
+function formatBytesArrayForDisplay(bytes, mode) {
+  const list = Array.isArray(bytes) ? bytes : [];
+  if (!list.length) return "";
+  const fmt = normalizeValueFormat(mode);
+  if (fmt === "hex") {
+    return list.map((b) => `0x${(b & 0xff).toString(16).toUpperCase().padStart(2, "0")}`).join(", ");
+  }
+  if (fmt === "str") {
+    return `"${bytesToAsciiString(list)}"`;
+  }
+  return list.join(", ");
+}
+
+function parseBytesArrayWithFormat(text, mode, maxLen) {
+  const s = String(text ?? "").trim();
+  if (!s) return [];
+  const fmt = normalizeValueFormat(mode);
+  const limit = maxLen > 0 ? maxLen : 8;
+
+  if (fmt === "str") {
+    const str = unwrapQuotedString(s);
+    const bytes = [...str].map((c) => c.charCodeAt(0) & 0xff);
+    if (bytes.length > limit) {
+      throw new Error(`string exceeds max ${limit} bytes`);
+    }
+    return bytes;
+  }
+
+  const inner = s.startsWith("[") && s.endsWith("]") ? s.slice(1, -1) : s;
+  const parts = inner
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length);
+  if (!parts.length) return [];
+  if (parts.length > limit) {
+    throw new Error(`byte list length must be 1..${limit}`);
+  }
+
+  const bytes = parts.map((p) => {
+    if (fmt === "hex") {
+      const token = p.startsWith("0x") || p.startsWith("0X") ? p : `0x${p}`;
+      const n = Number.parseInt(token, 16);
+      if (Number.isNaN(n)) throw new Error(`invalid hex byte: ${p}`);
+      return n;
+    }
+    const n = Number.parseInt(p, 10);
+    if (Number.isNaN(n)) throw new Error(`invalid decimal byte: ${p}`);
+    return n;
+  });
+  if (bytes.some((b) => b < 0 || b > 255)) {
+    throw new Error("bytes must be 0..255");
+  }
+  return bytes;
+}
+
+function formatInt64ForDisplay(value, mode) {
+  const fmt = normalizeValueFormat(mode);
+  if (value == null || value === "") return "";
+  if (fmt === "hex") {
+    const u = toUnsigned64(BigInt(Math.trunc(Number(value))));
+    return `0x${u.toString(16)}`;
+  }
+  if (fmt === "str") {
+    return `"${bytesToAsciiString(int64ToLeBytes(value))}"`;
+  }
+  return String(value);
+}
+
+function parseInt64WithFormat(text, mode, { allowByteList = false } = {}) {
+  const fmt = normalizeValueFormat(mode);
+  const s = String(text ?? "").trim();
+  if (!s) return 0;
+
+  if (fmt === "str") {
+    const str = unwrapQuotedString(s);
+    const bytes = [...str].map((c) => c.charCodeAt(0) & 0xff);
+    if (!bytes.length) return 0;
+    if (bytes.length > 8) throw new Error("string fits in at most 8 bytes for int64");
+    return leBytesToInt64Number(bytes);
+  }
+
+  if (fmt === "hex") {
+    const token = s.startsWith("0x") || s.startsWith("0X") ? s : `0x${s}`;
+    const n = Number.parseInt(token, 16);
+    if (Number.isNaN(n)) throw new Error("invalid hex integer");
+    return n;
+  }
+
+  if (allowByteList && (s.startsWith("[") || s.includes(","))) {
+    return leBytesToInt64Number(parseBytesArrayWithFormat(s, "dec", 8));
+  }
+
+  const n = Number.parseInt(s, 10);
+  if (Number.isNaN(n)) throw new Error("invalid decimal integer");
+  return n;
+}
+
+function fieldUsesValueFormat(command, param) {
+  if (param.is_list) return true;
+  if (param.accepts_byte_list) return true;
+  return false;
+}
+
+const HEX_ADDRESS_FIELDS = {
+  can_transmit: new Set(["id"]),
+  can_receive: new Set(["id"]),
+  i2c_write: new Set(["device_addr"]),
+  i2c_read: new Set(["device_addr"]),
+};
+
+function fieldUsesHexAddress(command, paramName) {
+  return HEX_ADDRESS_FIELDS[command]?.has(paramName) ?? false;
+}
+
+function liveFieldUsesHexAddress(op, fieldName) {
+  return fieldUsesHexAddress(op?.union_member, fieldName);
+}
+
+function formatHexAddressValue(value) {
+  if (value == null || value === "") return "0x0";
+  const n = typeof value === "number" ? value : Number.parseInt(String(value), 0);
+  if (Number.isNaN(n)) return "0x0";
+  return `0x${n.toString(16).toUpperCase()}`;
+}
+
+function parseHexAddressInput(text) {
+  const s = String(text ?? "").trim();
+  if (!s) return 0;
+  const token = s.startsWith("0x") || s.startsWith("0X") ? s : `0x${s}`;
+  const n = Number.parseInt(token, 16);
+  if (Number.isNaN(n)) throw new Error("invalid hex address (use 0x prefix)");
+  if (n < 0) throw new Error("address must be non-negative");
+  return n;
+}
+
+function liveFieldUsesValueFormat(op, field) {
+  if (field.array_size) return true;
+  return op?.union_member === "var_set" && field.name === "value";
+}
+
+function getLiveFieldFormatKey(op, fieldName) {
+  return `${op?.union_member || "unknown"}.${fieldName}`;
+}
+
+function getLiveFieldFormat(op, fieldName) {
+  return migrateLegacyValueFormat(appState.liveFieldFormats?.[getLiveFieldFormatKey(op, fieldName)]);
+}
+
+function setLiveFieldFormat(op, fieldName, mode) {
+  if (!appState.liveFieldFormats) appState.liveFieldFormats = {};
+  appState.liveFieldFormats[getLiveFieldFormatKey(op, fieldName)] = normalizeValueFormat(mode);
+}
+
+function getNodeArgFormat(node, paramName) {
+  return migrateLegacyValueFormat(node.data?.argFormats?.[paramName]);
+}
+
+function formatArgForDisplay(val, format, { isList = false, isVarSetValue = false } = {}) {
+  if (isList) {
+    return formatBytesArrayForDisplay(Array.isArray(val) ? val : [], format);
+  }
+  if (isVarSetValue) {
+    return formatInt64ForDisplay(val, format);
+  }
+  return val ?? "";
+}
+
+function makeValueFormatSelect(id, selected, title) {
+  const sel = document.createElement("select");
+  sel.id = id;
+  sel.className = "value-format-select";
+  sel.title = title || "Value representation";
+  sel.setAttribute("aria-label", title || "Value representation");
+  for (const opt of VALUE_FORMAT_OPTIONS) {
+    const o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (opt.value === normalizeValueFormat(selected)) o.selected = true;
+    sel.appendChild(o);
+  }
+  return sel;
+}
 
 function ensureLiveExprCasts(count) {
   if (!Array.isArray(appState.liveExprCasts)) appState.liveExprCasts = [];
   while (appState.liveExprCasts.length < count) {
-    appState.liveExprCasts.push("int64");
+    appState.liveExprCasts.push("dec");
   }
   if (appState.liveExprCasts.length > count) {
     appState.liveExprCasts.length = count;
   }
   for (let i = 0; i < appState.liveExprCasts.length; i++) {
-    // Migrate leftover float64 display modes from the previous UI.
-    if (appState.liveExprCasts[i] === "float64" || appState.liveExprCasts[i] === "float_bits_hex" ||
-        appState.liveExprCasts[i] === "float_bits_u64") {
-      appState.liveExprCasts[i] = "int64";
-    }
+    appState.liveExprCasts[i] = migrateLegacyValueFormat(appState.liveExprCasts[i]);
   }
 }
 
@@ -694,41 +933,20 @@ function toSigned64(v) {
   return BigInt.asIntN(64, v);
 }
 
-/** Format a raw int64 wire value string for the selected Live Expression cast. */
+/** Format a raw int64 wire value string for the selected Live Expression representation. */
 function formatLiveExpressionValue(raw, castMode) {
   if (raw == null || raw === "—") return "—";
   const value = parseLiveExprInt64(raw);
   if (value === null) return String(raw);
 
-  const mode = castMode || "int64";
-  const u = toUnsigned64(value);
-  const s = toSigned64(value);
-  switch (mode) {
-    case "int64":
-      return s.toString(10);
-    case "uint64":
-      return u.toString(10);
-    case "hex":
-      return `0x${u.toString(16)}`;
-    case "bin":
-      return `0b${u.toString(2)}`;
-    case "uint32":
-      return (u & 0xffffffffn).toString(10);
-    case "int32":
-      return BigInt.asIntN(32, u).toString(10);
-    case "uint16":
-      return (u & 0xffffn).toString(10);
-    case "int16":
-      return BigInt.asIntN(16, u).toString(10);
-    case "uint8":
-      return (u & 0xffn).toString(10);
-    case "int8":
-      return BigInt.asIntN(8, u).toString(10);
-    case "bool":
-      return value !== 0n ? "true" : "false";
-    default:
-      return s.toString(10);
+  const mode = migrateLegacyValueFormat(castMode);
+  if (mode === "hex") {
+    return `0x${toUnsigned64(value).toString(16)}`;
   }
+  if (mode === "str") {
+    return `"${bytesToAsciiString(int64ToLeBytes(value))}"`;
+  }
+  return toSigned64(value).toString(10);
 }
 
 function refreshLiveExpressionDisplay() {
@@ -747,15 +965,15 @@ function makeLiveExprCastSelect(varIndex, selected) {
   sel.id = `live-expr-cast-${varIndex}`;
   sel.title = `Display type for v${varIndex}`;
   sel.setAttribute("aria-label", `Display type for v${varIndex}`);
-  for (const opt of LIVE_EXPR_CAST_OPTIONS) {
+  for (const opt of VALUE_FORMAT_OPTIONS) {
     const o = document.createElement("option");
     o.value = opt.value;
     o.textContent = opt.label;
-    if (opt.value === selected) o.selected = true;
+    if (opt.value === migrateLegacyValueFormat(selected)) o.selected = true;
     sel.appendChild(o);
   }
   sel.addEventListener("change", () => {
-    appState.liveExprCasts[varIndex] = sel.value || "int64";
+    appState.liveExprCasts[varIndex] = normalizeValueFormat(sel.value);
     const el = document.getElementById(`live-expr-val-${varIndex}`);
     if (el) {
       el.textContent = formatLiveExpressionValue(
@@ -1020,6 +1238,9 @@ function formatNodeLabel(step) {
     .slice(0, 2)
     .map((k) => {
       const v = args[k];
+      if (fieldUsesHexAddress(step.command, k) && typeof v === "number") {
+        return `${k}=${formatHexAddressValue(v)}`;
+      }
       if (Array.isArray(v)) return `${k}=[${v.join(", ")}]`;
       if (typeof v === "number" && (step.command === "var_set" || k === "value") && !Number.isInteger(v)) {
         return `${k}=${v}`;
@@ -1177,29 +1398,50 @@ function renderPropsPanel(nodeId) {
     panel.innerHTML = `<h3>Properties</h3><p class="props-empty">${friendlyName(command)} — no parameters</p>`;
     return;
   }
+  if (!node.data.argFormats) node.data.argFormats = {};
 
   const fields = meta.params
     .map((p) => {
       const val = node.data.args[p.name];
-      const displayVal = Array.isArray(val) ? val.join(", ") : val ?? "";
+      const usesFormat = fieldUsesValueFormat(command, p);
+      const argFormat = getNodeArgFormat(node, p.name);
+      const displayVal = usesFormat
+        ? formatArgForDisplay(val, argFormat, { isList: !!p.is_list, isVarSetValue: !!p.accepts_byte_list })
+        : Array.isArray(val)
+          ? val.join(", ")
+          : val ?? "";
       if (p.is_list) {
         const maxLen = p.max_len || appState.limits.comm_data_length;
         return `
           <div class="field">
             <label for="prop-${p.name}">${p.name}<span class="limit-hint">max ${maxLen} bytes</span></label>
-            <input id="prop-${p.name}" data-param="${p.name}" data-is-list="1" data-max-len="${maxLen}" class="wide"
-              value="${displayVal}" placeholder="comma-separated, max ${maxLen} bytes" />
+            <div class="field-format-row">
+              <select id="prop-format-${p.name}" data-format-for="${p.name}" class="value-format-select" title="Value representation">
+                ${VALUE_FORMAT_OPTIONS.map(
+                  (opt) =>
+                    `<option value="${opt.value}"${opt.value === argFormat ? " selected" : ""}>${opt.label}</option>`
+                ).join("")}
+              </select>
+              <input id="prop-${p.name}" data-param="${p.name}" data-is-list="1" data-max-len="${maxLen}" class="wide"
+                value="${escapeHtmlAttr(displayVal)}" placeholder="72, 69, 76 or 0x48, 0x45 or &quot;HELLO&quot;" />
+            </div>
           </div>`;
       }
       if (p.accepts_byte_list) {
         const maxLen = p.max_len || appState.limits.comm_data_length || 8;
-        const shown =
-          typeof val === "number" && val > 255 ? `0x${val.toString(16)}` : displayVal;
         return `
           <div class="field">
             <label for="prop-${p.name}">${p.name}<span class="limit-hint">int64 or LE bytes (max ${maxLen})</span></label>
-            <input id="prop-${p.name}" data-param="${p.name}" data-accepts-byte-list="1" data-max-len="${maxLen}" class="wide"
-              value="${shown}" placeholder="3500 or 0x0A, 0x03, 0x33" />
+            <div class="field-format-row">
+              <select id="prop-format-${p.name}" data-format-for="${p.name}" class="value-format-select" title="Value representation">
+                ${VALUE_FORMAT_OPTIONS.map(
+                  (opt) =>
+                    `<option value="${opt.value}"${opt.value === argFormat ? " selected" : ""}>${opt.label}</option>`
+                ).join("")}
+              </select>
+              <input id="prop-${p.name}" data-param="${p.name}" data-accepts-byte-list="1" data-max-len="${maxLen}" class="wide"
+                value="${escapeHtmlAttr(displayVal)}" placeholder="3500, 0xDAC, or &quot;text&quot;" />
+            </div>
           </div>`;
       }
       if (p.name === "comparing_type") {
@@ -1211,6 +1453,14 @@ function renderPropsPanel(nodeId) {
           <div class="field">
             <label for="prop-${p.name}">${p.name}</label>
             <select id="prop-${p.name}" data-param="${p.name}">${opts}</select>
+          </div>`;
+      }
+      if (fieldUsesHexAddress(command, p.name)) {
+        const shown = formatHexAddressValue(val);
+        return `
+          <div class="field">
+            <label for="prop-${p.name}">${p.name}<span class="limit-hint">hex (0x)</span></label>
+            <input id="prop-${p.name}" data-param="${p.name}" data-hex-address="1" value="${escapeHtmlAttr(shown)}" placeholder="0x12" />
           </div>`;
       }
       const maxValue = p.max_value;
@@ -1229,30 +1479,52 @@ function renderPropsPanel(nodeId) {
 
   panel.innerHTML = `<h3>${friendlyName(command)}</h3>${fields}`;
 
+  panel.querySelectorAll("[data-format-for]").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const param = sel.dataset.formatFor;
+      const format = normalizeValueFormat(sel.value);
+      node.data.argFormats[param] = format;
+      drawflowEditor.updateNodeDataFromId(nodeId, node.data);
+      const paramMeta = meta.params.find((p) => p.name === param);
+      const input = panel.querySelector(`#prop-${param}`);
+      if (!input || !paramMeta) return;
+      input.value = formatArgForDisplay(node.data.args[param], format, {
+        isList: !!paramMeta.is_list,
+        isVarSetValue: !!paramMeta.accepts_byte_list,
+      });
+    });
+  });
+
   panel.querySelectorAll("[data-param]").forEach((el) => {
     const handler = () => {
       const param = el.dataset.param;
+      const formatSel = panel.querySelector(`#prop-format-${param}`);
+      const format = formatSel ? normalizeValueFormat(formatSel.value) : "dec";
       let value;
       if (el.dataset.isList === "1") {
         const maxLen = parseInt(el.dataset.maxLen || "8", 10);
-        value = el.value
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s.length)
-          .map((s) => (s.startsWith("0x") ? parseInt(s, 16) : parseInt(s, 10) || 0));
+        try {
+          value = parseBytesArrayWithFormat(el.value, format, maxLen);
+        } catch (err) {
+          setStatus(`Invalid ${param}: ${err.message || err}`);
+          return;
+        }
         if (value.length > maxLen) {
           value = value.slice(0, maxLen);
-          el.value = value.join(", ");
+          el.value = formatBytesArrayForDisplay(value, format);
           setStatus(`Trimmed ${param} to max ${maxLen} bytes`);
         }
       } else if (el.dataset.acceptsByteList === "1") {
         try {
-          value = parseVarSetValueInput(el.value);
-          if (typeof value === "number" && value > 255) {
-            el.value = `0x${value.toString(16)}`;
-          } else {
-            el.value = String(value);
-          }
+          value = parseInt64WithFormat(el.value, format, { allowByteList: format === "dec" });
+        } catch (err) {
+          setStatus(`Invalid ${param}: ${err.message || err}`);
+          return;
+        }
+      } else if (el.dataset.hexAddress === "1") {
+        try {
+          value = parseHexAddressInput(el.value);
+          el.value = formatHexAddressValue(value);
         } catch (err) {
           setStatus(`Invalid ${param}: ${err.message || err}`);
           return;
@@ -2148,14 +2420,45 @@ function collectLiveMicroFieldValues(op) {
     const input = document.getElementById(`live-field-${f.name}`);
     if (!input) continue;
     const raw = input.value.trim();
+    const usesFormat = liveFieldUsesValueFormat(op, f);
+    const formatSel = document.getElementById(`live-field-format-${f.name}`);
+    const format = formatSel ? normalizeValueFormat(formatSel.value) : "dec";
+
     if (f.array_size) {
-      const parsed = parseByteArrayInput(raw);
-      values[f.name] = parsed.bytes;
-      if (op.union_member === "uart_transmit" && f.name === "data" && parsed.fromQuotedString) {
-        uartDataFromQuotedString = true;
+      try {
+        const maxLen = f.max_len || parseInt(String(f.array_size), 10) || 8;
+        values[f.name] = parseBytesArrayWithFormat(raw, format, maxLen);
+        if (
+          op.union_member === "uart_transmit" &&
+          f.name === "data" &&
+          (format === "str" || parseByteArrayInput(raw).fromQuotedString)
+        ) {
+          uartDataFromQuotedString = true;
+        }
+      } catch (err) {
+        throw new Error(`${f.name}: ${err.message || err}`);
       }
       continue;
     }
+
+    if (usesFormat && op.union_member === "var_set" && f.name === "value") {
+      try {
+        values[f.name] = parseInt64WithFormat(raw, format, { allowByteList: format === "dec" });
+      } catch (err) {
+        throw new Error(`${f.name}: ${err.message || err}`);
+      }
+      continue;
+    }
+
+    if (liveFieldUsesHexAddress(op, f.name)) {
+      try {
+        values[f.name] = parseHexAddressInput(raw);
+      } catch (err) {
+        throw new Error(`${f.name}: ${err.message || err}`);
+      }
+      continue;
+    }
+
     if (/^0x[0-9a-fA-F]+$/.test(raw)) values[f.name] = raw;
     else if (/^-?\d+$/.test(raw)) values[f.name] = parseInt(raw, 10);
     else values[f.name] = raw;
@@ -2181,31 +2484,90 @@ function updateLiveFields() {
     label.htmlFor = `live-field-${f.name}`;
     const maxLen = f.max_len || (f.array_size ? parseInt(String(f.array_size), 10) : null);
     const maxValue = f.max_value;
-    const hint = f.hint || (maxLen ? `max ${maxLen} bytes` : maxValue != null ? `max ${maxValue}` : null);
+    const usesFormat = liveFieldUsesValueFormat(op, f);
+    const usesHexAddress = liveFieldUsesHexAddress(op, f.name);
+    const format = getLiveFieldFormat(op, f.name);
+    const hint = f.hint || (usesHexAddress ? "hex (0x)" : maxLen ? `max ${maxLen} bytes` : maxValue != null ? `max ${maxValue}` : null);
     if (hint) {
       label.innerHTML = `${f.name}<span class="limit-hint">${hint}</span>`;
     } else {
       label.textContent = f.name;
     }
-    const input = document.createElement("input");
-    input.id = `live-field-${f.name}`;
-    input.dataset.field = f.name;
-    if (maxLen || f.array_size) {
+
+    let input;
+
+    if (usesHexAddress) {
+      input = document.createElement("input");
+      input.id = `live-field-${f.name}`;
+      input.dataset.field = f.name;
+      input.dataset.hexAddress = "1";
+      input.value = formatHexAddressValue(f.default ?? 0);
+      input.placeholder = "0x12";
+      input.addEventListener("change", () => {
+        try {
+          input.value = formatHexAddressValue(parseHexAddressInput(input.value));
+        } catch (_) {
+          /* keep value until send validates */
+        }
+      });
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+    } else if (usesFormat) {
+      const row = document.createElement("div");
+      row.className = "field-format-row";
+      const formatSel = makeValueFormatSelect(`live-field-format-${f.name}`, format, `Format for ${f.name}`);
+      formatSel.dataset.formatFor = f.name;
+      input = document.createElement("input");
+      input.id = `live-field-${f.name}`;
+      input.dataset.field = f.name;
       input.className = "wide";
-      input.placeholder = `comma-separated or "text", max ${maxLen || f.array_size} bytes`;
-      input.dataset.maxLen = String(maxLen || f.array_size);
-      if (Array.isArray(f.default)) input.value = f.default.join(",");
-      else input.value = "";
+      if (f.array_size) {
+        input.dataset.maxLen = String(maxLen || f.array_size);
+        input.placeholder = `bytes (dec/hex) or "text"`;
+        if (Array.isArray(f.default)) {
+          input.value = formatBytesArrayForDisplay(f.default, format);
+        }
+      } else {
+        input.placeholder = "int64 (dec/hex) or text";
+        input.value = formatInt64ForDisplay(f.default ?? 0, format);
+      }
+      formatSel.addEventListener("change", () => {
+        const prevFormat = getLiveFieldFormat(op, f.name);
+        const nextFormat = normalizeValueFormat(formatSel.value);
+        setLiveFieldFormat(op, f.name, nextFormat);
+        if (f.array_size) {
+          try {
+            const bytes = parseBytesArrayWithFormat(input.value, prevFormat, maxLen || 8);
+            input.value = formatBytesArrayForDisplay(bytes, nextFormat);
+          } catch (_) {
+            input.value = "";
+          }
+        } else {
+          try {
+            const n = parseInt64WithFormat(input.value, prevFormat, { allowByteList: prevFormat === "dec" });
+            input.value = formatInt64ForDisplay(n, nextFormat);
+          } catch (_) {
+            input.value = "";
+          }
+        }
+      });
+      row.appendChild(formatSel);
+      row.appendChild(input);
+      wrap.appendChild(label);
+      wrap.appendChild(row);
     } else {
+      input = document.createElement("input");
+      input.id = `live-field-${f.name}`;
+      input.dataset.field = f.name;
       input.value = f.default !== undefined && f.default !== null ? String(f.default) : "0";
       if (maxValue != null) {
         input.type = "number";
         input.min = "0";
         input.max = String(maxValue);
       }
+      wrap.appendChild(label);
+      wrap.appendChild(input);
     }
-    wrap.appendChild(label);
-    wrap.appendChild(input);
     fieldsDiv.appendChild(wrap);
   }
 }
@@ -2287,7 +2649,13 @@ async function usbSendMicro() {
     setStatus("Select a micro command first");
     return;
   }
-  const values = collectLiveMicroFieldValues(op);
+  let values;
+  try {
+    values = collectLiveMicroFieldValues(op);
+  } catch (err) {
+    setStatus(err.message || String(err));
+    return;
+  }
   setStatus("Sending micro command…");
   const res = await fetch("/api/usb/send-micro", {
     method: "POST",

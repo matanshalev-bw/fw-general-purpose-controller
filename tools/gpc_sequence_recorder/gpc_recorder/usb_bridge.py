@@ -296,6 +296,18 @@ def micro_ops_catalog() -> List[Dict[str, Any]]:
             "use_var": "1=duty from var_index, 0=use duty_percent",
             "var_index": "var slot 0–19 when use_var=1",
         },
+        "can_transmit": {
+            "id": "hex (0x)",
+        },
+        "can_receive": {
+            "id": "hex (0x)",
+        },
+        "i2c_write": {
+            "device_addr": "hex (0x)",
+        },
+        "i2c_read": {
+            "device_addr": "hex (0x)",
+        },
     }
     catalog: List[Dict[str, Any]] = []
     for member, op in sorted(schema.micro_ops.items()):

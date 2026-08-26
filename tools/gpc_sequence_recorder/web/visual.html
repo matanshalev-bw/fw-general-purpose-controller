@@ -172,7 +172,44 @@
       border-radius: 3px;
       padding: 0.1rem 0.2rem;
       font-size: 0.7rem;
-      max-width: 7.5rem;
+      max-width: 3.5rem;
+    }
+
+    .field-format-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      width: 100%;
+    }
+    .field-format-row .value-format-select {
+      flex-shrink: 0;
+      min-width: 3.2rem;
+    }
+    .field-format-row input.wide {
+      flex: 1;
+      min-width: 0;
+    }
+    .props-panel .field-format-row select {
+      background: #3c3c3c;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 3px;
+      padding: 0.2rem 0.35rem;
+      font-size: 0.75rem;
+    }
+    #live-fields .field {
+      flex-wrap: wrap;
+    }
+    #live-fields .field-format-row {
+      flex: 1 1 100%;
+    }
+    #live-fields .field-format-row select {
+      background: #3c3c3c;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 3px;
+      padding: 0.15rem 0.3rem;
+      font-size: 0.75rem;
     }
 
     .live-row {
