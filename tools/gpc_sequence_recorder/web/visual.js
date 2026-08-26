@@ -167,6 +167,16 @@ const appState = {
 
 let drawflowEditor = null;
 let selectedNodeId = null;
+let selectedNodeIds = new Set();
+let skipNextNodeSelected = false;
+/** @type {Array<{command: string, args: object}>} */
+let commandClipboard = [];
+/** @type {Array<Array<{command: string, args: object}>>} */
+let editorUndoStack = [];
+/** @type {Array<{command: string, args: object}>|null} */
+let editorUndoPending = null;
+let editorUndoSuspended = false;
+const EDITOR_UNDO_MAX = 50;
 let flashOutputBuffer = "";
 let liveExprWs = null;
 
@@ -1259,15 +1269,74 @@ function nodeClassForCommand(command) {
   return "node-step";
 }
 
-function buildDrawflowFromSteps(steps) {
+function cloneSteps(steps) {
+  return steps.map(cloneStep);
+}
+
+function stepsEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function resetEditorUndo() {
+  editorUndoStack = [];
+  editorUndoPending = null;
+}
+
+function captureEditorUndoPending() {
+  if (editorUndoSuspended || !drawflowEditor) return;
+  editorUndoPending = cloneSteps(linearizeDrawflow());
+}
+
+function commitEditorUndoIfChanged() {
+  if (editorUndoSuspended || !editorUndoPending || !drawflowEditor) {
+    editorUndoPending = null;
+    return;
+  }
+  const current = linearizeDrawflow();
+  if (!stepsEqual(editorUndoPending, current)) {
+    const last = editorUndoStack[editorUndoStack.length - 1];
+    if (!last || !stepsEqual(last, editorUndoPending)) {
+      editorUndoStack.push(editorUndoPending);
+      if (editorUndoStack.length > EDITOR_UNDO_MAX) editorUndoStack.shift();
+    }
+  }
+  editorUndoPending = null;
+}
+
+function pushEditorUndoNow() {
+  if (editorUndoSuspended || !drawflowEditor) return;
+  editorUndoPending = null;
+  const steps = cloneSteps(linearizeDrawflow());
+  const last = editorUndoStack[editorUndoStack.length - 1];
+  if (last && stepsEqual(last, steps)) return;
+  editorUndoStack.push(steps);
+  if (editorUndoStack.length > EDITOR_UNDO_MAX) editorUndoStack.shift();
+}
+
+function undoEditor() {
+  if (!editorUndoStack.length) {
+    setStatus("Nothing to undo");
+    return false;
+  }
+  editorUndoSuspended = true;
+  editorUndoPending = null;
+  const steps = editorUndoStack.pop();
+  buildDrawflowFromSteps(steps);
+  updateModalStepLimit();
+  editorUndoSuspended = false;
+  setStatus("Undone");
+  return true;
+}
+
+function buildDrawflowFromSteps(steps, selectStepIndex = null) {
   if (!drawflowEditor) return;
   drawflowEditor.clear();
-  selectedNodeId = null;
-  renderPropsPanel(null);
+  clearNodeSelection();
 
   let prevId = null;
   let x = 60;
   let y = 80;
+  const nodeIds = [];
   for (const step of steps) {
     const meta = appState.commandMeta[step.command];
     const inputs = prevId !== null ? 1 : 0;
@@ -1286,6 +1355,7 @@ function buildDrawflowFromSteps(steps) {
       },
       html
     );
+    nodeIds.push(id);
     if (prevId !== null) {
       drawflowEditor.addConnection(prevId, id, "output_1", "input_1");
     }
@@ -1296,9 +1366,88 @@ function buildDrawflowFromSteps(steps) {
       y += 130;
     }
   }
+
+  if (selectStepIndex != null && nodeIds[selectStepIndex] != null) {
+    setNodeSelection([nodeIds[selectStepIndex]], nodeIds[selectStepIndex]);
+    if (typeof drawflowEditor.selectNode === "function") {
+      drawflowEditor.selectNode(selectedNodeId);
+    }
+  }
 }
 
-function linearizeDrawflow() {
+function syncNodeSelectionVisuals() {
+  document.querySelectorAll("#drawflow .drawflow-node").forEach((el) => {
+    const id = el.id.replace(/^node-/, "");
+    el.classList.toggle("gpc-selected", selectedNodeIds.has(id));
+  });
+}
+
+function setNodeSelection(ids, primaryId) {
+  selectedNodeIds = new Set(ids.map(String));
+  selectedNodeId = primaryId != null ? String(primaryId) : selectedNodeIds.size ? [...selectedNodeIds][0] : null;
+  syncNodeSelectionVisuals();
+  renderPropsPanel(selectedNodeId);
+}
+
+function clearNodeSelection() {
+  selectedNodeIds.clear();
+  selectedNodeId = null;
+  syncNodeSelectionVisuals();
+  renderPropsPanel(null);
+}
+
+function handleDrawflowNodePointerDown(ev) {
+  if (ev.button !== 0) return;
+  const nodeEl = ev.target.closest(".drawflow-node");
+  if (!nodeEl) {
+    if (!ev.ctrlKey && !ev.metaKey) {
+      clearNodeSelection();
+    }
+    return;
+  }
+
+  if (!(ev.ctrlKey || ev.metaKey)) return;
+
+  ev.preventDefault();
+  ev.stopPropagation();
+  skipNextNodeSelected = true;
+
+  const id = nodeEl.id.replace(/^node-/, "");
+  const next = new Set(selectedNodeIds);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  setNodeSelection([...next], next.has(id) ? id : [...next][0] ?? null);
+}
+
+function collectCopyIndices(steps, selectedIndices) {
+  const expanded = new Set();
+  for (const index of selectedIndices) {
+    for (const idx of expandIfConditionBlock(steps, index)) {
+      expanded.add(idx);
+    }
+  }
+  return [...expanded].sort((a, b) => a - b);
+}
+
+function getPasteInsertIndex(entries, stepCount) {
+  if (!selectedNodeIds.size) return stepCount;
+  const idToIndex = new Map(entries.map((entry, index) => [entry.id, index]));
+  let maxIndex = -1;
+  for (const id of selectedNodeIds) {
+    const index = idToIndex.get(String(id));
+    if (index !== undefined && index > maxIndex) maxIndex = index;
+  }
+  return maxIndex >= 0 ? maxIndex + 1 : stepCount;
+}
+
+function cloneStep(step) {
+  return {
+    command: step.command,
+    args: JSON.parse(JSON.stringify(step.args || {})),
+  };
+}
+
+function getOrderedDrawflowEntries() {
   if (!drawflowEditor) return [];
   const exported = drawflowEditor.export();
   const data = exported.drawflow?.Home?.data || {};
@@ -1318,7 +1467,7 @@ function linearizeDrawflow() {
   let startId = nodeIds.find((id) => !hasIncoming.has(id));
   if (!startId) startId = nodeIds[0];
 
-  const steps = [];
+  const entries = [];
   let currentId = startId;
   const visited = new Set();
   while (currentId && !visited.has(currentId)) {
@@ -1326,7 +1475,8 @@ function linearizeDrawflow() {
     const node = data[currentId];
     const command = node.data?.command;
     if (command) {
-      steps.push({
+      entries.push({
+        id: String(currentId),
         command,
         args: { ...(node.data.args || {}) },
       });
@@ -1341,7 +1491,81 @@ function linearizeDrawflow() {
     }
     currentId = nextId;
   }
-  return steps;
+  return entries;
+}
+
+function expandIfConditionBlock(steps, startIndex) {
+  if (steps[startIndex]?.command !== "if_condition") return [startIndex];
+  let depth = 0;
+  for (let j = startIndex; j < steps.length; j++) {
+    if (steps[j].command === "if_condition") depth++;
+    if (steps[j].command === "end_condition") {
+      depth--;
+      if (depth === 0) {
+        const indices = [];
+        for (let k = startIndex; k <= j; k++) indices.push(k);
+        return indices;
+      }
+    }
+  }
+  return [startIndex];
+}
+
+function copySelectedCommand() {
+  if (!drawflowEditor || !selectedNodeIds.size) {
+    setStatus("Select a command to copy");
+    return false;
+  }
+
+  const entries = getOrderedDrawflowEntries();
+  const idToIndex = new Map(entries.map((entry, index) => [entry.id, index]));
+  const indices = [...selectedNodeIds]
+    .map((id) => idToIndex.get(String(id)))
+    .filter((index) => index !== undefined)
+    .sort((a, b) => a - b);
+  if (!indices.length) {
+    setStatus("Select a command to copy");
+    return false;
+  }
+
+  const steps = entries.map(({ command, args }) => ({ command, args }));
+  const copyIndices = collectCopyIndices(steps, indices);
+  commandClipboard = copyIndices.map((i) => cloneStep(steps[i]));
+
+  const label = commandClipboard.length === 1 ? "command" : "commands";
+  setStatus(`Copied ${commandClipboard.length} ${label}`);
+  return true;
+}
+
+function pasteCommands() {
+  if (!drawflowEditor) return false;
+  if (!commandClipboard.length) {
+    setStatus("Nothing to paste — copy a command first");
+    return false;
+  }
+
+  const steps = linearizeDrawflow();
+  const entries = getOrderedDrawflowEntries();
+  const insertIndex = getPasteInsertIndex(entries, steps.length);
+
+  const pasted = commandClipboard.map(cloneStep);
+  const newSteps = [...steps.slice(0, insertIndex), ...pasted, ...steps.slice(insertIndex)];
+  if (newSteps.length > appState.limits.max_steps) {
+    setStatus(`Cannot paste: would exceed max ${appState.limits.max_steps} steps`);
+    updateModalStepLimit();
+    return false;
+  }
+
+  pushEditorUndoNow();
+  buildDrawflowFromSteps(newSteps, insertIndex);
+  updateModalStepLimit();
+  const label = pasted.length === 1 ? "command" : "commands";
+  setStatus(`Pasted ${pasted.length} ${label}`);
+  return true;
+}
+
+function linearizeDrawflow() {
+  return getOrderedDrawflowEntries().map(({ command, args }) => ({ command, args }));
 }
 
 function addNodeAtDrop(command, args, clientX, clientY) {
@@ -1359,6 +1583,7 @@ function addNodeAtDrop(command, args, clientX, clientY) {
   const meta = appState.commandMeta[command];
   const step = { command, args: args || defaultArgs(meta) };
   const html = `<div class="node-label">${formatNodeLabel(step).replace(/\n/g, "<br>")}</div>`;
+  pushEditorUndoNow();
   drawflowEditor.addNode(
     command,
     1,
@@ -1385,8 +1610,15 @@ function updateModalStepLimit() {
 
 function renderPropsPanel(nodeId) {
   const panel = document.getElementById("props-panel");
+  const selectionCount = selectedNodeIds.size;
+
   if (!nodeId || !drawflowEditor) {
     panel.innerHTML = `<h3>Properties</h3><p class="props-empty">Select a node to edit parameters.</p>`;
+    return;
+  }
+
+  if (selectionCount > 1) {
+    panel.innerHTML = `<h3>${selectionCount} commands selected</h3><p class="props-empty">Ctrl+click to change selection. Ctrl+C to copy.</p>`;
     return;
   }
 
@@ -1548,6 +1780,7 @@ function renderPropsPanel(nodeId) {
       // so Save / linearizeDrawflow see the edited args instead of defaults.
       node.data.args[param] = value;
       drawflowEditor.updateNodeDataFromId(nodeId, node.data);
+      commitEditorUndoIfChanged();
       const label = formatNodeLabel({ command, args: node.data.args });
       const nodeEl = document.getElementById(`node-${nodeId}`);
       const inner = nodeEl?.querySelector(".node-label");
@@ -1555,7 +1788,22 @@ function renderPropsPanel(nodeId) {
     };
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
+    el.addEventListener("focusin", captureEditorUndoPending);
   });
+}
+
+function captureDrawflowUndoPending(ev) {
+  if (editorUndoSuspended || ev.button !== 0) return;
+  if (ev.ctrlKey || ev.metaKey) return;
+  const target = ev.target;
+  if (
+    target.closest(".drawflow-node") ||
+    target.classList.contains("input") ||
+    target.classList.contains("output") ||
+    target.classList.contains("main-path")
+  ) {
+    captureEditorUndoPending();
+  }
 }
 
 function initDrawflow() {
@@ -1568,6 +1816,8 @@ function initDrawflow() {
     ev.preventDefault();
     ev.dataTransfer.dropEffect = "copy";
   });
+  container.addEventListener("mousedown", handleDrawflowNodePointerDown, true);
+  container.addEventListener("mousedown", captureDrawflowUndoPending, true);
   container.addEventListener("drop", (ev) => {
     ev.preventDefault();
     const raw = ev.dataTransfer.getData("application/gpc-command");
@@ -1577,15 +1827,27 @@ function initDrawflow() {
   });
 
   drawflowEditor.on("nodeSelected", (id) => {
-    selectedNodeId = id;
-    renderPropsPanel(id);
+    if (skipNextNodeSelected) {
+      skipNextNodeSelected = false;
+      return;
+    }
+    setNodeSelection([id], id);
   });
   drawflowEditor.on("nodeUnselected", () => {
-    selectedNodeId = null;
-    renderPropsPanel(null);
+    if (selectedNodeIds.size <= 1) {
+      clearNodeSelection();
+    }
   });
-  drawflowEditor.on("nodeCreated", () => updateModalStepLimit());
-  drawflowEditor.on("nodeRemoved", () => updateModalStepLimit());
+  drawflowEditor.on("nodeCreated", () => {
+    commitEditorUndoIfChanged();
+    updateModalStepLimit();
+  });
+  drawflowEditor.on("nodeRemoved", () => {
+    commitEditorUndoIfChanged();
+    updateModalStepLimit();
+  });
+  drawflowEditor.on("connectionCreated", commitEditorUndoIfChanged);
+  drawflowEditor.on("connectionRemoved", commitEditorUndoIfChanged);
 }
 
 function openEditor(containerId) {
@@ -1605,6 +1867,7 @@ function openEditor(containerId) {
   if (!drawflowEditor) initDrawflow();
   else drawflowEditor.clear();
 
+  resetEditorUndo();
   buildDrawflowFromSteps(container.steps || []);
   updateModalStepLimit();
 }
@@ -1626,6 +1889,7 @@ function closeEditor(save) {
   }
   appState.activeContainerId = null;
   setEditorModalActions(null);
+  resetEditorUndo();
   document.getElementById("editor-modal").classList.remove("open");
   const modalLimit = document.getElementById("modal-limit");
   if (modalLimit) modalLimit.hidden = true;
@@ -2779,13 +3043,38 @@ function wireEvents() {
     if (!inside) closeAllExampleMenus();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    const confirmOpen = document.getElementById("confirm-save-example-modal")?.classList.contains("open");
-    if (confirmOpen) {
-      closeSaveExampleConfirm();
+    if (e.key === "Escape") {
+      const confirmOpen = document.getElementById("confirm-save-example-modal")?.classList.contains("open");
+      if (confirmOpen) {
+        closeSaveExampleConfirm();
+        return;
+      }
+      closeAllExampleMenus();
       return;
     }
-    closeAllExampleMenus();
+
+    const editorOpen = document.getElementById("editor-modal")?.classList.contains("open");
+    if (!editorOpen) return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+
+    const tag = (document.activeElement?.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+
+    const key = e.key.toLowerCase();
+    if (key === "c") {
+      e.preventDefault();
+      copySelectedCommand();
+      return;
+    }
+    if (key === "v") {
+      e.preventDefault();
+      pasteCommands();
+      return;
+    }
+    if (key === "z") {
+      e.preventDefault();
+      undoEditor();
+    }
   });
   document.getElementById("btn-export").addEventListener("click", exportGraph);
   document.getElementById("btn-flash").addEventListener("click", flashConfig);
