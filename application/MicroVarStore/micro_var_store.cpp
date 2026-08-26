@@ -2,14 +2,14 @@
 
 #include <cstring>
 
-uint64_t MicroVarStore::get(uint8_t index) const {
+int64_t MicroVarStore::get(uint8_t index) const {
   if (index >= MICRO_VAR_SLOT_COUNT) {
     return 0;
   }
   return vars_[index];
 }
 
-void MicroVarStore::set(uint8_t index, uint64_t value) {
+void MicroVarStore::set(uint8_t index, int64_t value) {
   if (index >= MICRO_VAR_SLOT_COUNT) {
     return;
   }

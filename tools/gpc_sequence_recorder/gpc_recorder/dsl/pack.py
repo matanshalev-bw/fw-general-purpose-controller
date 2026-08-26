@@ -73,6 +73,7 @@ def _field_size(schema: Schema, field: FieldDef) -> int:
         "uint64_t": 8,
         "int64_t": 8,
         "float": 4,
+        "double": 8,
     }
     if t in sizes:
         return sizes[t]
@@ -111,6 +112,8 @@ def _pack_field(schema: Schema, field: FieldDef, value: Any) -> bytes:
         return struct.pack("<q", int(value))
     if t == "float":
         return struct.pack("<f", float(value))
+    if t == "double":
+        return struct.pack("<d", float(value))
     raise ValueError(f"Cannot pack type {field.cpp_type!r}")
 
 
@@ -145,6 +148,8 @@ def _zero_default(schema: Schema, field: FieldDef) -> Any:
     if t in schema.enums:
         return 0
     if t == "float":
+        return 0.0
+    if t == "double":
         return 0.0
     if t in (
         "uint8_t",
@@ -284,6 +289,8 @@ def _unpack_field(schema: Schema, field: FieldDef, chunk: bytes) -> Any:
         return struct.unpack("<q", chunk[:8])[0]
     if t == "float":
         return struct.unpack("<f", chunk[:4])[0]
+    if t == "double":
+        return struct.unpack("<d", chunk[:8])[0]
     raise ValueError(f"Cannot unpack type {field.cpp_type!r}")
 
 

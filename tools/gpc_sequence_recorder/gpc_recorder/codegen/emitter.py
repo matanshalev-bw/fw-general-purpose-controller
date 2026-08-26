@@ -77,6 +77,8 @@ def _format_scalar(v: Any) -> str:
         return "1" if v else "0"
     if isinstance(v, str) and v.startswith("0x"):
         return v
+    if isinstance(v, float):
+        return format(v, ".17g")
     return str(int(v))
 
 
@@ -107,6 +109,10 @@ def _format_union_init(member: str, values: Dict[str, Any], schema=None) -> str:
                 parts.append(
                     f"static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::{enum_name})"
                 )
+            elif field.cpp_type.replace(" ", "") in ("double", "float"):
+                parts.append(_format_scalar(float(v)))
+            elif field.cpp_type.replace(" ", "") in ("int64_t", "uint64_t"):
+                parts.append(_format_scalar(int(v)))
             else:
                 parts.append(_format_scalar(v))
         return "{" + ", ".join(parts) + "}"

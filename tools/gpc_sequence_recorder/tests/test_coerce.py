@@ -70,10 +70,11 @@ def test_coerce_var_set_value_from_array_forms():
     assert coerce_var_set_value("10, 3, 51") == 0x33030A
     assert coerce_var_set_value(3500) == 3500
     assert coerce_var_set_value("0x1234") == 0x1234
+    assert coerce_var_set_value(-7) == -7
 
 
 def test_pack_var_set_byte_array_via_usb_bridge():
-    # var_index=1, reserved=0,0,0, value=0x33030A LE
+    # var_index=1, reserved=0,0,0, value=0x33030A as int64 LE
     payload_hex = pack_micro_op_hex(
         "var_set",
         {"var_index": 1, "value": [0x0A, 0x03, 0x33]},

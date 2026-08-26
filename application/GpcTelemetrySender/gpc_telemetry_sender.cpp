@@ -49,7 +49,7 @@ void GpcTelemetrySender::buildPayload(const volatile TelemetryBinding& binding, 
       continue;
     }
 
-    const uint64_t var_value = var_store_->get(field.var_index);
+    const int64_t var_value = var_store_->get(field.var_index);
     uint8_t encoded[8] = {};
     switch (field.byte_size) {
       case 1:
@@ -117,7 +117,7 @@ void GpcTelemetrySender::tickGpcVariablesTelemetry() {
   }
 
   bluelink::TelemetryPayload::GpcVariablesTelemetry telemetry{};
-  for (uint8_t i = 0; i < bluelink::TelemetryPayload::GPC_VARIABLES_COUNT; ++i) {
+  for (uint8_t i = 0; i < bluelink::GPC_VARIABLES_COUNT; ++i) {
     telemetry.variables[i] = var_store_->get(i);
   }
 

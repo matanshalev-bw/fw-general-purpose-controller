@@ -23,9 +23,9 @@ static bool extractCommandFields(MicroVarStore* store, const volatile CommandExt
       return false;
     }
 
-    uint64_t value = 0;
-    memcpy(&value, payload + field.byte_offset, field.byte_size);
-    store->set(field.var_index, value);
+    uint64_t packed = 0;
+    memcpy(&packed, payload + field.byte_offset, field.byte_size);
+    store->set(field.var_index, static_cast<int64_t>(packed));
   }
 
   return true;

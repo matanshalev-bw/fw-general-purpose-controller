@@ -79,11 +79,16 @@ def _looks_like_byte_array(value: str) -> bool:
 
 
 def coerce_var_set_value(value: Any) -> int:
-    """Accept a raw uint64, or a byte list packed LE like COMM RX into MicroVarStore."""
+    """Accept an int64, or a byte list packed LE like COMM RX into MicroVarStore."""
     if isinstance(value, bool):
         raise ValueError("value must be an integer or byte array, not bool")
     if isinstance(value, int):
-        return value & 0xFFFFFFFFFFFFFFFF
+        # Keep as Python int; pack uses int64_t (<q) on the wire.
+        return value
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise ValueError("value must be an integer (float with fraction not allowed)")
+        return int(value)
     if isinstance(value, (list, tuple)):
         return pack_le_bytes_to_uint64(coerce_int_byte_list(value, name="value"))
     if isinstance(value, str):
@@ -91,7 +96,7 @@ def coerce_var_set_value(value: Any) -> int:
         if _looks_like_byte_array(s):
             return pack_le_bytes_to_uint64(coerce_int_byte_list(s, name="value"))
         try:
-            return int(s, 0) & 0xFFFFFFFFFFFFFFFF
+            return int(s, 0)
         except ValueError as e:
             raise ValueError(
                 "value must be an integer (e.g. 3500 / 0x1234) or a byte array "

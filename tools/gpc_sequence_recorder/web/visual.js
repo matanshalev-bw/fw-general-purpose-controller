@@ -144,6 +144,7 @@ const appState = {
   usbControllerCmds: [],
   usbOpen: false,
   liveExprValues: [],
+  liveExprCasts: [],
   liveExprFresh: false,
   /** Live GPC FSM state name from CONTROLLER_STATE_TELEMETRY, or null when unknown. */
   liveControllerState: null,
@@ -158,7 +159,7 @@ const appState = {
     max_command_bindings: 16,
     max_telemetry_bindings: 3,
     max_telemetry_fields: 8,
-    max_var_slots: 15,
+    max_var_slots: 16,
     comm_data_length: 8,
   },
 };
@@ -642,13 +643,138 @@ function makePaletteItem(command, meta, targetParent) {
   return el;
 }
 
+const LIVE_EXPR_CAST_OPTIONS = [
+  { value: "int64", label: "int64" },
+  { value: "uint64", label: "uint64" },
+  { value: "hex", label: "hex" },
+  { value: "bin", label: "bin" },
+  { value: "uint32", label: "uint32" },
+  { value: "int32", label: "int32" },
+  { value: "uint16", label: "uint16" },
+  { value: "int16", label: "int16" },
+  { value: "uint8", label: "uint8" },
+  { value: "int8", label: "int8" },
+  { value: "bool", label: "bool" },
+];
+
+function ensureLiveExprCasts(count) {
+  if (!Array.isArray(appState.liveExprCasts)) appState.liveExprCasts = [];
+  while (appState.liveExprCasts.length < count) {
+    appState.liveExprCasts.push("int64");
+  }
+  if (appState.liveExprCasts.length > count) {
+    appState.liveExprCasts.length = count;
+  }
+  for (let i = 0; i < appState.liveExprCasts.length; i++) {
+    // Migrate leftover float64 display modes from the previous UI.
+    if (appState.liveExprCasts[i] === "float64" || appState.liveExprCasts[i] === "float_bits_hex" ||
+        appState.liveExprCasts[i] === "float_bits_u64") {
+      appState.liveExprCasts[i] = "int64";
+    }
+  }
+}
+
+function parseLiveExprInt64(raw) {
+  const s = String(raw).trim();
+  if (!s || s === "—") return null;
+  try {
+    return BigInt(s);
+  } catch (_) {
+    const n = Number(s);
+    if (!Number.isFinite(n)) return null;
+    return BigInt(Math.trunc(n));
+  }
+}
+
+function toUnsigned64(v) {
+  return BigInt.asUintN(64, v);
+}
+
+function toSigned64(v) {
+  return BigInt.asIntN(64, v);
+}
+
+/** Format a raw int64 wire value string for the selected Live Expression cast. */
+function formatLiveExpressionValue(raw, castMode) {
+  if (raw == null || raw === "—") return "—";
+  const value = parseLiveExprInt64(raw);
+  if (value === null) return String(raw);
+
+  const mode = castMode || "int64";
+  const u = toUnsigned64(value);
+  const s = toSigned64(value);
+  switch (mode) {
+    case "int64":
+      return s.toString(10);
+    case "uint64":
+      return u.toString(10);
+    case "hex":
+      return `0x${u.toString(16)}`;
+    case "bin":
+      return `0b${u.toString(2)}`;
+    case "uint32":
+      return (u & 0xffffffffn).toString(10);
+    case "int32":
+      return BigInt.asIntN(32, u).toString(10);
+    case "uint16":
+      return (u & 0xffffn).toString(10);
+    case "int16":
+      return BigInt.asIntN(16, u).toString(10);
+    case "uint8":
+      return (u & 0xffn).toString(10);
+    case "int8":
+      return BigInt.asIntN(8, u).toString(10);
+    case "bool":
+      return value !== 0n ? "true" : "false";
+    default:
+      return s.toString(10);
+  }
+}
+
+function refreshLiveExpressionDisplay() {
+  const count = appState.limits.max_var_slots || 16;
+  ensureLiveExprCasts(count);
+  for (let i = 0; i < count; i++) {
+    const el = document.getElementById(`live-expr-val-${i}`);
+    if (el) {
+      el.textContent = formatLiveExpressionValue(appState.liveExprValues[i], appState.liveExprCasts[i]);
+    }
+  }
+}
+
+function makeLiveExprCastSelect(varIndex, selected) {
+  const sel = document.createElement("select");
+  sel.id = `live-expr-cast-${varIndex}`;
+  sel.title = `Display type for v${varIndex}`;
+  sel.setAttribute("aria-label", `Display type for v${varIndex}`);
+  for (const opt of LIVE_EXPR_CAST_OPTIONS) {
+    const o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (opt.value === selected) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener("change", () => {
+    appState.liveExprCasts[varIndex] = sel.value || "int64";
+    const el = document.getElementById(`live-expr-val-${varIndex}`);
+    if (el) {
+      el.textContent = formatLiveExpressionValue(
+        appState.liveExprValues[varIndex],
+        appState.liveExprCasts[varIndex]
+      );
+    }
+  });
+  return sel;
+}
+
 function renderLiveExpressionGrid() {
   const grid = document.getElementById("live-expr-grid");
   if (!grid) return;
-  const count = appState.limits.max_var_slots || 15;
+  const count = appState.limits.max_var_slots || 16;
   if (!appState.liveExprValues.length) {
     appState.liveExprValues = Array(count).fill("—");
   }
+  ensureLiveExprCasts(count);
   grid.innerHTML = "";
   for (let i = 0; i < count; i++) {
     const cell = document.createElement("div");
@@ -660,8 +786,9 @@ function renderLiveExpressionGrid() {
     const val = document.createElement("span");
     val.className = "val";
     val.id = `live-expr-val-${i}`;
-    val.textContent = appState.liveExprValues[i] ?? "—";
+    val.textContent = formatLiveExpressionValue(appState.liveExprValues[i], appState.liveExprCasts[i]);
     cell.appendChild(idx);
+    cell.appendChild(makeLiveExprCastSelect(i, appState.liveExprCasts[i]));
     cell.appendChild(val);
     grid.appendChild(cell);
   }
@@ -686,36 +813,32 @@ function updateLiveExpressionStatus() {
 }
 
 function applyLiveExpressionValues(values) {
-  const count = appState.limits.max_var_slots || 15;
+  const count = appState.limits.max_var_slots || 16;
   for (let i = 0; i < count; i++) {
     appState.liveExprValues[i] = values[i] ?? "—";
-    const el = document.getElementById(`live-expr-val-${i}`);
-    if (el) el.textContent = appState.liveExprValues[i];
   }
   appState.liveExprFresh = true;
+  refreshLiveExpressionDisplay();
   updateLiveExpressionStatus();
 }
 
 function clearLiveExpressionValues(markStale = true) {
-  const count = appState.limits.max_var_slots || 15;
+  const count = appState.limits.max_var_slots || 16;
   appState.liveExprValues = Array(count).fill("—");
   appState.liveExprFresh = false;
-  for (let i = 0; i < count; i++) {
-    const el = document.getElementById(`live-expr-val-${i}`);
-    if (el) el.textContent = "—";
-  }
+  refreshLiveExpressionDisplay();
   if (markStale) updateLiveExpressionStatus();
 }
 
-/** Parse host log lines containing `gpc_vars v0=<u64> … vN=<u64>`. */
+/** Parse host log lines containing `gpc_vars v0=<i64> … vN=<i64>`. */
 function parseGpcVarsLogLine(text) {
   const marker = text.indexOf("gpc_vars");
   if (marker < 0) return null;
   const segment = text.slice(marker);
-  const count = appState.limits.max_var_slots || 15;
+  const count = appState.limits.max_var_slots || 16;
   const values = Array(count).fill("—");
   let matched = 0;
-  const re = /\bv(\d+)=(\d+)\b/g;
+  const re = /\bv(\d+)=(-?\d+)\b/g;
   let m;
   while ((m = re.exec(segment)) !== null) {
     const idx = Number(m[1]);
@@ -852,7 +975,7 @@ function packBytesLeToUint64(bytes) {
   return `0x${value.toString(16)}`;
 }
 
-/** Parse var_set value: raw integer, or LE byte list matching GPC COMM RX packing. */
+/** Parse var_set value: int64, or LE byte list packed into int64. */
 function parseVarSetValueInput(text) {
   const s = String(text).trim();
   if (!s) return 0;
@@ -871,7 +994,7 @@ function parseVarSetValueInput(text) {
     if (bytes.some((b) => Number.isNaN(b) || b < 0 || b > 255)) {
       throw new Error("bytes must be 0..255");
     }
-    return packBytesLeToUint64(bytes);
+    return Number(packBytesLeToUint64(bytes));
   }
   if (s.startsWith("0x") || s.startsWith("0X")) {
     const n = Number.parseInt(s, 16);
@@ -898,8 +1021,11 @@ function formatNodeLabel(step) {
     .map((k) => {
       const v = args[k];
       if (Array.isArray(v)) return `${k}=[${v.join(", ")}]`;
+      if (typeof v === "number" && (step.command === "var_set" || k === "value") && !Number.isInteger(v)) {
+        return `${k}=${v}`;
+      }
       if (typeof v === "number" && (step.command === "var_set" || k === "value") && v > 255) {
-        return `${k}=0x${v.toString(16)}`;
+        return `${k}=${v}`;
       }
       return `${k}=${v}`;
     })
@@ -1071,7 +1197,7 @@ function renderPropsPanel(nodeId) {
           typeof val === "number" && val > 255 ? `0x${val.toString(16)}` : displayVal;
         return `
           <div class="field">
-            <label for="prop-${p.name}">${p.name}<span class="limit-hint">uint64 or LE bytes (max ${maxLen})</span></label>
+            <label for="prop-${p.name}">${p.name}<span class="limit-hint">int64 or LE bytes (max ${maxLen})</span></label>
             <input id="prop-${p.name}" data-param="${p.name}" data-accepts-byte-list="1" data-max-len="${maxLen}" class="wide"
               value="${shown}" placeholder="3500 or 0x0A, 0x03, 0x33" />
           </div>`;

@@ -254,7 +254,7 @@ std::string formatPayloadDetails(bluelink::PayloadTypeIds type, const uint8_t* p
         bluelink::TelemetryPayload::GpcVariablesTelemetry vars{};
         std::memcpy(&vars, payload, sizeof(vars));
         oss << "gpc_vars";
-        for (uint8_t i = 0; i < bluelink::TelemetryPayload::GPC_VARIABLES_COUNT; ++i) {
+        for (uint8_t i = 0; i < bluelink::GPC_VARIABLES_COUNT; ++i) {
           oss << " v" << static_cast<unsigned>(i) << '=' << vars.variables[i];
         }
         return oss.str();

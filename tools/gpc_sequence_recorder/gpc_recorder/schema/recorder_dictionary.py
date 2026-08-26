@@ -50,7 +50,7 @@ _EXAMPLES: Dict[str, str] = {
     "uart_receive": "uart_receive(uart_instance=1, length=4, var_index=0)",
     "spi_receive": "spi_receive(spi_instance=1, rx_len=3, var_index=0)",
     "i2c_read": "i2c_read(i2c_instance=1, device_addr=0x50, length=2, var_index=0)",
-    "var_set": "var_set(var_index=1, value=3343114)  # or value=[0x0A, 0x03, 0x33] (LE → uint64)",
+    "var_set": "var_set(var_index=1, value=3343114)  # or value=[0x0A, 0x03, 0x33] (LE → int64)",
     "var_mul": "var_mul(dest_var_index=0, src_var_index=0, numerator=1, denominator=10)",
     "var_add": "var_add(dest_var_index=0, src_var_index=0, addend=5)",
     "if_condition": "if_condition(first_var_index=0, comparing_type=\">=\", second_var_index=1)",
@@ -99,7 +99,7 @@ _DESCRIPTIONS: Dict[str, str] = {
     "spi_receive": "SPI master receive (zero TX clocking); store rx_len bytes into var_index.",
     "i2c_read": "I2C master read; store length bytes into var_index.",
     "var_set": (
-        "Set a var slot (0–19) to a uint64: raw integer, or a byte array packed little-endian "
+        "Set a var slot to an int64: integer, or a byte array packed little-endian "
         "the same way COMM RX stores into the var (e.g. [0x0A, 0x03, 0x33] → 0x33030A)."
     ),
     "var_mul": "Multiply src var by numerator/denominator and store in dest var.",
@@ -247,7 +247,7 @@ def _enrich_params_with_payload_limits(name: str, params: List[Dict[str, Any]]) 
     except Exception:
         return
 
-    # var_set.value accepts a LE byte array (same packing as COMM RX → uint64).
+    # var_set.value accepts a LE byte array (same packing as COMM RX → int64).
     if name == "var_set":
         for p in params:
             if p["name"] == "value":

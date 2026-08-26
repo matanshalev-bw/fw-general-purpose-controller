@@ -45,9 +45,9 @@ bool storeCommRxBytes(MicroVarStore* store, uint8_t var_index, const uint8_t* da
     return false;
   }
 
-  uint64_t value = 0;
-  memcpy(&value, data, length);
-  store->set(var_index, value);
+  uint64_t packed = 0;
+  memcpy(&packed, data, length);
+  store->set(var_index, static_cast<int64_t>(packed));
   return true;
 }
 
@@ -345,7 +345,7 @@ bool MicroSequenceExecutor::executeDigitalGpioRead(const bluelink::MicroOpsPaylo
     return false;
   }
 
-  var_store_->set(op.var_index, state == GpioPinState::PIN_SET ? 1U : 0U);
+  var_store_->set(op.var_index, state == GpioPinState::PIN_SET ? 1 : 0);
   return true;
 }
 
@@ -366,13 +366,13 @@ bool MicroSequenceExecutor::executeAdcRead(const bluelink::MicroOpsPayload::Micr
   }
 
   if (op.store_raw != 0) {
-    var_store_->set(op.var_index, raw_value);
+    var_store_->set(op.var_index, static_cast<int64_t>(raw_value));
   } else {
     float voltage = 0.0f;
     if (GpioInterface::analogReadDma(adc_instance, op.channel, voltage) != InterfaceStatus::INTERFACE_OK) {
-      var_store_->set(op.var_index, raw_value);
+      var_store_->set(op.var_index, static_cast<int64_t>(raw_value));
     } else {
-      var_store_->set(op.var_index, static_cast<uint32_t>(voltage * 1000.0f));
+      var_store_->set(op.var_index, static_cast<int64_t>(voltage * 1000.0f));
     }
   }
   return true;
@@ -396,7 +396,7 @@ bool MicroSequenceExecutor::executeDacWrite(const bluelink::MicroOpsPayload::Mic
     if (var_store_ == nullptr || op.var_index >= MICRO_VAR_SLOT_COUNT) {
       return false;
     }
-    value = static_cast<uint16_t>(var_store_->get(op.var_index) & 0xFFFU);
+    value = static_cast<uint16_t>(static_cast<uint64_t>(var_store_->get(op.var_index)) & 0xFFFU);
   } else if (value > 0xFFFU) {
     value = 0xFFFU;
   }
@@ -422,7 +422,7 @@ bool MicroSequenceExecutor::executePwmSet(const bluelink::MicroOpsPayload::Micro
     if (var_store_ == nullptr || op.var_index >= MICRO_VAR_SLOT_COUNT) {
       return false;
     }
-    duty_percent = static_cast<uint16_t>(var_store_->get(op.var_index) & 0xFFFFU);
+    duty_percent = static_cast<uint16_t>(static_cast<uint64_t>(var_store_->get(op.var_index)) & 0xFFFFU);
   }
   if (duty_percent > 100U) {
     duty_percent = 100U;
@@ -555,8 +555,8 @@ bool MicroSequenceExecutor::executeVarMul(const bluelink::MicroOpsPayload::Micro
     return false;
   }
 
-  const uint64_t src = var_store_->get(op.src_var_index);
-  const uint64_t result = (src * static_cast<uint64_t>(op.numerator)) / static_cast<uint64_t>(op.denominator);
+  const int64_t src = var_store_->get(op.src_var_index);
+  const int64_t result = (src * static_cast<int64_t>(op.numerator)) / static_cast<int64_t>(op.denominator);
   var_store_->set(op.dest_var_index, result);
   return true;
 }
@@ -567,9 +567,8 @@ bool MicroSequenceExecutor::executeVarAdd(const bluelink::MicroOpsPayload::Micro
     return false;
   }
 
-  const int64_t result =
-      static_cast<int64_t>(var_store_->get(op.src_var_index)) + static_cast<int64_t>(op.addend);
-  var_store_->set(op.dest_var_index, static_cast<uint64_t>(result));
+  const int64_t result = var_store_->get(op.src_var_index) + static_cast<int64_t>(op.addend);
+  var_store_->set(op.dest_var_index, result);
   return true;
 }
 
@@ -606,8 +605,8 @@ bool MicroSequenceExecutor::executeTriggerSafety(const bluelink::MicroOpsPayload
 }
 
 bool MicroSequenceExecutor::evaluateCondition(const bluelink::MicroOpsPayload::MicroIfCondition& op) const {
-  const uint64_t first = var_store_->get(op.first_var_index);
-  const uint64_t second = var_store_->get(op.second_var_index);
+  const int64_t first = var_store_->get(op.first_var_index);
+  const int64_t second = var_store_->get(op.second_var_index);
 
   switch (static_cast<bluelink::MicroOpsPayload::MicroCompareType>(op.compare_type)) {
     case bluelink::MicroOpsPayload::MicroCompareType::EQ:
