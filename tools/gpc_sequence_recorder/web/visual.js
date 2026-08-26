@@ -72,6 +72,19 @@ const FIXED_SLOTS = [
   },
 ];
 
+/** Numeric ControllerState enum → FIXED_SLOTS state id (matches PayloadFieldDefinitions). */
+const CONTROLLER_STATE_BY_VALUE = [
+  "CONTROLLER_STATE_INIT",
+  "CONTROLLER_STATE_MANUAL",
+  "CONTROLLER_STATE_DISENGAGEMENT",
+  "CONTROLLER_STATE_ENGAGED",
+  "CONTROLLER_STATE_POWER_UP_BIT",
+  "CONTROLLER_STATE_OPERATIONAL",
+  "CONTROLLER_STATE_ERROR",
+  "CONTROLLER_STATE_EMERGENCY",
+  "CONTROLLER_STATE_TECHNICIAN", // firmware only; no Visual card
+];
+
 const FRIENDLY_NAMES = {
   gpio_read: "digital read",
   gpio_write: "digital write",
@@ -132,6 +145,8 @@ const appState = {
   usbOpen: false,
   liveExprValues: [],
   liveExprFresh: false,
+  /** Live GPC FSM state name from CONTROLLER_STATE_TELEMETRY, or null when unknown. */
+  liveControllerState: null,
   componentIds: [],
   activeContainerId: null,
   bindMode: null,
@@ -500,13 +515,23 @@ function renderBoard() {
     const card = document.createElement("div");
     card.className = `state-card ${slot.cardClass || ""}`;
     card.style.gridArea = slot.area;
+    if (slot.state) card.dataset.stateId = slot.state;
     if (used > 0) card.classList.add("has-steps");
+    if (slot.state && slot.state === appState.liveControllerState) {
+      card.classList.add("is-current-state");
+    }
     card.innerHTML = `
       <div class="card-title">${c.label}</div>
       <div class="card-meta">${used} step${used === 1 ? "" : "s"}</div>
       <div class="card-preview">${containerPreview(c)}</div>
       <div class="limit-hint ${limitClass(used, maxSteps)}">${formatBudget(used, maxSteps, "steps")}</div>
     `;
+    if (slot.state && slot.state === appState.liveControllerState) {
+      const badge = document.createElement("div");
+      badge.className = "current-state-badge";
+      badge.textContent = "LIVE";
+      card.appendChild(badge);
+    }
     card.appendChild(makeStateArrow(slot.repeatable, slot.arrowUp));
     card.addEventListener("click", () => openEditor(c.id));
     board.appendChild(card);
@@ -702,6 +727,50 @@ function parseGpcVarsLogLine(text) {
   return matched > 0 ? values : null;
 }
 
+/**
+ * Parse CONTROLLER_STATE_TELEMETRY host log lines:
+ * `… CONTROLLER_STATE_TELEMETRY(110) … controller_state=N`
+ * Returns enum name string, or null if not a matching line.
+ */
+function parseControllerStateLogLine(text) {
+  if (!text.includes("CONTROLLER_STATE_TELEMETRY")) return null;
+  const m = text.match(/\bcontroller_state=(\d+)\b/);
+  if (!m) return null;
+  const idx = Number(m[1]);
+  if (idx < 0 || idx >= CONTROLLER_STATE_BY_VALUE.length) return null;
+  return CONTROLLER_STATE_BY_VALUE[idx];
+}
+
+/** Apply / clear the LIVE highlight on board cards without a full re-render. */
+function applyLiveControllerStateHighlight(stateName) {
+  const prev = appState.liveControllerState;
+  if (prev === stateName) return;
+  appState.liveControllerState = stateName;
+
+  const board = document.getElementById("state-board");
+  if (!board) return;
+
+  for (const card of board.querySelectorAll(".state-card[data-state-id]")) {
+    const isCurrent = !!stateName && card.dataset.stateId === stateName;
+    card.classList.toggle("is-current-state", isCurrent);
+    let badge = card.querySelector(".current-state-badge");
+    if (isCurrent) {
+      if (!badge) {
+        badge = document.createElement("div");
+        badge.className = "current-state-badge";
+        badge.textContent = "LIVE";
+        card.appendChild(badge);
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+}
+
+function clearLiveControllerState() {
+  applyLiveControllerStateHighlight(null);
+}
+
 function stopLiveExpressionStream() {
   if (liveExprWs) {
     try {
@@ -715,6 +784,7 @@ function stopLiveExpressionStream() {
     liveExprWs = null;
   }
   appState.liveExprFresh = false;
+  clearLiveControllerState();
   updateLiveExpressionStatus();
 }
 
@@ -739,6 +809,8 @@ function startLiveExpressionStream() {
     if (msg.type === "output" && msg.text) {
       const values = parseGpcVarsLogLine(msg.text);
       if (values) applyLiveExpressionValues(values);
+      const controllerState = parseControllerStateLogLine(msg.text);
+      if (controllerState) applyLiveControllerStateHighlight(controllerState);
     } else if (msg.type === "error" || msg.type === "done") {
       stopLiveExpressionStream();
       if (appState.usbOpen) {
@@ -749,6 +821,7 @@ function startLiveExpressionStream() {
   };
   liveExprWs.onclose = () => {
     liveExprWs = null;
+    clearLiveControllerState();
     if (appState.usbOpen) {
       appState.liveExprFresh = false;
       updateLiveExpressionStatus();
