@@ -25,6 +25,10 @@ bool GpcController::sendSetStateRequest(bluelink::ControllerState req_state) {
     return true;
   }
 
+  if (state_ == bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY) {
+    return false;
+  }
+
   if (req_state == bluelink::ControllerState::CONTROLLER_STATE_INIT &&
       state_ == bluelink::ControllerState::CONTROLLER_STATE_ENGAGED) {
     return true;
@@ -58,6 +62,9 @@ bool GpcController::handleControllerStateCommand(
 }
 
 void GpcController::enterState(bluelink::ControllerState new_state) {
+  if (state_ == bluelink::ControllerState::CONTROLLER_STATE_EMERGENCY) {
+    return;
+  }
   state_ = new_state;
   onStateChanged();
 }
