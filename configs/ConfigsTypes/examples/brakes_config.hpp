@@ -221,7 +221,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     { 1, 1, 1 },
                 },
                 .sequence = {
-                    .step_count = 10,
+                    .step_count = 14,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
@@ -245,11 +245,19 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::GT), 10, 2},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
                             .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE), 11, 1},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0xE9, 0, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0}},
+                            .can_transmit = {1, 8, 0x220, {0x84, 0x0, 0xFB, 0xFB, 0x2, 0x2, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::GT), 11, 2},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
@@ -257,11 +265,19 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0xD2, 0x1, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0}},
+                            .can_transmit = {1, 8, 0x220, {0x8, 0x1, 0xFB, 0xFB, 0x2, 0x2, 0, 0}},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::GT), 12, 2},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
+                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LT), 13, 1},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0xBC, 0x2, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0}},
+                            .can_transmit = {1, 8, 0x220, {0x90, 0x1, 0xFB, 0xFB, 0x2, 0x2, 0, 0}},
                         },
                     },
                 },
