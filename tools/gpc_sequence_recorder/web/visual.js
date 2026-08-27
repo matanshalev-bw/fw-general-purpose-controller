@@ -659,6 +659,7 @@ const VALUE_FORMAT_OPTIONS = [
   { value: "dec", label: "dec" },
   { value: "hex", label: "hex" },
   { value: "str", label: "str" },
+  { value: "dec_array", label: "array (dec)" },
 ];
 
 function escapeHtmlAttr(text) {
@@ -669,14 +670,21 @@ function escapeHtmlAttr(text) {
 }
 
 function normalizeValueFormat(mode) {
-  if (mode === "hex" || mode === "str") return mode;
+  if (mode === "hex" || mode === "str" || mode === "dec_array") return mode;
   return "dec";
 }
 
 function migrateLegacyValueFormat(mode) {
-  if (!mode || mode === "dec" || mode === "hex" || mode === "str") return normalizeValueFormat(mode);
-  if (mode === "hex" || mode === "bin" || mode === "float_bits_hex") return "hex";
+  if (!mode || mode === "dec" || mode === "hex" || mode === "str" || mode === "dec_array") {
+    return normalizeValueFormat(mode);
+  }
+  if (mode === "bin" || mode === "float_bits_hex") return "hex";
   return "dec";
+}
+
+function formatAllowsByteList(mode) {
+  const fmt = normalizeValueFormat(mode);
+  return fmt === "dec" || fmt === "dec_array";
 }
 
 function int64ToLeBytes(value) {
@@ -793,6 +801,9 @@ function formatInt64ForDisplay(value, mode) {
   if (fmt === "str") {
     return `"${bytesToAsciiString(int64ToLeBytes(value))}"`;
   }
+  if (fmt === "dec_array") {
+    return formatBytesArrayForDisplay(int64ToLeBytes(value), "dec");
+  }
   return String(value);
 }
 
@@ -814,6 +825,10 @@ function parseInt64WithFormat(text, mode, { allowByteList = false } = {}) {
     const n = Number.parseInt(token, 16);
     if (Number.isNaN(n)) throw new Error("invalid hex integer");
     return n;
+  }
+
+  if (fmt === "dec_array") {
+    return leBytesToInt64Number(parseBytesArrayWithFormat(s, "dec", 8));
   }
 
   if (allowByteList && (s.startsWith("[") || s.includes(","))) {
@@ -956,6 +971,9 @@ function formatLiveExpressionValue(raw, castMode) {
   }
   if (mode === "str") {
     return `"${bytesToAsciiString(int64ToLeBytes(value))}"`;
+  }
+  if (mode === "dec_array") {
+    return formatBytesArrayForDisplay(int64ToLeBytes(value), "dec");
   }
   return toSigned64(value).toString(10);
 }
@@ -1673,7 +1691,7 @@ function renderPropsPanel(nodeId) {
                 ).join("")}
               </select>
               <input id="prop-${p.name}" data-param="${p.name}" data-accepts-byte-list="1" data-max-len="${maxLen}" class="wide"
-                value="${escapeHtmlAttr(displayVal)}" placeholder="3500, 0xDAC, or &quot;text&quot;" />
+                value="${escapeHtmlAttr(displayVal)}" placeholder="3500, 0xDAC, &quot;text&quot;, or 1, 2, 3" />
             </div>
           </div>`;
       }
@@ -1749,7 +1767,7 @@ function renderPropsPanel(nodeId) {
         }
       } else if (el.dataset.acceptsByteList === "1") {
         try {
-          value = parseInt64WithFormat(el.value, format, { allowByteList: format === "dec" });
+          value = parseInt64WithFormat(el.value, format, { allowByteList: formatAllowsByteList(format) });
         } catch (err) {
           setStatus(`Invalid ${param}: ${err.message || err}`);
           return;
@@ -2708,7 +2726,7 @@ function collectLiveMicroFieldValues(op) {
 
     if (usesFormat && op.union_member === "var_set" && f.name === "value") {
       try {
-        values[f.name] = parseInt64WithFormat(raw, format, { allowByteList: format === "dec" });
+        values[f.name] = parseInt64WithFormat(raw, format, { allowByteList: formatAllowsByteList(format) });
       } catch (err) {
         throw new Error(`${f.name}: ${err.message || err}`);
       }
@@ -2809,7 +2827,9 @@ function updateLiveFields() {
           }
         } else {
           try {
-            const n = parseInt64WithFormat(input.value, prevFormat, { allowByteList: prevFormat === "dec" });
+            const n = parseInt64WithFormat(input.value, prevFormat, {
+              allowByteList: formatAllowsByteList(prevFormat),
+            });
             input.value = formatInt64ForDisplay(n, nextFormat);
           } catch (_) {
             input.value = "";
