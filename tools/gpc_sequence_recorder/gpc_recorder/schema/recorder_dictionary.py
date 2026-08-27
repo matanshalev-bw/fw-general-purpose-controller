@@ -41,7 +41,7 @@ _EXAMPLES: Dict[str, str] = {
     "adc_read": "adc_read(adc_instance=1, channel=0, var_index=0, store_raw=1)",
     "dac_write": "dac_write(dac_instance=1, use_var=0, var_index=0, literal_value=2048)",
     "delay_ms": "delay_ms(100)",
-    "can_transmit": "can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])",
+    "can_transmit": "can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])  # or use_var=1, var_index=0",
     "pwm_set": "pwm_set(frequency_hz=1000, duty_percent=50)",
     "uart_transmit": 'uart_transmit(uart_instance=1, length=5, data=[0x48, 0x45, 0x4C, 0x4C, 0x4F])  # or USB data: "HELLO"',
     "spi_transfer": "spi_transfer(spi_instance=1, tx_len=3, tx_data=[0x9F, 0x00, 0x00])",
@@ -90,11 +90,11 @@ _DESCRIPTIONS: Dict[str, str] = {
     "adc_read": "Append an ADC read step; stores the sample in var_index (store_raw selects raw vs scaled). Pins: ADC1→PA0, ADC2→PB2.",
     "dac_write": "Append a DAC write step using a literal value or a var slot (use_var=1). Uses DAC1 CH1 on PA4.",
     "delay_ms": "Append a delay step (milliseconds).",
-    "can_transmit": "Append a CAN transmit step (bus, id, dlc, and up to 8 data bytes).",
+    "can_transmit": "Append a CAN transmit step (bus, id, dlc, and up to 8 data bytes). use_var=1 reads LE-packed bytes from var_index.",
     "pwm_set": "Set PWM frequency and duty on PB11 (TIM2 CH4). duty_percent is 0–100, or from var_index when use_var=1.",
-    "uart_transmit": "Append a UART transmit step.",
-    "spi_transfer": "Append a SPI transfer step (TX data only).",
-    "i2c_write": "Append an I2C write step.",
+    "uart_transmit": "Append a UART transmit step. use_var=1 reads LE-packed bytes from var_index.",
+    "spi_transfer": "Append a SPI transfer step (TX data only). use_var=1 reads LE-packed bytes from var_index.",
+    "i2c_write": "Append an I2C write step. use_var=1 reads LE-packed bytes from var_index.",
     "can_receive": "Poll CAN RX for a matching ID (timeout DEFAULT_COMM_RX_TIMEOUT); store up to dlc bytes in var_index.",
     "uart_receive": "Poll UART RX for length bytes; store little-endian into var_index.",
     "spi_receive": "SPI master receive (zero TX clocking); store rx_len bytes into var_index.",
@@ -198,14 +198,21 @@ def _param_to_dict(p: inspect.Parameter) -> Dict[str, Any]:
     ann = None if p.annotation is inspect._empty else p.annotation
     ann_str = None
     if ann is not None:
-        try:
-            ann_str = ann.__name__  # type: ignore[attr-defined]
-        except Exception:
-            ann_str = str(ann).replace("typing.", "")
+        # Prefer full typing string so Optional[List[int]] keeps the List[...] part.
+        # __name__ alone collapses Optional[List[int]] to just "Optional".
+        ann_str = str(ann).replace("typing.", "")
     kind = str(p.kind).split(".")[-1]
+    # Optional[List[int]] / List[int] / list[int] all count as byte-list params.
     is_list = False
     if ann_str:
-        is_list = ann_str == "List" or ann_str.startswith("List[")
+        lowered = ann_str.replace(" ", "")
+        is_list = (
+            lowered == "List"
+            or lowered.startswith("List[")
+            or "List[" in lowered
+            or lowered.startswith("list[")
+            or "list[" in lowered
+        )
     return {
         "name": p.name,
         "kind": kind,
@@ -239,12 +246,24 @@ _PARAM_HINTS: Dict[str, Dict[str, str]] = {
     },
     "can_transmit": {
         "id": "hex (0x)",
+        "use_var": "1=TX bytes from var_index (LE), 0=use data[]",
+        "var_index": "var slot 0–19 when use_var=1",
     },
-    "can_receive": {
-        "id": "hex (0x)",
+    "uart_transmit": {
+        "use_var": "1=TX bytes from var_index (LE), 0=use data[]",
+        "var_index": "var slot 0–19 when use_var=1",
+    },
+    "spi_transfer": {
+        "use_var": "1=TX bytes from var_index (LE), 0=use tx_data[]",
+        "var_index": "var slot 0–19 when use_var=1",
     },
     "i2c_write": {
         "device_addr": "hex (0x)",
+        "use_var": "1=TX bytes from var_index (LE), 0=use data[]",
+        "var_index": "var slot 0–19 when use_var=1",
+    },
+    "can_receive": {
+        "id": "hex (0x)",
     },
     "i2c_read": {
         "device_addr": "hex (0x)",
@@ -293,8 +312,16 @@ def _enrich_params_with_payload_limits(name: str, params: List[Dict[str, Any]]) 
         field = field_by_name.get(p["name"])
         if field and field.array_size:
             p["max_len"] = resolve_array_size(schema, field.array_size)
-        elif p["name"] in _LENGTH_PARAM_NAMES or p["name"] in _DATA_PARAM_NAMES:
-            if p.get("is_list") or p["name"] in _DATA_PARAM_NAMES:
+    for p in params:
+        field = field_by_name.get(p["name"])
+        if field and field.array_size:
+            p["is_list"] = True
+            p["max_len"] = resolve_array_size(schema, field.array_size)
+        elif p["name"] in _DATA_PARAM_NAMES:
+            p["is_list"] = True
+            p["max_len"] = payload_max
+        elif p["name"] in _LENGTH_PARAM_NAMES:
+            if p.get("is_list"):
                 p["max_len"] = payload_max
             else:
                 p["max_value"] = payload_max

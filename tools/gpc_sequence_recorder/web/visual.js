@@ -299,7 +299,7 @@ function defaultArgs(meta) {
   for (const p of meta.params) {
     if (p.has_default) args[p.name] = p.default;
     else if (p.annotation === "int" || p.annotation === "float") args[p.name] = 0;
-    else if (p.is_list) args[p.name] = [];
+    else if (isListParam(p)) args[p.name] = [];
     else if (p.annotation === "str") args[p.name] = "";
     else args[p.name] = 0;
   }
@@ -870,8 +870,15 @@ function parseInt64WithFormat(text, mode, { allowByteList = false } = {}) {
   return n;
 }
 
-function fieldUsesValueFormat(command, param) {
+function isListParam(param) {
+  if (!param) return false;
   if (param.is_list) return true;
+  const ann = String(param.annotation || "");
+  return ann === "List" || ann.includes("List[") || ann.includes("list[");
+}
+
+function fieldUsesValueFormat(command, param) {
+  if (isListParam(param)) return true;
   if (param.accepts_byte_list) return true;
   return false;
 }
@@ -1291,12 +1298,19 @@ function formatNodeLabel(step) {
     return `IF var${args.first_var_index ?? 0} ${op} var${args.second_var_index ?? 0}`;
   }
   if (step.command === "end_condition") return "end IF";
-  const keys = Object.keys(args).filter((k) => k !== "reserved");
+  const keys = Object.keys(args).filter((k) => {
+    if (k === "reserved") return false;
+    // Hide use_var=0 / var_index when not using a var.
+    if (k === "use_var" && !isTruthyUseVar(args.use_var)) return false;
+    if (k === "var_index" && args.use_var !== undefined && !isTruthyUseVar(args.use_var)) return false;
+    return true;
+  });
   if (!keys.length) return name;
   return `${name}\n${keys
     .slice(0, 2)
     .map((k) => {
       const v = args[k];
+      if (k === "use_var") return isTruthyUseVar(v) ? "use_var" : null;
       if (fieldUsesHexAddress(step.command, k) && typeof v === "number") {
         return `${k}=${formatHexAddressValue(v)}`;
       }
@@ -1309,7 +1323,23 @@ function formatNodeLabel(step) {
       }
       return `${k}=${v}`;
     })
+    .filter(Boolean)
     .join(", ")}`;
+}
+
+function isTruthyUseVar(val) {
+  return val === 1 || val === true || val === "1";
+}
+
+function commandHasUseVarParam(metaOrParams) {
+  const params = Array.isArray(metaOrParams) ? metaOrParams : metaOrParams?.params || [];
+  return params.some((p) => p.name === "use_var");
+}
+
+function syncUseVarVarIndexVisibility(root, checked) {
+  if (!root) return;
+  const wrap = root.querySelector("[data-use-var-reveal='var_index']");
+  if (wrap) wrap.hidden = !checked;
 }
 
 function nodeClassForCommand(command) {
@@ -1681,17 +1711,39 @@ function renderPropsPanel(nodeId) {
   }
   if (!node.data.argFormats) node.data.argFormats = {};
 
+  const hasUseVar = commandHasUseVarParam(meta);
+  const useVarOn = isTruthyUseVar(node.data.args.use_var);
+
   const fields = meta.params
     .map((p) => {
       const val = node.data.args[p.name];
+      if (p.name === "use_var") {
+        const checked = isTruthyUseVar(val);
+        return `
+          <div class="field field-checkbox">
+            <label for="prop-use_var" class="checkbox-label">
+              <input id="prop-use_var" data-param="use_var" type="checkbox"${checked ? " checked" : ""} />
+              use var
+            </label>
+          </div>`;
+      }
+      if (p.name === "var_index" && hasUseVar) {
+        const maxValue = p.max_value ?? (appState.limits.max_var_slots - 1);
+        const hintText = p.hint || `0–${maxValue}`;
+        return `
+          <div class="field" data-use-var-reveal="var_index"${useVarOn ? "" : " hidden"}>
+            <label for="prop-var_index">${p.name}<span class="limit-hint">${hintText}</span></label>
+            <input id="prop-var_index" data-param="var_index" type="number" min="0" max="${maxValue}" value="${val ?? 0}" />
+          </div>`;
+      }
       const usesFormat = fieldUsesValueFormat(command, p);
       const argFormat = getNodeArgFormat(node, p.name);
       const displayVal = usesFormat
-        ? formatArgForDisplay(val, argFormat, { isList: !!p.is_list, isVarSetValue: !!p.accepts_byte_list })
+        ? formatArgForDisplay(val, argFormat, { isList: isListParam(p), isVarSetValue: !!p.accepts_byte_list })
         : Array.isArray(val)
           ? val.join(", ")
           : val ?? "";
-      if (p.is_list) {
+      if (isListParam(p)) {
         const maxLen = p.max_len || appState.limits.comm_data_length;
         return `
           <div class="field">
@@ -1770,7 +1822,7 @@ function renderPropsPanel(nodeId) {
       const input = panel.querySelector(`#prop-${param}`);
       if (!input || !paramMeta) return;
       input.value = formatArgForDisplay(node.data.args[param], format, {
-        isList: !!paramMeta.is_list,
+        isList: isListParam(paramMeta),
         isVarSetValue: !!paramMeta.accepts_byte_list,
       });
     });
@@ -1782,7 +1834,10 @@ function renderPropsPanel(nodeId) {
       const formatSel = panel.querySelector(`#prop-format-${param}`);
       const format = formatSel ? normalizeValueFormat(formatSel.value) : "dec";
       let value;
-      if (el.dataset.isList === "1") {
+      if (el.type === "checkbox") {
+        value = el.checked ? 1 : 0;
+        if (param === "use_var") syncUseVarVarIndexVisibility(panel, el.checked);
+      } else if (el.dataset.isList === "1") {
         const maxLen = parseInt(el.dataset.maxLen || "8", 10);
         try {
           value = parseBytesArrayWithFormat(el.value, format, maxLen);
@@ -2732,6 +2787,10 @@ function collectLiveMicroFieldValues(op) {
   for (const f of op.fields || []) {
     const input = document.getElementById(`live-field-${f.name}`);
     if (!input) continue;
+    if (input.type === "checkbox") {
+      values[f.name] = input.checked ? 1 : 0;
+      continue;
+    }
     const raw = input.value.trim();
     const usesFormat = liveFieldUsesValueFormat(op, f);
     const formatSel = document.getElementById(`live-field-format-${f.name}`);
@@ -2790,6 +2849,7 @@ function updateLiveFields() {
   const fieldsDiv = document.getElementById("live-fields");
   fieldsDiv.innerHTML = "";
   if (!op || !op.fields) return;
+  const hasUseVar = commandHasUseVarParam(op.fields);
   for (const f of op.fields) {
     const wrap = document.createElement("div");
     wrap.className = "field";
@@ -2800,6 +2860,52 @@ function updateLiveFields() {
     const usesFormat = liveFieldUsesValueFormat(op, f);
     const usesHexAddress = liveFieldUsesHexAddress(op, f.name);
     const format = getLiveFieldFormat(op, f.name);
+
+    if (f.name === "use_var") {
+      wrap.classList.add("field-checkbox");
+      label.className = "checkbox-label";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.id = `live-field-${f.name}`;
+      input.dataset.field = f.name;
+      input.checked = isTruthyUseVar(f.default);
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(" use var"));
+      wrap.appendChild(label);
+      input.addEventListener("change", () => {
+        syncUseVarVarIndexVisibility(fieldsDiv, input.checked);
+      });
+      fieldsDiv.appendChild(wrap);
+      continue;
+    }
+
+    if (f.name === "var_index" && hasUseVar) {
+      wrap.dataset.useVarReveal = "var_index";
+      wrap.hidden = !isTruthyUseVar(
+        (() => {
+          const cb = fieldsDiv.querySelector("#live-field-use_var");
+          return cb ? cb.checked : f.default;
+        })()
+      );
+      const hint = f.hint || (maxValue != null ? `max ${maxValue}` : null);
+      if (hint) {
+        label.innerHTML = `${f.name}<span class="limit-hint">${hint}</span>`;
+      } else {
+        label.textContent = f.name;
+      }
+      const input = document.createElement("input");
+      input.type = "number";
+      input.id = `live-field-${f.name}`;
+      input.dataset.field = f.name;
+      input.min = "0";
+      if (maxValue != null) input.max = String(maxValue);
+      input.value = f.default !== undefined && f.default !== null ? String(f.default) : "0";
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      fieldsDiv.appendChild(wrap);
+      continue;
+    }
+
     const hint = f.hint || (usesHexAddress ? "hex (0x)" : maxLen ? `max ${maxLen} bytes` : maxValue != null ? `max ${maxValue}` : null);
     if (hint) {
       label.innerHTML = `${f.name}<span class="limit-hint">${hint}</span>`;
@@ -2885,6 +2991,8 @@ function updateLiveFields() {
     }
     fieldsDiv.appendChild(wrap);
   }
+  const useVarCb = fieldsDiv.querySelector("#live-field-use_var");
+  if (useVarCb) syncUseVarVarIndexVisibility(fieldsDiv, useVarCb.checked);
 }
 
 async function refreshUsbPorts() {

@@ -51,6 +51,17 @@ bool storeCommRxBytes(MicroVarStore* store, uint8_t var_index, const uint8_t* da
   return true;
 }
 
+bool loadCommTxBytes(MicroVarStore* store, uint8_t var_index, uint8_t* data, uint8_t length) {
+  if (store == nullptr || data == nullptr || var_index >= MICRO_VAR_SLOT_COUNT || length == 0 ||
+      length > bluelink::MicroOpsPayload::COMM_DATA_LENGTH) {
+    return false;
+  }
+
+  const uint64_t packed = static_cast<uint64_t>(store->get(var_index));
+  memcpy(data, &packed, length);
+  return true;
+}
+
 }  // namespace
 
 MicroSequenceExecutor::MicroSequenceExecutor() = default;
@@ -445,6 +456,18 @@ InterfaceStatus MicroSequenceExecutor::executeCanTransmit(const bluelink::MicroO
 
   const uint8_t dlc =
       op.dlc > bluelink::MicroOpsPayload::COMM_DATA_LENGTH ? bluelink::MicroOpsPayload::COMM_DATA_LENGTH : op.dlc;
+  if (dlc == 0) {
+    return InterfaceStatus::INTERFACE_ERROR;
+  }
+
+  if (op.use_var != 0) {
+    uint8_t data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+    if (not loadCommTxBytes(var_store_, op.var_index, data, dlc)) {
+      return InterfaceStatus::INTERFACE_ERROR;
+    }
+    return raw_can_->transmitStandard(op.id, data, dlc);
+  }
+
   return raw_can_->transmitStandard(op.id, op.data, dlc);
 }
 
@@ -453,6 +476,17 @@ bool MicroSequenceExecutor::executeUartTransmit(const bluelink::MicroOpsPayload:
   //     op.length > bluelink::MicroOpsPayload::COMM_DATA_LENGTH) {
   //   return false;
   // }
+  if (op.length == 0 || op.length > bluelink::MicroOpsPayload::COMM_DATA_LENGTH) {
+    return false;
+  }
+
+  if (op.use_var != 0) {
+    uint8_t data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+    if (not loadCommTxBytes(var_store_, op.var_index, data, op.length)) {
+      return false;
+    }
+    return uart.write(data, op.length) == InterfaceStatus::INTERFACE_OK;
+  }
 
   return uart.write(op.data, op.length) == InterfaceStatus::INTERFACE_OK;
 }
@@ -462,6 +496,14 @@ bool MicroSequenceExecutor::executeSpiTransfer(const bluelink::MicroOpsPayload::
     //op.spi_instance != HardwareMap::MICRO_SEQUENCE_SPI_INSTANCE ||
      op.tx_len == 0 || op.tx_len > bluelink::MicroOpsPayload::COMM_DATA_LENGTH) {
     return false;
+  }
+
+  if (op.use_var != 0) {
+    uint8_t tx_data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+    if (not loadCommTxBytes(var_store_, op.var_index, tx_data, op.tx_len)) {
+      return false;
+    }
+    return spi.write(tx_data, op.tx_len) == InterfaceStatus::INTERFACE_OK;
   }
 
   return spi.write(op.tx_data, op.tx_len) == InterfaceStatus::INTERFACE_OK;
@@ -475,6 +517,14 @@ bool MicroSequenceExecutor::executeI2cWrite(const bluelink::MicroOpsPayload::Mic
   }
 
   i2c.setDeviceAddr(static_cast<uint16_t>(op.device_addr << 1));
+  if (op.use_var != 0) {
+    uint8_t data[bluelink::MicroOpsPayload::COMM_DATA_LENGTH] = {};
+    if (not loadCommTxBytes(var_store_, op.var_index, data, op.length)) {
+      return false;
+    }
+    return i2c.write(data, op.length) == InterfaceStatus::INTERFACE_OK;
+  }
+
   return i2c.write(op.data, op.length) == InterfaceStatus::INTERFACE_OK;
 }
 

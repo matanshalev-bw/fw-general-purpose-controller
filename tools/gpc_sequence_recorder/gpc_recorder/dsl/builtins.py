@@ -449,11 +449,22 @@ class RecorderContext:
         can_bus: int,
         id: int,
         dlc: int,
-        data: List[int],
+        data: Optional[List[int]] = None,
+        use_var: int = 0,
+        var_index: int = 0,
     ) -> None:
+        if use_var:
+            validate_var_index(var_index)
         self._add_step(
             "can_transmit",
-            {"can_bus": can_bus, "id": id, "dlc": dlc, "data": coerce_int_byte_list(data, name="data")},
+            {
+                "can_bus": can_bus,
+                "id": id,
+                "dlc": dlc,
+                "data": coerce_int_byte_list(data if data is not None else [], name="data"),
+                "use_var": use_var,
+                "var_index": var_index,
+            },
         )
 
     def pwm_set(
@@ -473,16 +484,46 @@ class RecorderContext:
             },
         )
 
-    def uart_transmit(self, uart_instance: int, length: int, data: List[int]) -> None:
+    def uart_transmit(
+        self,
+        uart_instance: int,
+        length: int,
+        data: Optional[List[int]] = None,
+        use_var: int = 0,
+        var_index: int = 0,
+    ) -> None:
+        if use_var:
+            validate_var_index(var_index)
         self._add_step(
             "uart_transmit",
-            {"uart_instance": uart_instance, "length": length, "data": coerce_int_byte_list(data, name="data")},
+            {
+                "uart_instance": uart_instance,
+                "length": length,
+                "data": coerce_int_byte_list(data if data is not None else [], name="data"),
+                "use_var": use_var,
+                "var_index": var_index,
+            },
         )
 
-    def spi_transfer(self, spi_instance: int, tx_len: int, tx_data: List[int]) -> None:
+    def spi_transfer(
+        self,
+        spi_instance: int,
+        tx_len: int,
+        tx_data: Optional[List[int]] = None,
+        use_var: int = 0,
+        var_index: int = 0,
+    ) -> None:
+        if use_var:
+            validate_var_index(var_index)
         self._add_step(
             "spi_transfer",
-            {"spi_instance": spi_instance, "tx_len": tx_len, "tx_data": coerce_int_byte_list(tx_data, name="tx_data")},
+            {
+                "spi_instance": spi_instance,
+                "tx_len": tx_len,
+                "tx_data": coerce_int_byte_list(tx_data if tx_data is not None else [], name="tx_data"),
+                "use_var": use_var,
+                "var_index": var_index,
+            },
         )
 
     def i2c_write(
@@ -490,15 +531,21 @@ class RecorderContext:
         i2c_instance: int,
         device_addr: int,
         length: int,
-        data: List[int],
+        data: Optional[List[int]] = None,
+        use_var: int = 0,
+        var_index: int = 0,
     ) -> None:
+        if use_var:
+            validate_var_index(var_index)
         self._add_step(
             "i2c_write",
             {
                 "i2c_instance": i2c_instance,
                 "device_addr": device_addr,
                 "length": length,
-                "data": coerce_int_byte_list(data, name="data"),
+                "data": coerce_int_byte_list(data if data is not None else [], name="data"),
+                "use_var": use_var,
+                "var_index": var_index,
             },
         )
 

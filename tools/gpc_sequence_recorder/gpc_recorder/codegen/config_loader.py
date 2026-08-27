@@ -157,7 +157,9 @@ def _parse_step_values(
         if field.array_size:
             size = resolve_array_size(schema, field.array_size)
             if ti >= len(tokens):
-                raise ValueError(f"Missing value for {field.name} in {union_member}")
+                # Trailing fields omitted in HPP → C++ zero-init.
+                values[field.name] = [0] * size
+                continue
             token = tokens[ti].strip()
             if token.startswith("{"):
                 inner = token[1:-1].strip()
@@ -172,7 +174,9 @@ def _parse_step_values(
             values[field.name] = arr
         else:
             if ti >= len(tokens):
-                raise ValueError(f"Missing value for {field.name} in {union_member}")
+                # Trailing fields omitted in HPP → C++ zero-init (e.g. use_var/var_index).
+                values[field.name] = 0
+                continue
             values[field.name] = _parse_scalar(tokens[ti])
             ti += 1
     return values

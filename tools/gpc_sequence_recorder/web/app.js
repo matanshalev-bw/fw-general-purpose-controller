@@ -943,6 +943,37 @@
       const wrap = document.createElement("div");
       wrap.className = "field";
       const label = document.createElement("label");
+
+      if (p.name === "use_var") {
+        wrap.classList.add("field-checkbox");
+        label.className = "checkbox-label";
+        label.htmlFor = `rec-field-${p.name}`;
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.id = `rec-field-${p.name}`;
+        input.dataset.param = p.name;
+        input.dataset.hasDefault = p.has_default ? "1" : "0";
+        const defOn =
+          p.has_default &&
+          (p.default === 1 || p.default === "1" || p.default === true);
+        input.checked = !!defOn;
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(" use var"));
+        wrap.appendChild(label);
+        recorderFieldsEl.appendChild(wrap);
+        input.addEventListener("change", () => {
+          const reveal = recorderFieldsEl.querySelector("[data-use-var-reveal='var_index']");
+          if (reveal) reveal.hidden = !input.checked;
+        });
+        return;
+      }
+
+      if (p.name === "var_index" && cmd.params.some((x) => x.name === "use_var")) {
+        wrap.dataset.useVarReveal = "var_index";
+        const useVarEl = document.getElementById("rec-field-use_var");
+        wrap.hidden = !(useVarEl && useVarEl.checked);
+      }
+
       label.textContent = isListParam(p) ? `${p.name}[]` : p.name;
 
       const isList = isListParam(p);
@@ -1068,7 +1099,13 @@
     params.forEach((p) => {
       if (p.kind === "VAR_KEYWORD" || p.kind === "VAR_POSITIONAL") return;
       const input = document.getElementById(`rec-field-${p.name}`);
-      const raw = input ? input.value.trim() : "";
+      if (!input) return;
+      if (input.type === "checkbox") {
+        // Always emit use_var so DSL gets an explicit 0/1.
+        kwargs.push(`${p.name}=${input.checked ? 1 : 0}`);
+        return;
+      }
+      const raw = input.value.trim();
       const isEmpty = raw === "";
       if (isEmpty && p.has_default) return;
       if (isEmpty && !p.has_default) return; // required but missing

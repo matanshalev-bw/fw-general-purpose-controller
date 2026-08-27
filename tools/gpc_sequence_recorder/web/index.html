@@ -327,6 +327,23 @@
       align-items: center;
       gap: 0.25rem;
     }
+    /* display:flex above beats the UA [hidden] rule — keep hide working */
+    #recorder-fields .field[hidden] {
+      display: none !important;
+    }
+    #recorder-fields .field-checkbox .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+      color: #ccc;
+      font-size: 0.8rem;
+    }
+    #recorder-fields .checkbox-label input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      accent-color: #5b8def;
+    }
     #recorder-fields .field label { font-size: 0.8rem; color: #bbb; }
     #recorder-fields input { width: 10rem; }
     #recorder-fields input.wide { width: 16rem; }

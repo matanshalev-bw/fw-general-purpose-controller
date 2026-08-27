@@ -679,6 +679,32 @@
       flex-direction: column;
       gap: 0.15rem;
     }
+    /* display:flex above beats the UA [hidden] rule — keep hide working */
+    .props-panel .field[hidden],
+    #live-fields .field[hidden],
+    #live-controller-fields .field[hidden] {
+      display: none !important;
+    }
+    .props-panel .field-checkbox,
+    #live-fields .field-checkbox {
+      flex-direction: row;
+      align-items: center;
+    }
+    .props-panel .checkbox-label,
+    #live-fields .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      color: #ccc;
+      font-size: 0.8rem;
+    }
+    .props-panel .checkbox-label input[type="checkbox"],
+    #live-fields .checkbox-label input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      accent-color: #5b8def;
+    }
     .props-panel label { color: #aaa; font-size: 0.75rem; }
     .props-panel label .limit-hint {
       margin-left: 0.35rem;

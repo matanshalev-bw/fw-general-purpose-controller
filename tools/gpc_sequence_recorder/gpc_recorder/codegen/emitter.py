@@ -94,10 +94,22 @@ def _format_array_field(v: Any, size: int = 8, *, hex_bytes: bool = False) -> st
 def _format_union_init(member: str, values: Dict[str, Any], schema=None) -> str:
     if schema and member in schema.micro_ops:
         parts: List[str] = []
-        for field in schema.micro_ops[member].fields:
+        fields = list(schema.micro_ops[member].fields)
+        # Omit trailing use_var=0, var_index=0 on comm TX (C++ zero-inits them).
+        if member in ("can_transmit", "uart_transmit", "spi_transfer", "i2c_write"):
+            while fields and fields[-1].name in ("use_var", "var_index"):
+                trailing = fields[-1].name
+                raw = values.get(trailing, 0)
+                if int(raw or 0) != 0:
+                    break
+                fields.pop()
+        for field in fields:
             v = values.get(field.name)
             if v is None:
-                raise ValueError(f"Missing field {field.name!r} for {member}")
+                if field.name in ("use_var", "var_index"):
+                    v = 0
+                else:
+                    raise ValueError(f"Missing field {field.name!r} for {member}")
             if field.array_size:
                 size = resolve_array_size(schema, field.array_size)
                 use_hex = member == "can_transmit" and field.name == "data"
