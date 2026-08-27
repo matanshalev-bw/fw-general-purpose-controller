@@ -32,7 +32,7 @@ _UNION_TO_COMMAND: Dict[str, str] = {
     "var_set": "var_set",
     "var_mul": "var_mul",
     "var_add": "var_add",
-    "var_byte_assign": "var_byte_assign",
+    "var_bytes_assign": "var_bytes_assign",
     "if_condition": "if_condition",
     "move_to_error_state": "move_to_error_state",
     "move_to_emergency_state": "move_to_emergency_state",

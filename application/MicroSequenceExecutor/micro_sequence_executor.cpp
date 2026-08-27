@@ -317,9 +317,9 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
       return executeVarMul(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarMul*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::VAR_ADD:
       return executeVarAdd(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarAdd*>(step.params));
-    case bluelink::MicroOpsPayload::MicroOpType::VAR_BYTE_ASSIGN:
-      return executeVarByteAssign(
-          *reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarByteAssign*>(step.params));
+    case bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN:
+      return executeVarBytesAssign(
+          *reinterpret_cast<const bluelink::MicroOpsPayload::MicroVarBytesAssign*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::MOVE_TO_ERROR_STATE:
       return executeMoveToErrorState(
           *reinterpret_cast<const bluelink::MicroOpsPayload::MicroMoveToErrorState*>(step.params));
@@ -625,16 +625,23 @@ bool MicroSequenceExecutor::executeVarAdd(const bluelink::MicroOpsPayload::Micro
   return true;
 }
 
-bool MicroSequenceExecutor::executeVarByteAssign(const bluelink::MicroOpsPayload::MicroVarByteAssign& op) {
+bool MicroSequenceExecutor::executeVarBytesAssign(const bluelink::MicroOpsPayload::MicroVarBytesAssign& op) {
   if (op.dest_var_index >= MICRO_VAR_SLOT_COUNT || op.src_var_index >= MICRO_VAR_SLOT_COUNT ||
-      op.byte_index >= bluelink::MicroOpsPayload::COMM_DATA_LENGTH || var_store_ == nullptr) {
+      op.byte_index >= bluelink::MicroOpsPayload::COMM_DATA_LENGTH || op.byte_count == 0 ||
+      op.byte_index + op.byte_count > bluelink::MicroOpsPayload::COMM_DATA_LENGTH ||
+      var_store_ == nullptr) {
     return false;
   }
 
   const uint64_t dest = static_cast<uint64_t>(var_store_->get(op.dest_var_index));
-  const uint8_t src_byte = static_cast<uint8_t>(var_store_->get(op.src_var_index));
-  const uint64_t mask = ~(static_cast<uint64_t>(0xFF) << (8 * op.byte_index));
-  const uint64_t result = (dest & mask) | (static_cast<uint64_t>(src_byte) << (8 * op.byte_index));
+  const uint64_t src = static_cast<uint64_t>(var_store_->get(op.src_var_index));
+  uint64_t result = dest;
+  for (uint8_t i = 0; i < op.byte_count; ++i) {
+    const uint8_t src_byte = static_cast<uint8_t>((src >> (8 * i)) & 0xFF);
+    const uint8_t dest_idx = static_cast<uint8_t>(op.byte_index + i);
+    const uint64_t mask = ~(static_cast<uint64_t>(0xFF) << (8 * dest_idx));
+    result = (result & mask) | (static_cast<uint64_t>(src_byte) << (8 * dest_idx));
+  }
   var_store_->set(op.dest_var_index, static_cast<int64_t>(result));
   return true;
 }

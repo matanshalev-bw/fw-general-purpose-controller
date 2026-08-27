@@ -53,7 +53,7 @@ _EXAMPLES: Dict[str, str] = {
     "var_set": "var_set(var_index=1, value=3343114)  # or value=[0x0A, 0x03, 0x33] (LE → int64)",
     "var_mul": "var_mul(dest_var_index=0, src_var_index=0, numerator=1, denominator=10)",
     "var_add": "var_add(dest_var_index=0, src_var_index=0, addend=5)",
-    "var_byte_assign": "var_byte_assign(dest_var_index=1, byte_index=3, src_var_index=2)",
+    "var_bytes_assign": "var_bytes_assign(dest_var_index=1, byte_index=3, byte_count=1, src_var_index=2)",
     "if_condition": "if_condition(first_var_index=0, comparing_type=\">=\", second_var_index=1)",
     "end_condition": "end_condition()",
     "move_to_error_state": "move_to_error_state()",
@@ -105,8 +105,8 @@ _DESCRIPTIONS: Dict[str, str] = {
     ),
     "var_mul": "Multiply src var by numerator/denominator and store in dest var.",
     "var_add": "Add addend to src var and store in dest var.",
-    "var_byte_assign": (
-        "Copy the low byte of src var into dest var at byte_index (0..7, little-endian)."
+    "var_bytes_assign": (
+        "Copy byte_count LE bytes from src var into dest var starting at byte_index (0..7)."
     ),
     "if_condition": "Start a conditional block; compare two var slots (==, !=, >, >=, <, <=).",
     "end_condition": "Close the active if_condition block and record its body step count.",
@@ -161,7 +161,7 @@ _RECORDER_COMMAND_GROUPS: List[tuple[str, List[str]]] = [
             "var_set",
             "var_mul",
             "var_add",
-            "var_byte_assign",
+            "var_bytes_assign",
             "if_condition",
             "end_condition",
             "move_to_error_state",
@@ -268,10 +268,11 @@ _PARAM_HINTS: Dict[str, Dict[str, str]] = {
     "i2c_read": {
         "device_addr": "hex (0x)",
     },
-    "var_byte_assign": {
+    "var_bytes_assign": {
         "dest_var_index": "dest var slot (LE byte array)",
-        "byte_index": "0..7 LE byte index in dest",
-        "src_var_index": "src var; low byte → dest[byte_index]",
+        "byte_index": "0..7 LE start byte index in dest",
+        "byte_count": "1..8 bytes from src (LE bytes 0..n-1)",
+        "src_var_index": "src var; bytes → dest[byte_index..byte_index+n-1]",
     },
 }
 

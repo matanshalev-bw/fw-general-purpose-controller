@@ -173,24 +173,24 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             .step_count = 6,
             .steps = {
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTE_ASSIGN,
-                            .var_byte_assign = {0, 4, 1},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN,
+                            .var_bytes_assign = {0, 4, 1, 1},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
                             .delay_ms = {1300},
                         },
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTE_ASSIGN,
-                            .var_byte_assign = {0, 4, 2},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN,
+                            .var_bytes_assign = {0, 4, 1, 2},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
                             .delay_ms = {1300},
                         },
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTE_ASSIGN,
-                            .var_byte_assign = {0, 4, 3},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN,
+                            .var_bytes_assign = {0, 4, 1, 3},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
@@ -285,7 +285,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     { 1, 1, 1 },
                 },
                 .sequence = {
-                    .step_count = 7,
+                    .step_count = 5,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
@@ -300,16 +300,8 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                             .var_mul = {2, 1, 4, 1},
                         },
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTE_ASSIGN,
-                            .var_byte_assign = {4, 0, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_MUL,
-                            .var_mul = {3, 2, 1, 256},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTE_ASSIGN,
-                            .var_byte_assign = {4, 1, 3},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN,
+                            .var_bytes_assign = {4, 0, 2, 2},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,

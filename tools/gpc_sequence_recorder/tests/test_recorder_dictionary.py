@@ -17,10 +17,11 @@ def test_config_component_param_has_component_id_enum():
     assert enum_values == data["component_ids"]
 
 
-def test_var_byte_assign_params_have_field_hints():
+def test_var_bytes_assign_params_have_field_hints():
     data = recorder_commands_dictionary()
-    cmd = next(c for c in data["recorder_commands"] if c["name"] == "var_byte_assign")
+    cmd = next(c for c in data["recorder_commands"] if c["name"] == "var_bytes_assign")
     hints = {p["name"]: p.get("hint") for p in cmd["params"]}
     assert "dest" in hints["dest_var_index"].lower()
     assert "0..7" in hints["byte_index"]
-    assert "low byte" in hints["src_var_index"].lower()
+    assert "1..8" in hints["byte_count"]
+    assert "src" in hints["src_var_index"].lower()
