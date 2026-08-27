@@ -659,7 +659,8 @@ const VALUE_FORMAT_OPTIONS = [
   { value: "dec", label: "dec" },
   { value: "hex", label: "hex" },
   { value: "str", label: "str" },
-  { value: "dec_array", label: "array (dec)" },
+  { value: "array_int8", label: "array (int8)" },
+  { value: "array_uint8", label: "array (uint8)" },
 ];
 
 function escapeHtmlAttr(text) {
@@ -670,21 +671,34 @@ function escapeHtmlAttr(text) {
 }
 
 function normalizeValueFormat(mode) {
-  if (mode === "hex" || mode === "str" || mode === "dec_array") return mode;
+  if (mode === "hex" || mode === "str" || mode === "array_int8" || mode === "array_uint8") return mode;
   return "dec";
 }
 
 function migrateLegacyValueFormat(mode) {
-  if (!mode || mode === "dec" || mode === "hex" || mode === "str" || mode === "dec_array") {
+  if (mode === "dec_array") return "array_int8";
+  if (
+    !mode ||
+    mode === "dec" ||
+    mode === "hex" ||
+    mode === "str" ||
+    mode === "array_int8" ||
+    mode === "array_uint8"
+  ) {
     return normalizeValueFormat(mode);
   }
   if (mode === "bin" || mode === "float_bits_hex") return "hex";
   return "dec";
 }
 
+function isArrayValueFormat(mode) {
+  const fmt = normalizeValueFormat(mode);
+  return fmt === "array_int8" || fmt === "array_uint8";
+}
+
 function formatAllowsByteList(mode) {
   const fmt = normalizeValueFormat(mode);
-  return fmt === "dec" || fmt === "dec_array";
+  return fmt === "dec" || isArrayValueFormat(fmt);
 }
 
 function int64ToLeBytes(value) {
@@ -736,6 +750,11 @@ function bytesToAsciiString(bytes) {
   return bytes.slice(0, end).map((b) => String.fromCharCode(b & 0xff)).join("");
 }
 
+function toSigned8(byte) {
+  const u = byte & 0xff;
+  return u > 127 ? u - 256 : u;
+}
+
 function formatBytesArrayForDisplay(bytes, mode) {
   const list = Array.isArray(bytes) ? bytes : [];
   if (!list.length) return "";
@@ -746,7 +765,10 @@ function formatBytesArrayForDisplay(bytes, mode) {
   if (fmt === "str") {
     return `"${bytesToAsciiString(list)}"`;
   }
-  return list.join(", ");
+  if (fmt === "array_int8") {
+    return list.map((b) => String(toSigned8(b))).join(", ");
+  }
+  return list.map((b) => String(b & 0xff)).join(", ");
 }
 
 function parseBytesArrayWithFormat(text, mode, maxLen) {
@@ -785,6 +807,14 @@ function parseBytesArrayWithFormat(text, mode, maxLen) {
     if (Number.isNaN(n)) throw new Error(`invalid decimal byte: ${p}`);
     return n;
   });
+
+  if (fmt === "array_int8") {
+    if (bytes.some((b) => b < -128 || b > 127)) {
+      throw new Error("signed bytes must be -128..127");
+    }
+    return bytes.map((b) => b & 0xff);
+  }
+
   if (bytes.some((b) => b < 0 || b > 255)) {
     throw new Error("bytes must be 0..255");
   }
@@ -801,8 +831,8 @@ function formatInt64ForDisplay(value, mode) {
   if (fmt === "str") {
     return `"${bytesToAsciiString(int64ToLeBytes(value))}"`;
   }
-  if (fmt === "dec_array") {
-    return formatBytesArrayForDisplay(int64ToLeBytes(value), "dec");
+  if (isArrayValueFormat(fmt)) {
+    return formatBytesArrayForDisplay(int64ToLeBytes(value), fmt);
   }
   return String(value);
 }
@@ -827,8 +857,8 @@ function parseInt64WithFormat(text, mode, { allowByteList = false } = {}) {
     return n;
   }
 
-  if (fmt === "dec_array") {
-    return leBytesToInt64Number(parseBytesArrayWithFormat(s, "dec", 8));
+  if (isArrayValueFormat(fmt)) {
+    return leBytesToInt64Number(parseBytesArrayWithFormat(s, fmt, 8));
   }
 
   if (allowByteList && (s.startsWith("[") || s.includes(","))) {
@@ -972,8 +1002,8 @@ function formatLiveExpressionValue(raw, castMode) {
   if (mode === "str") {
     return `"${bytesToAsciiString(int64ToLeBytes(value))}"`;
   }
-  if (mode === "dec_array") {
-    return formatBytesArrayForDisplay(int64ToLeBytes(value), "dec");
+  if (isArrayValueFormat(mode)) {
+    return formatBytesArrayForDisplay(int64ToLeBytes(value), mode);
   }
   return toSigned64(value).toString(10);
 }
