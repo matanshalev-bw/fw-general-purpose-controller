@@ -53,6 +53,7 @@ _EXAMPLES: Dict[str, str] = {
     "var_set": "var_set(var_index=1, value=3343114)  # or value=[0x0A, 0x03, 0x33] (LE → int64)",
     "var_mul": "var_mul(dest_var_index=0, src_var_index=0, numerator=1, denominator=10)",
     "var_add": "var_add(dest_var_index=0, src_var_index=0, addend=5)",
+    "var_byte_assign": "var_byte_assign(dest_var_index=1, byte_index=3, src_var_index=2)",
     "if_condition": "if_condition(first_var_index=0, comparing_type=\">=\", second_var_index=1)",
     "end_condition": "end_condition()",
     "move_to_error_state": "move_to_error_state()",
@@ -104,6 +105,9 @@ _DESCRIPTIONS: Dict[str, str] = {
     ),
     "var_mul": "Multiply src var by numerator/denominator and store in dest var.",
     "var_add": "Add addend to src var and store in dest var.",
+    "var_byte_assign": (
+        "Copy the low byte of src var into dest var at byte_index (0..7, little-endian)."
+    ),
     "if_condition": "Start a conditional block; compare two var slots (==, !=, >, >=, <, <=).",
     "end_condition": "Close the active if_condition block and record its body step count.",
     "move_to_error_state": "Transition the controller to CONTROLLER_STATE_ERROR.",
@@ -157,6 +161,7 @@ _RECORDER_COMMAND_GROUPS: List[tuple[str, List[str]]] = [
             "var_set",
             "var_mul",
             "var_add",
+            "var_byte_assign",
             "if_condition",
             "end_condition",
             "move_to_error_state",
@@ -243,6 +248,11 @@ _PARAM_HINTS: Dict[str, Dict[str, str]] = {
     },
     "i2c_read": {
         "device_addr": "hex (0x)",
+    },
+    "var_byte_assign": {
+        "dest_var_index": "dest var slot (LE byte array)",
+        "byte_index": "0..7 LE byte index in dest",
+        "src_var_index": "src var; low byte → dest[byte_index]",
     },
 }
 

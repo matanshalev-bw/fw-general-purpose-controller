@@ -579,6 +579,20 @@ class RecorderContext:
             },
         )
 
+    def var_byte_assign(self, dest_var_index: int, byte_index: int, src_var_index: int) -> None:
+        validate_var_index(dest_var_index)
+        validate_var_index(src_var_index)
+        if not (0 <= int(byte_index) < 8):
+            raise ValueError(f"byte_index must be 0..7, got {byte_index}")
+        self._add_step(
+            "var_byte_assign",
+            {
+                "dest_var_index": dest_var_index,
+                "byte_index": int(byte_index),
+                "src_var_index": src_var_index,
+            },
+        )
+
     def if_condition(self, first_var_index: int, comparing_type: str, second_var_index: int) -> None:
         compare_type = _normalize_compare_type(comparing_type)
         validate_var_index(first_var_index)
@@ -839,6 +853,7 @@ def build_namespace(ctx: RecorderContext) -> Dict[str, Any]:
         "var_set": ctx.var_set,
         "var_mul": ctx.var_mul,
         "var_add": ctx.var_add,
+        "var_byte_assign": ctx.var_byte_assign,
         "if_condition": ctx.if_condition,
         "end_condition": ctx.end_condition,
         "move_to_error_state": ctx.move_to_error_state,

@@ -105,6 +105,7 @@ const FRIENDLY_NAMES = {
   var_set: "var set",
   var_mul: "var mul",
   var_add: "var add",
+  var_byte_assign: "var byte assign",
   move_to_error_state: "move to error",
   move_to_emergency_state: "move to emergency",
   trigger_safety: "trigger safety",

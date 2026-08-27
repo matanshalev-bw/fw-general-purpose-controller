@@ -60,6 +60,7 @@ class MicroSequenceExecutor {
   bool executeVarSet(const bluelink::MicroOpsPayload::MicroVarSet& op);
   bool executeVarMul(const bluelink::MicroOpsPayload::MicroVarMul& op);
   bool executeVarAdd(const bluelink::MicroOpsPayload::MicroVarAdd& op);
+  bool executeVarByteAssign(const bluelink::MicroOpsPayload::MicroVarByteAssign& op);
   bool executeMoveToErrorState(const bluelink::MicroOpsPayload::MicroMoveToErrorState& op);
   bool executeMoveToEmergencyState(const bluelink::MicroOpsPayload::MicroMoveToEmergencyState& op);
   bool executeTriggerSafety(const bluelink::MicroOpsPayload::MicroTriggerSafety& op);

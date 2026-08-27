@@ -111,3 +111,38 @@ def test_schema_includes_var_mul_and_var_add():
     schema = get_schema()
     assert "var_mul" in schema.micro_ops
     assert "var_add" in schema.micro_ops
+    assert "var_byte_assign" in schema.micro_ops
+
+
+def test_var_byte_assign_records_and_emits():
+    engine = ReplEngine(auto_reload=False)
+    lines = [
+        "bind_main_tick()",
+        "var_set(var_index=1, value=[1, 2, 3, 0])",
+        "var_set(var_index=2, value=0x104)",
+        "var_byte_assign(dest_var_index=1, byte_index=3, src_var_index=2)",
+        "end_binding()",
+    ]
+    for line in lines:
+        out, cont = engine.execute(line)
+        assert cont, out
+
+    steps = engine.ctx.session.main_tick_steps
+    assert steps[2].union_member == "var_byte_assign"
+    assert steps[2].values["dest_var_index"] == 1
+    assert steps[2].values["byte_index"] == 3
+    assert steps[2].values["src_var_index"] == 2
+
+    text = emit_config_hpp(engine.ctx.session.to_dict(), engine.ctx.schema, write=False)
+    assert "MicroOpType::VAR_BYTE_ASSIGN" in text
+    assert ".var_byte_assign" in text
+
+
+def test_var_byte_assign_rejects_invalid_byte_index():
+    engine = ReplEngine(auto_reload=False)
+    out, cont = engine.execute("bind_main_tick()")
+    assert cont, out
+    out, cont = engine.execute("var_byte_assign(dest_var_index=1, byte_index=8, src_var_index=2)")
+    assert "byte_index" in out.lower()
+    assert "ValueError" in out
+    assert engine.ctx.session.main_tick_steps == []

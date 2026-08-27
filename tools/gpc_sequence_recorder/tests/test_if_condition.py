@@ -121,6 +121,7 @@ def test_schema_includes_new_micro_ops():
     assert "var_set" in schema.micro_ops
     assert "var_mul" in schema.micro_ops
     assert "var_add" in schema.micro_ops
+    assert "var_byte_assign" in schema.micro_ops
     assert "if_condition" in schema.micro_ops
     assert "end_condition" not in schema.micro_ops
     assert "move_to_error_state" in schema.micro_ops

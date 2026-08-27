@@ -34,6 +34,7 @@ FUNCTION_KEYWORDS: Dict[str, List[str]] = {
     "var_set": ["var_index=", "value="],
     "var_mul": ["dest_var_index=", "src_var_index=", "numerator=", "denominator="],
     "var_add": ["dest_var_index=", "src_var_index=", "addend="],
+    "var_byte_assign": ["dest_var_index=", "byte_index=", "src_var_index="],
     "reload": ["path="],
     "export": ["path="],
 }

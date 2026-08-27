@@ -39,6 +39,7 @@ _OP_TYPE_TO_MEMBER = {
     "VAR_SET": "var_set",
     "VAR_MUL": "var_mul",
     "VAR_ADD": "var_add",
+    "VAR_BYTE_ASSIGN": "var_byte_assign",
     "IF_CONDITION": "if_condition",
     "MOVE_TO_ERROR_STATE": "move_to_error_state",
     "MOVE_TO_EMERGENCY_STATE": "move_to_emergency_state",
