@@ -656,9 +656,10 @@ function makePaletteItem(command, meta, targetParent) {
 }
 
 const VALUE_FORMAT_OPTIONS = [
-  { value: "dec", label: "dec" },
+  { value: "int", label: "int" },
   { value: "hex", label: "hex" },
   { value: "str", label: "str" },
+  { value: "double", label: "double" },
   { value: "array_int8", label: "array (int8)" },
   { value: "array_uint8", label: "array (uint8)" },
 ];
@@ -671,24 +672,36 @@ function escapeHtmlAttr(text) {
 }
 
 function normalizeValueFormat(mode) {
-  if (mode === "hex" || mode === "str" || mode === "array_int8" || mode === "array_uint8") return mode;
-  return "dec";
+  if (
+    mode === "hex" ||
+    mode === "str" ||
+    mode === "double" ||
+    mode === "array_int8" ||
+    mode === "array_uint8"
+  ) {
+    return mode;
+  }
+  return "int";
 }
 
 function migrateLegacyValueFormat(mode) {
-  if (mode === "dec_array") return "array_int8";
+  if (mode === "dec" || mode === "dec_array") {
+    return mode === "dec_array" ? "array_int8" : "int";
+  }
+  if (mode === "float_bits_hex") return "double";
   if (
     !mode ||
-    mode === "dec" ||
+    mode === "int" ||
     mode === "hex" ||
     mode === "str" ||
+    mode === "double" ||
     mode === "array_int8" ||
     mode === "array_uint8"
   ) {
     return normalizeValueFormat(mode);
   }
-  if (mode === "bin" || mode === "float_bits_hex") return "hex";
-  return "dec";
+  if (mode === "bin") return "hex";
+  return "int";
 }
 
 function isArrayValueFormat(mode) {
@@ -698,11 +711,28 @@ function isArrayValueFormat(mode) {
 
 function formatAllowsByteList(mode) {
   const fmt = normalizeValueFormat(mode);
-  return fmt === "dec" || isArrayValueFormat(fmt);
+  return fmt === "int" || isArrayValueFormat(fmt);
 }
 
 function int64ToLeBytes(value) {
-  let v = typeof value === "bigint" ? value : BigInt(Math.trunc(Number(value)));
+  if (Array.isArray(value)) {
+    const bytes = [];
+    for (let i = 0; i < 8; i++) {
+      bytes.push(i < value.length ? value[i] & 0xff : 0);
+    }
+    return bytes;
+  }
+  let v;
+  if (typeof value === "bigint") {
+    v = value;
+  } else if (typeof value === "string") {
+    const s = value.trim();
+    if (!s) v = 0n;
+    else if (s.startsWith("0x") || s.startsWith("0X")) v = BigInt(s);
+    else v = BigInt(s);
+  } else {
+    v = BigInt(Math.trunc(Number(value)));
+  }
   v = BigInt.asIntN(64, v);
   const bytes = [];
   for (let i = 0; i < 8; i++) {
@@ -755,6 +785,48 @@ function toSigned8(byte) {
   return u > 127 ? u - 256 : u;
 }
 
+function leBytesToDouble(bytes) {
+  const buf = new ArrayBuffer(8);
+  const view = new DataView(buf);
+  for (let i = 0; i < 8; i++) {
+    view.setUint8(i, i < bytes.length ? bytes[i] & 0xff : 0);
+  }
+  return view.getFloat64(0, true);
+}
+
+function doubleToLeBytes(value) {
+  const buf = new ArrayBuffer(8);
+  const view = new DataView(buf);
+  view.setFloat64(0, value, true);
+  const bytes = [];
+  for (let i = 0; i < 8; i++) {
+    bytes.push(view.getUint8(i));
+  }
+  return bytes;
+}
+
+function formatDoubleForDisplay(bitsOrBytes) {
+  const d = leBytesToDouble(int64ToLeBytes(bitsOrBytes));
+  if (Number.isNaN(d)) return "NaN";
+  if (d === Infinity) return "Infinity";
+  if (d === -Infinity) return "-Infinity";
+  return String(d);
+}
+
+function parseDoubleText(text) {
+  const s = String(text ?? "").trim();
+  if (!s) return 0;
+  const lower = s.toLowerCase();
+  if (lower === "nan") return NaN;
+  if (lower === "infinity" || lower === "+infinity" || lower === "inf" || lower === "+inf") {
+    return Infinity;
+  }
+  if (lower === "-infinity" || lower === "-inf") return -Infinity;
+  const d = Number(s);
+  if (Number.isNaN(d)) throw new Error("invalid double");
+  return d;
+}
+
 function formatBytesArrayForDisplay(bytes, mode) {
   const list = Array.isArray(bytes) ? bytes : [];
   if (!list.length) return "";
@@ -764,6 +836,9 @@ function formatBytesArrayForDisplay(bytes, mode) {
   }
   if (fmt === "str") {
     return `"${bytesToAsciiString(list)}"`;
+  }
+  if (fmt === "double") {
+    return formatDoubleForDisplay(list);
   }
   if (fmt === "array_int8") {
     return list.map((b) => String(toSigned8(b))).join(", ");
@@ -784,6 +859,13 @@ function parseBytesArrayWithFormat(text, mode, maxLen) {
       throw new Error(`string exceeds max ${limit} bytes`);
     }
     return bytes;
+  }
+
+  if (fmt === "double") {
+    if (limit < 8) {
+      throw new Error(`double needs 8 bytes (max ${limit})`);
+    }
+    return doubleToLeBytes(parseDoubleText(s));
   }
 
   const inner = s.startsWith("[") && s.endsWith("]") ? s.slice(1, -1) : s;
@@ -825,14 +907,31 @@ function formatInt64ForDisplay(value, mode) {
   const fmt = normalizeValueFormat(mode);
   if (value == null || value === "") return "";
   if (fmt === "hex") {
-    const u = toUnsigned64(BigInt(Math.trunc(Number(value))));
-    return `0x${u.toString(16)}`;
+    const bytes = int64ToLeBytes(value);
+    let bits = 0n;
+    for (let i = 0; i < bytes.length; i++) {
+      bits |= BigInt(bytes[i] & 0xff) << BigInt(8 * i);
+    }
+    return `0x${BigInt.asUintN(64, bits).toString(16)}`;
   }
   if (fmt === "str") {
     return `"${bytesToAsciiString(int64ToLeBytes(value))}"`;
   }
+  if (fmt === "double") {
+    return formatDoubleForDisplay(value);
+  }
   if (isArrayValueFormat(fmt)) {
     return formatBytesArrayForDisplay(int64ToLeBytes(value), fmt);
+  }
+  if (Array.isArray(value)) {
+    return String(leBytesToInt64(value));
+  }
+  if (typeof value === "string" && (value.startsWith("0x") || value.startsWith("0X"))) {
+    try {
+      return BigInt.asIntN(64, BigInt(value)).toString(10);
+    } catch (_) {
+      return value;
+    }
   }
   return String(value);
 }
@@ -857,12 +956,17 @@ function parseInt64WithFormat(text, mode, { allowByteList = false } = {}) {
     return n;
   }
 
+  if (fmt === "double") {
+    // Store as LE byte list so full IEEE-754 bit patterns survive JSON Number limits.
+    return doubleToLeBytes(parseDoubleText(s));
+  }
+
   if (isArrayValueFormat(fmt)) {
     return leBytesToInt64Number(parseBytesArrayWithFormat(s, fmt, 8));
   }
 
   if (allowByteList && (s.startsWith("[") || s.includes(","))) {
-    return leBytesToInt64Number(parseBytesArrayWithFormat(s, "dec", 8));
+    return leBytesToInt64Number(parseBytesArrayWithFormat(s, "int", 8));
   }
 
   const n = Number.parseInt(s, 10);
@@ -966,7 +1070,7 @@ function makeValueFormatSelect(id, selected, title) {
 function ensureLiveExprCasts(count) {
   if (!Array.isArray(appState.liveExprCasts)) appState.liveExprCasts = [];
   while (appState.liveExprCasts.length < count) {
-    appState.liveExprCasts.push("dec");
+    appState.liveExprCasts.push("int");
   }
   if (appState.liveExprCasts.length > count) {
     appState.liveExprCasts.length = count;
@@ -1008,6 +1112,9 @@ function formatLiveExpressionValue(raw, castMode) {
   }
   if (mode === "str") {
     return `"${bytesToAsciiString(int64ToLeBytes(value))}"`;
+  }
+  if (mode === "double") {
+    return formatDoubleForDisplay(value);
   }
   if (isArrayValueFormat(mode)) {
     return formatBytesArrayForDisplay(int64ToLeBytes(value), mode);
@@ -1773,7 +1880,7 @@ function renderPropsPanel(nodeId) {
                 ).join("")}
               </select>
               <input id="prop-${p.name}" data-param="${p.name}" data-accepts-byte-list="1" data-max-len="${maxLen}" class="wide"
-                value="${escapeHtmlAttr(displayVal)}" placeholder="3500, 0xDAC, &quot;text&quot;, or 1, 2, 3" />
+                value="${escapeHtmlAttr(displayVal)}" placeholder="3500, 0xDAC, 3.14, &quot;text&quot;, or 1, 2, 3" />
             </div>
           </div>`;
       }
@@ -1832,7 +1939,7 @@ function renderPropsPanel(nodeId) {
     const handler = () => {
       const param = el.dataset.param;
       const formatSel = panel.querySelector(`#prop-format-${param}`);
-      const format = formatSel ? normalizeValueFormat(formatSel.value) : "dec";
+      const format = formatSel ? normalizeValueFormat(formatSel.value) : "int";
       let value;
       if (el.type === "checkbox") {
         value = el.checked ? 1 : 0;
@@ -2794,7 +2901,7 @@ function collectLiveMicroFieldValues(op) {
     const raw = input.value.trim();
     const usesFormat = liveFieldUsesValueFormat(op, f);
     const formatSel = document.getElementById(`live-field-format-${f.name}`);
-    const format = formatSel ? normalizeValueFormat(formatSel.value) : "dec";
+    const format = formatSel ? normalizeValueFormat(formatSel.value) : "int";
 
     if (f.array_size) {
       try {
@@ -2947,7 +3054,7 @@ function updateLiveFields() {
           input.value = formatBytesArrayForDisplay(f.default, format);
         }
       } else {
-        input.placeholder = "int64 (dec/hex) or text";
+        input.placeholder = "int64 / double / text";
         input.value = formatInt64ForDisplay(f.default ?? 0, format);
       }
       formatSel.addEventListener("change", () => {
