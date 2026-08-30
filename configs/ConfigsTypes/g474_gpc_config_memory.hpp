@@ -2,7 +2,7 @@
 #define G474_GPC_CONFIG_MEMORY_HPP_
 
 /* gpc-recorder:var_names=["","pos_percent","pos_mm","","pos_cmd","","","","","","","","","","",""] */
-/* gpc-recorder:live_expr_casts=["int","int","int","int","hex","int","int","int","int","int","int","int","int","int","int","int"] */
+/* gpc-recorder:live_expr_casts=["int","int","int","int","hex","str","int","int","int","int","int","int","int","int","int","int"] */
 
 #include "config_memory.hpp"
 #include "distributed_can_id.hpp"
