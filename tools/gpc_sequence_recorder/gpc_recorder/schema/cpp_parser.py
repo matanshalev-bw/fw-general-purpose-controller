@@ -185,7 +185,7 @@ class Schema:
                 self.payload_id_to_struct[pid] = name
 
     def _load_telemetry(self, content: str) -> None:
-        from gpc_recorder.dsl.pack import struct_packed_size
+        from gpc_recorder.dsl.pack import _field_size, struct_packed_size
 
         structs = self._converter.extract_structs_from_header(content, "TelemetryPayload")
         for name, body in structs.items():
@@ -205,11 +205,23 @@ class Schema:
             try:
                 size = struct_packed_size(self, struct_def)
             except ValueError:
-                # BrakesTelemetry embeds BrakesActuatorTelemetry; GPC lite configs publish
-                # only the first four scalar bytes (modes + percentages).
-                if name != "BrakesTelemetry":
+                # Nested field types (e.g. BrakesTelemetry embeds BrakesActuatorTelemetry).
+                # GPC lite publishes only a packed scalar prefix (≤8 bytes); drop the
+                # unsupported tail so bind_telemetry/_field_size never see it.
+                lite_fields: List[FieldDef] = []
+                size = 0
+                for field in fields:
+                    try:
+                        field_sz = _field_size(self, field)
+                    except ValueError:
+                        break
+                    if size + field_sz > 8:
+                        break
+                    lite_fields.append(field)
+                    size += field_sz
+                if not lite_fields:
                     continue
-                size = 4
+                struct_def = StructDef(name=name, fields=lite_fields)
             self.telemetry_structs[name] = struct_def
             self.telemetry_struct_sizes[name] = size
             pid = _struct_name_to_telemetry_payload_id(name, self.payload_type_ids)

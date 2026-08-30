@@ -119,6 +119,20 @@ def test_schema_loads_horn_telemetry(schema):
     assert schema.telemetry_struct_sizes["HornTelemetry"] == 8
 
 
+def test_schema_brakes_telemetry_gpc_lite_prefix(schema):
+    """BrakesTelemetry embeds BrakesActuatorTelemetry; GPC uses the 4-byte scalar prefix."""
+    assert schema.telemetry_payload_id_to_struct["BRAKES_TELEMETRY"] == "BrakesTelemetry"
+    assert schema.telemetry_struct_sizes["BrakesTelemetry"] == 4
+    fields = schema.telemetry_structs["BrakesTelemetry"].fields
+    assert [f.name for f in fields] == [
+        "desired_brakes_mode",
+        "actual_brakes_mode",
+        "desired_brakes_position_in_percentage",
+        "actual_brakes_position_in_percentage",
+    ]
+    assert all("Actuator" not in f.cpp_type for f in fields)
+
+
 def test_bind_telemetry_emit(schema, tmp_path):
     session = {
         "config_name": "G474_GPC_CONFIG",
