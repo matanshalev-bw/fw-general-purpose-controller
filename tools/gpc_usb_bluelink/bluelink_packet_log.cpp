@@ -162,6 +162,24 @@ std::string formatPayloadDetails(bluelink::PayloadTypeIds type, const uint8_t* p
           << payloadTypeName(ack.type) << ')';
       return oss.str();
     }
+    case bluelink::PayloadTypeIds::BRAKES_TELEMETRY: {
+      // Full BrakesTelemetry embeds BrakesActuatorTelemetry; GPC lite publishes only the
+      // leading 4 scalar bytes (modes + percentages), often padded to 8 on the wire.
+      constexpr size_t kBrakesLiteSize = 4;
+      if (payload_len < kBrakesLiteSize) {
+        break;
+      }
+      const uint8_t desired_mode = payload[0];
+      const uint8_t actual_mode = payload[1];
+      const uint8_t desired_pct = payload[2];
+      const uint8_t actual_pct = payload[3];
+      oss << "brakes desired_mode=" << bluelink::brakeModeToString(desired_mode) << '('
+          << static_cast<unsigned>(desired_mode) << ") actual_mode="
+          << bluelink::brakeModeToString(actual_mode) << '(' << static_cast<unsigned>(actual_mode)
+          << ") desired_pct=" << static_cast<unsigned>(desired_pct)
+          << " actual_pct=" << static_cast<unsigned>(actual_pct);
+      return oss.str();
+    }
     case bluelink::PayloadTypeIds::HORN_TELEMETRY:
       if (tryFormatTelemetryPayload<bluelink::TelemetryPayload::HornTelemetry>(
               payload, payload_len, oss,
@@ -509,6 +527,8 @@ std::string payloadTypeName(bluelink::PayloadTypeIds type) {
       return "LOG";
     case bluelink::PayloadTypeIds::HORN_TELEMETRY:
       return "HORN_TELEMETRY";
+    case bluelink::PayloadTypeIds::BRAKES_TELEMETRY:
+      return "BRAKES_TELEMETRY";
     case bluelink::PayloadTypeIds::POWER_TELEMETRY:
       return "POWER_TELEMETRY";
     case bluelink::PayloadTypeIds::DRIVE_CONTROL_TELEMETRY:
