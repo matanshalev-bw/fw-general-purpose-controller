@@ -1076,6 +1076,67 @@ function getNodeArgFormat(node, paramName) {
   return migrateLegacyValueFormat(node.data?.argFormats?.[paramName]);
 }
 
+/** Live Expression cast for a var slot (index / vN / sugar name). */
+function getLiveExprCastForSlot(varRef) {
+  const count = appState.limits.max_var_slots || 16;
+  ensureLiveExprCasts(count);
+  let idx = 0;
+  try {
+    idx = resolveVarRefClient(varRef ?? 0);
+  } catch (_) {
+    idx = 0;
+  }
+  return migrateLegacyValueFormat(appState.liveExprCasts[idx] || "int");
+}
+
+function setLiveExprCastForSlot(varRef, format) {
+  const count = appState.limits.max_var_slots || 16;
+  ensureLiveExprCasts(count);
+  let idx;
+  try {
+    idx = resolveVarRefClient(varRef ?? 0);
+  } catch (_) {
+    return;
+  }
+  const next = normalizeValueFormat(format);
+  appState.liveExprCasts[idx] = next;
+  const sel = document.getElementById(`live-expr-cast-${idx}`);
+  if (sel && sel.value !== next) sel.value = next;
+  const el = document.getElementById(`live-expr-val-${idx}`);
+  if (el) {
+    el.textContent = formatLiveExpressionValue(appState.liveExprValues[idx], next);
+  }
+}
+
+function isVarSetValueParam(command, paramName) {
+  return command === "var_set" && paramName === "value";
+}
+
+function syncOpenVarSetPropsFromLiveCast(varIndex) {
+  if (!selectedNodeId || !drawflowEditor) return;
+  const node = drawflowEditor.getNodeFromId(selectedNodeId);
+  if (!node || node.data?.command !== "var_set") return;
+  let slot;
+  try {
+    slot = resolveVarRefClient(node.data.args?.var_index ?? 0);
+  } catch (_) {
+    return;
+  }
+  if (slot !== varIndex) return;
+  const format = getLiveExprCastForSlot(varIndex);
+  const panel = document.getElementById("props-panel");
+  const formatSel = panel?.querySelector("#prop-format-value");
+  const input = panel?.querySelector("#prop-value");
+  if (formatSel) formatSel.value = format;
+  if (input) {
+    input.value = formatArgForDisplay(node.data.args.value, format, { isVarSetValue: true });
+  }
+  const label = formatNodeLabel({ command: "var_set", args: node.data.args });
+  const nodeEl = document.getElementById(`node-${selectedNodeId}`);
+  const inner = nodeEl?.querySelector(".node-label");
+  if (inner) inner.innerHTML = label.replace(/\n/g, "<br>");
+}
+
 function formatArgForDisplay(val, format, { isList = false, isVarSetValue = false } = {}) {
   if (isList) {
     return formatBytesArrayForDisplay(Array.isArray(val) ? val : [], format);
@@ -1189,6 +1250,7 @@ function makeLiveExprCastSelect(varIndex, selected) {
         appState.liveExprCasts[varIndex]
       );
     }
+    syncOpenVarSetPropsFromLiveCast(varIndex);
   });
   return sel;
 }
@@ -1652,11 +1714,9 @@ function formatNodeLabel(step) {
         return `${k}=${formatHexAddressValue(v)}`;
       }
       if (Array.isArray(v)) return `${k}=[${v.join(", ")}]`;
-      if (typeof v === "number" && (step.command === "var_set" || k === "value") && !Number.isInteger(v)) {
-        return `${k}=${v}`;
-      }
-      if (typeof v === "number" && (step.command === "var_set" || k === "value") && v > 255) {
-        return `${k}=${v}`;
+      if (step.command === "var_set" && k === "value") {
+        const fmt = getLiveExprCastForSlot(args.var_index ?? 0);
+        return `${k}=${formatInt64ForDisplay(v, fmt)}`;
       }
       return `${k}=${v}`;
     })
@@ -2083,7 +2143,9 @@ function renderPropsPanel(nodeId) {
         }
       }
       const usesFormat = fieldUsesValueFormat(command, p);
-      const argFormat = getNodeArgFormat(node, p.name);
+      const argFormat = isVarSetValueParam(command, p.name)
+        ? getLiveExprCastForSlot(node.data.args.var_index ?? 0)
+        : getNodeArgFormat(node, p.name);
       const displayVal = usesFormat
         ? formatArgForDisplay(val, argFormat, { isList: isListParam(p), isVarSetValue: !!p.accepts_byte_list })
         : Array.isArray(val)
@@ -2162,8 +2224,12 @@ function renderPropsPanel(nodeId) {
     sel.addEventListener("change", () => {
       const param = sel.dataset.formatFor;
       const format = normalizeValueFormat(sel.value);
-      node.data.argFormats[param] = format;
-      drawflowEditor.updateNodeDataFromId(nodeId, node.data);
+      if (isVarSetValueParam(command, param)) {
+        setLiveExprCastForSlot(node.data.args.var_index ?? 0, format);
+      } else {
+        node.data.argFormats[param] = format;
+        drawflowEditor.updateNodeDataFromId(nodeId, node.data);
+      }
       const paramMeta = meta.params.find((p) => p.name === param);
       const input = panel.querySelector(`#prop-${param}`);
       if (!input || !paramMeta) return;
@@ -2171,6 +2237,12 @@ function renderPropsPanel(nodeId) {
         isList: isListParam(paramMeta),
         isVarSetValue: !!paramMeta.accepts_byte_list,
       });
+      if (isVarSetValueParam(command, param)) {
+        const label = formatNodeLabel({ command, args: node.data.args });
+        const nodeEl = document.getElementById(`node-${nodeId}`);
+        const inner = nodeEl?.querySelector(".node-label");
+        if (inner) inner.innerHTML = label.replace(/\n/g, "<br>");
+      }
     });
   });
 
@@ -2230,6 +2302,17 @@ function renderPropsPanel(nodeId) {
       // so Save / linearizeDrawflow see the edited args instead of defaults.
       node.data.args[param] = value;
       drawflowEditor.updateNodeDataFromId(nodeId, node.data);
+      if (command === "var_set" && param === "var_index") {
+        const format = getLiveExprCastForSlot(value);
+        const formatSel = panel.querySelector("#prop-format-value");
+        const valueInput = panel.querySelector("#prop-value");
+        if (formatSel) formatSel.value = format;
+        if (valueInput) {
+          valueInput.value = formatArgForDisplay(node.data.args.value, format, {
+            isVarSetValue: true,
+          });
+        }
+      }
       commitEditorUndoIfChanged();
       const label = formatNodeLabel({ command, args: node.data.args });
       const nodeEl = document.getElementById(`node-${nodeId}`);
