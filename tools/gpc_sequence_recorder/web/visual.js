@@ -146,6 +146,8 @@ const appState = {
   usbOpen: false,
   liveExprValues: [],
   liveExprCasts: [],
+  /** @type {string[]} sugar names for v0..vN */
+  varNames: [],
   liveFieldFormats: {},
   liveExprFresh: false,
   /** Live GPC FSM state name from CONTROLLER_STATE_TELEMETRY, or null when unknown. */
@@ -194,6 +196,20 @@ function showBindModalError(message) {
 
 function clearBindModalError() {
   const el = document.getElementById("bind-modal-error");
+  if (!el) return;
+  el.textContent = "";
+  el.hidden = true;
+}
+
+function showEditorModalError(message) {
+  const el = document.getElementById("editor-modal-error");
+  if (!el) return;
+  el.textContent = message;
+  el.hidden = false;
+}
+
+function clearEditorModalError() {
+  const el = document.getElementById("editor-modal-error");
   if (!el) return;
   el.textContent = "";
   el.hidden = true;
@@ -254,7 +270,7 @@ function formatBindingFieldSummary(fields, maxFields = 4) {
     .map((k) => {
       if (k.endsWith("_var_index")) {
         const base = k.slice(0, -"_var_index".length);
-        return `${base}→var${fields[k]}`;
+        return `${base}→${formatVarRefDisplay(fields[k])}`;
       }
       return `${k}=${fields[k]}`;
     })
@@ -334,7 +350,9 @@ function stepSummary(step) {
 
 function containerPreview(container) {
   if (container.type === "telemetry") {
-    return container.trigger ? `${container.trigger} @ ${container.rate || "?"} Hz` : "not configured";
+    if (!container.trigger) return "not configured";
+    const fieldPart = formatBindingFieldSummary(container.fields || {}, 3);
+    return `${container.trigger} @ ${container.rate || "?"} Hz${fieldPart}`;
   }
   if (container.type === "command") {
     const trig = container.trigger || "no trigger";
@@ -420,7 +438,7 @@ function isBindCommandEnumField(field) {
 function buildBindCommandFieldInputHtml(field, isExtract, constVal, extractVal) {
   if (isExtract && !isBindCommandEnumField(field)) {
     const varVal = extractVal ?? 0;
-    return `<input id="bind-${field.name}-value" data-field="${field.name}_var_index" type="number" min="0" max="${appState.limits.max_var_slots - 1}" value="${varVal}" />`;
+    return buildVarIndexInputHtml(`bind-${field.name}-value`, "data-field", `${field.name}_var_index`, varVal);
   }
 
   if (field.enum_values && field.enum_values.length) {
@@ -451,6 +469,7 @@ function buildBindCommandFieldRowHtml(field, existingFields) {
     existingFields?.[varIndexKey] !== "";
   const constVal = existingFields?.[field.name];
   const extractVal = existingFields?.[varIndexKey] ?? 0;
+  const sugarHint = `<span class="limit-hint">${escapeHtmlAttr(varNameHintText())}</span>`;
 
   if (isEnum) {
     return `
@@ -465,13 +484,15 @@ function buildBindCommandFieldRowHtml(field, existingFields) {
   return `
     <div class="field bind-command-field" data-bind-field="${field.name}">
       <div class="bind-field-header">
-        <label for="bind-${field.name}-value">${field.name}</label>
+        <label for="bind-${field.name}-value">${field.name}${isExtract ? sugarHint : ""}</label>
         <label class="bind-mode-toggle">
           <input type="checkbox" id="bind-${field.name}-extract" data-bind-extract="${field.name}"${isExtract ? " checked" : ""} />
-          store to var index
+          store to var
         </label>
       </div>
-      <div class="bind-field-value" id="bind-${field.name}-value-wrap">
+      <div class="bind-field-value" id="bind-${field.name}-value-wrap"
+           data-last-const="${escapeHtmlAttr(constVal ?? field.default ?? 0)}"
+           data-last-extract="${escapeHtmlAttr(extractVal ?? 0)}">
         ${buildBindCommandFieldInputHtml(field, isExtract, constVal, extractVal)}
       </div>
     </div>`;
@@ -488,16 +509,30 @@ function initBindCommandFieldToggles(triggerDef) {
 
       const wrap = document.getElementById(`bind-${fieldName}-value-wrap`);
       const currentEl = wrap?.querySelector("[data-field]");
-      let constVal = field.default ?? 0;
-      let extractVal = 0;
+      let constVal = wrap?.dataset.lastConst ?? field.default ?? 0;
+      let extractVal = wrap?.dataset.lastExtract ?? 0;
       if (currentEl) {
         if (cb.checked) {
-          constVal = currentEl.dataset.isEnum === "1" ? currentEl.value : currentEl.value;
+          constVal = currentEl.value;
+          if (wrap) wrap.dataset.lastConst = String(constVal);
         } else {
-          extractVal = parseInt(currentEl.value, 10) || 0;
+          extractVal = currentEl.value;
+          if (wrap) wrap.dataset.lastExtract = String(extractVal);
         }
       }
       wrap.innerHTML = buildBindCommandFieldInputHtml(field, cb.checked, constVal, extractVal);
+      const label = wrap.closest(".bind-command-field")?.querySelector("label[for]");
+      if (label) {
+        const hint = label.querySelector(".limit-hint");
+        if (cb.checked && !hint) {
+          label.insertAdjacentHTML(
+            "beforeend",
+            `<span class="limit-hint">${escapeHtmlAttr(varNameHintText())}</span>`
+          );
+        } else if (!cb.checked && hint) {
+          hint.remove();
+        }
+      }
     });
   });
 }
@@ -1158,6 +1193,186 @@ function makeLiveExprCastSelect(varIndex, selected) {
   return sel;
 }
 
+
+function ensureVarNames(count) {
+  if (!Array.isArray(appState.varNames)) appState.varNames = [];
+  while (appState.varNames.length < count) appState.varNames.push("");
+  if (appState.varNames.length > count) appState.varNames.length = count;
+}
+
+function varNameHintText() {
+  ensureVarNames(appState.limits.max_var_slots || 16);
+  const parts = [];
+  for (let i = 0; i < appState.varNames.length; i++) {
+    if (appState.varNames[i]) parts.push(`${appState.varNames[i]}→${i}`);
+  }
+  return parts.length ? parts.join(", ") : "index or sugar name";
+}
+
+function formatVarRefDisplay(ref) {
+  if (ref === undefined || ref === null || ref === "") return "";
+  if (typeof ref === "number" || (typeof ref === "string" && /^\d+$/.test(ref.trim()))) {
+    const idx = Number(ref);
+    const name = appState.varNames?.[idx];
+    return name ? `${name}` : String(ref);
+  }
+  return String(ref);
+}
+
+function setVarNameFromUi(index, rawName) {
+  ensureVarNames(appState.limits.max_var_slots || 16);
+  const cleaned = String(rawName || "").trim();
+  if (!cleaned) {
+    appState.varNames[index] = "";
+    setStatus(`v${index} name cleared`);
+    return true;
+  }
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(cleaned)) {
+    setStatus(`Invalid var name "${cleaned}": use a Python identifier`);
+    return false;
+  }
+  if (/^v\d+$/.test(cleaned)) {
+    setStatus(`Invalid var name ${cleaned}: vN is reserved`);
+    return false;
+  }
+  for (let i = 0; i < appState.varNames.length; i++) {
+    if (i !== index && appState.varNames[i] === cleaned) {
+      setStatus(`Var name ${cleaned} already used by v${i}`);
+      return false;
+    }
+  }
+  appState.varNames[index] = cleaned;
+  setStatus(`v${index} named ${cleaned}`);
+  return true;
+}
+
+/** Resolve int / digit string / vN / sugar name; throws Error on failure. */
+function resolveVarRefClient(value) {
+  const maxSlots = appState.limits.max_var_slots || 16;
+  ensureVarNames(maxSlots);
+  if (typeof value === "boolean") {
+    throw new Error(`Invalid var reference: ${value}`);
+  }
+  if (typeof value === "number") {
+    if (!Number.isInteger(value) || value < 0 || value >= maxSlots) {
+      throw new Error(`var_index must be < ${maxSlots}`);
+    }
+    return value;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`Invalid var reference type ${typeof value}`);
+  }
+  const text = value.trim();
+  if (!text) {
+    throw new Error("Empty var reference");
+  }
+  if (/^\d+$/.test(text)) {
+    const idx = Number(text);
+    if (idx >= maxSlots) {
+      throw new Error(`var_index must be < ${maxSlots}`);
+    }
+    return idx;
+  }
+  const vn = /^v(\d+)$/.exec(text);
+  if (vn) {
+    const idx = Number(vn[1]);
+    if (idx >= maxSlots) {
+      throw new Error(`var_index must be < ${maxSlots}`);
+    }
+    return idx;
+  }
+  for (let i = 0; i < appState.varNames.length; i++) {
+    if (appState.varNames[i] && appState.varNames[i] === text) {
+      return i;
+    }
+  }
+  throw new Error(`Unknown var reference '${text}'`);
+}
+
+function isVarIndexArgKey(key) {
+  return key === "var_index" || /_var_index$/.test(key);
+}
+
+/** Returns an error string if any step arg has an unresolvable var reference. */
+function validateStepsVarRefs(steps) {
+  for (let si = 0; si < (steps || []).length; si++) {
+    const step = steps[si] || {};
+    const args = step.args || {};
+    const command = step.command || "step";
+    for (const key of Object.keys(args)) {
+      if (!isVarIndexArgKey(key)) continue;
+      // Match export/DSL: every *_var_index is resolved, even when use_var is off.
+      try {
+        resolveVarRefClient(args[key]);
+      } catch (err) {
+        const detail = err.message || String(err);
+        return `step ${si + 1} (${command}) ${key}: ${detail}`;
+      }
+    }
+  }
+  return null;
+}
+
+/** Returns an error string if any bind/telemetry *_var_index field is unresolvable. */
+function validateFieldsVarRefs(fields, label) {
+  for (const [key, value] of Object.entries(fields || {})) {
+    if (!isVarIndexArgKey(key)) continue;
+    try {
+      resolveVarRefClient(value);
+    } catch (err) {
+      const where = label ? `${label} ` : "";
+      return `${where}${key}: ${err.message || err}`;
+    }
+  }
+  return null;
+}
+
+/** Validate all containers before export / example save. */
+function validateGraphVarRefs(graph) {
+  for (const c of graph.containers || []) {
+    const stepErr = validateStepsVarRefs(c.steps || []);
+    if (stepErr) return `${c.label || c.id}: ${stepErr}`;
+    const fieldErr = validateFieldsVarRefs(c.fields || {}, c.label || c.type || "binding");
+    if (fieldErr) return fieldErr;
+  }
+  return null;
+}
+
+function varNameDatalistId() {
+  return "gpc-var-name-datalist";
+}
+
+function ensureVarNameDatalist() {
+  ensureVarNames(appState.limits.max_var_slots || 16);
+  let list = document.getElementById(varNameDatalistId());
+  if (!list) {
+    list = document.createElement("datalist");
+    list.id = varNameDatalistId();
+    document.body.appendChild(list);
+  }
+  const options = [];
+  for (let i = 0; i < appState.varNames.length; i++) {
+    options.push(`<option value="${i}" label="v${i}"></option>`);
+    if (appState.varNames[i]) {
+      options.push(
+        `<option value="${escapeHtmlAttr(appState.varNames[i])}" label="v${i}"></option>`
+      );
+    }
+  }
+  list.innerHTML = options.join("");
+  return list.id;
+}
+
+function buildVarIndexInputHtml(id, dataAttr, dataValue, currentVal) {
+  const shown =
+    currentVal === undefined || currentVal === null || currentVal === ""
+      ? ""
+      : formatVarRefDisplay(currentVal);
+  const hint = varNameHintText();
+  const listId = ensureVarNameDatalist();
+  return `<input id="${id}" ${dataAttr}="${dataValue}" type="text" class="var-index-input" list="${listId}" value="${escapeHtmlAttr(shown)}" placeholder="0 or sugar name" title="${escapeHtmlAttr(hint)}" />`;
+}
+
 function renderLiveExpressionGrid() {
   const grid = document.getElementById("live-expr-grid");
   if (!grid) return;
@@ -1167,6 +1382,7 @@ function renderLiveExpressionGrid() {
   }
   ensureLiveExprCasts(count);
   grid.innerHTML = "";
+  ensureVarNames(count);
   for (let i = 0; i < count; i++) {
     const cell = document.createElement("div");
     cell.className = "live-expr-cell";
@@ -1174,11 +1390,24 @@ function renderLiveExpressionGrid() {
     const idx = document.createElement("span");
     idx.className = "idx";
     idx.textContent = `v${i}`;
+    const nameInput = document.createElement("input");
+    nameInput.className = "name";
+    nameInput.type = "text";
+    nameInput.placeholder = "name";
+    nameInput.spellcheck = false;
+    nameInput.value = appState.varNames[i] || "";
+    nameInput.title = "Sugar name for this var slot";
+    nameInput.addEventListener("change", () => {
+      if (!setVarNameFromUi(i, nameInput.value)) {
+        nameInput.value = appState.varNames[i] || "";
+      }
+    });
     const val = document.createElement("span");
     val.className = "val";
     val.id = `live-expr-val-${i}`;
     val.textContent = formatLiveExpressionValue(appState.liveExprValues[i], appState.liveExprCasts[i]);
     cell.appendChild(idx);
+    cell.appendChild(nameInput);
     cell.appendChild(makeLiveExprCastSelect(i, appState.liveExprCasts[i]));
     cell.appendChild(val);
     grid.appendChild(cell);
@@ -1402,7 +1631,7 @@ function formatNodeLabel(step) {
   const args = step.args || {};
   if (step.command === "if_condition") {
     const op = args.comparing_type || ">=";
-    return `IF var${args.first_var_index ?? 0} ${op} var${args.second_var_index ?? 0}`;
+    return `IF ${formatVarRefDisplay(args.first_var_index ?? 0)} ${op} ${formatVarRefDisplay(args.second_var_index ?? 0)}`;
   }
   if (step.command === "end_condition") return "end IF";
   const keys = Object.keys(args).filter((k) => {
@@ -1418,6 +1647,7 @@ function formatNodeLabel(step) {
     .map((k) => {
       const v = args[k];
       if (k === "use_var") return isTruthyUseVar(v) ? "use_var" : null;
+      if (k.includes("var_index")) return `${k}=${formatVarRefDisplay(v)}`;
       if (fieldUsesHexAddress(step.command, k) && typeof v === "number") {
         return `${k}=${formatHexAddressValue(v)}`;
       }
@@ -1839,9 +2069,18 @@ function renderPropsPanel(nodeId) {
         const hintText = p.hint || `0–${maxValue}`;
         return `
           <div class="field" data-use-var-reveal="var_index"${useVarOn ? "" : " hidden"}>
-            <label for="prop-var_index">${p.name}<span class="limit-hint">${hintText}</span></label>
-            <input id="prop-var_index" data-param="var_index" type="number" min="0" max="${maxValue}" value="${val ?? 0}" />
+            <label for="prop-var_index">${p.name}<span class="limit-hint">${varNameHintText()}</span></label>
+            ${buildVarIndexInputHtml("prop-var_index", "data-param", "var_index", val ?? 0)}
           </div>`;
+      }
+      if (/(_)?var_index$/.test(p.name) || p.name.endsWith("_var_index") || ["var_index","first_var_index","second_var_index","dest_var_index","src_var_index"].includes(p.name)) {
+        if (!(p.name === "var_index" && hasUseVar)) {
+          return `
+          <div class="field">
+            <label for="prop-${p.name}">${p.name}<span class="limit-hint">${varNameHintText()}</span></label>
+            ${buildVarIndexInputHtml("prop-" + p.name, "data-param", p.name, val ?? 0)}
+          </div>`;
+        }
       }
       const usesFormat = fieldUsesValueFormat(command, p);
       const argFormat = getNodeArgFormat(node, p.name);
@@ -2069,6 +2308,7 @@ function openEditor(containerId) {
     return;
   }
 
+  clearEditorModalError();
   appState.activeContainerId = containerId;
   document.getElementById("modal-title").textContent = `${container.label} — sequence editor`;
   setEditorModalActions(container);
@@ -2087,17 +2327,25 @@ function closeEditor(save) {
   if (save && appState.activeContainerId) {
     const steps = linearizeDrawflow();
     if (steps.length > appState.limits.max_steps) {
-      setStatus(
-        `Cannot save: ${steps.length} steps, max is ${appState.limits.max_steps}`
-      );
+      const msg = `Cannot save: ${steps.length} steps, max is ${appState.limits.max_steps}`;
+      showEditorModalError(msg);
+      setStatus(msg);
       updateModalStepLimit();
       return;
     }
+    const varErr = validateStepsVarRefs(steps);
+    if (varErr) {
+      showEditorModalError(varErr);
+      setStatus(`Cannot save: ${varErr}`);
+      return;
+    }
+    clearEditorModalError();
     const container = appState.containers[appState.activeContainerId];
     if (container) container.steps = steps;
     renderBoard();
     setStatus(`Saved ${container.label} (${steps.length} steps)`);
   }
+  clearEditorModalError();
   appState.activeContainerId = null;
   setEditorModalActions(null);
   resetEditorUndo();
@@ -2177,14 +2425,14 @@ function validateCommandBindingFields(trigger, fields) {
     if (enumFieldNames.has(fieldName)) {
       return (
         `Field '${fieldName}' is an enum and must be a match value. ` +
-        "Only non-enum fields can use 'store to var index'."
+        "Only non-enum fields can use 'store to var' (index or sugar name)."
       );
     }
   }
   const hasMatchField = Object.keys(fields).some((key) => !key.endsWith("_var_index"));
   if (!hasMatchField) {
     return (
-      "Cannot save this command binding: every field uses 'store to var index'. " +
+      "Cannot save this command binding: every field uses 'store to var'. " +
       "Uncheck that box on at least one field (for example brake_mode) and set a match value " +
       "so the GPC knows when to run this sequence."
     );
@@ -2261,8 +2509,8 @@ function renderBindForm(existing) {
         const val = existing?.fields?.[varIndexKey] ?? 0;
         extraFields += `
           <div class="field">
-            <label for="bind-${varIndexKey}">${f.name} var_index</label>
-            <input id="bind-${varIndexKey}" data-field="${varIndexKey}" type="number" min="0" max="${appState.limits.max_var_slots - 1}" value="${val}" />
+            <label for="bind-${varIndexKey}">${f.name} → var<span class="limit-hint">${escapeHtmlAttr(varNameHintText())}</span></label>
+            ${buildVarIndexInputHtml(`bind-${varIndexKey}`, "data-field", varIndexKey, val)}
           </div>`;
       } else {
         extraFields += buildBindCommandFieldRowHtml(f, existing?.fields || {});
@@ -2299,6 +2547,13 @@ function closeBindModal(save) {
   if (save) {
     const trigger = document.getElementById("bind-trigger")?.value;
     const fields = collectBindFormFields();
+
+    const varFieldErr = validateFieldsVarRefs(fields, trigger || "binding");
+    if (varFieldErr) {
+      showBindModalError(varFieldErr);
+      setStatus(`Cannot save: ${varFieldErr}`);
+      return;
+    }
 
     if (appState.bindMode === "telemetry-edit" && appState.activeContainerId) {
       const fieldCount = Object.keys(fields).length;
@@ -2443,14 +2698,31 @@ function buildGraphPayload() {
     }
   }
 
+  ensureVarNames(appState.limits.max_var_slots || 16);
+  ensureLiveExprCasts(appState.limits.max_var_slots || 16);
   return {
     config: appState.config,
+    var_names: appState.varNames.slice(),
+    live_expr_casts: appState.liveExprCasts.slice(),
     containers,
   };
 }
 
 function applyLoadedGraph(graph) {
   appState.config = graph.config || appState.config;
+  const count = appState.limits.max_var_slots || 16;
+  ensureVarNames(count);
+  ensureLiveExprCasts(count);
+  const incoming = Array.isArray(graph.var_names) ? graph.var_names : [];
+  for (let i = 0; i < count; i++) {
+    appState.varNames[i] = incoming[i] != null ? String(incoming[i]).trim() : "";
+  }
+  const incomingCasts = Array.isArray(graph.live_expr_casts) ? graph.live_expr_casts : [];
+  for (let i = 0; i < count; i++) {
+    appState.liveExprCasts[i] = migrateLegacyValueFormat(
+      incomingCasts[i] != null ? incomingCasts[i] : "int"
+    );
+  }
   appState.containers = {};
   appState.commandCounter = 0;
   appState.telemetryCounter = 0;
@@ -2485,6 +2757,7 @@ function applyLoadedGraph(graph) {
     }
   }
   renderBoard();
+  renderLiveExpressionGrid();
 }
 
 function setLoadedExample(name) {
@@ -2515,6 +2788,11 @@ async function loadGraph(exampleName) {
 async function saveToExample(name) {
   syncConfigFromControls();
   const graph = buildGraphPayload();
+  const varErr = validateGraphVarRefs(graph);
+  if (varErr) {
+    setStatus(`Cannot save example: ${varErr}`);
+    return;
+  }
   setStatus(`Saving to example ${name}…`);
   const res = await fetch("/api/graph/examples/save", {
     method: "POST",
@@ -2656,6 +2934,11 @@ async function exportGraph() {
   const graph = buildGraphPayload();
   if (!graph.containers.length) {
     setStatus("Nothing to export — add at least one sequence or binding");
+    return;
+  }
+  const varErr = validateGraphVarRefs(graph);
+  if (varErr) {
+    setStatus(`Export failed: ${varErr}`);
     return;
   }
   setStatus("Exporting…");

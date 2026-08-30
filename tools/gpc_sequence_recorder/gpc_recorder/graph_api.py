@@ -10,6 +10,7 @@ from gpc_recorder.codegen.emitter import emit_config_hpp
 from gpc_recorder.dsl.builtins import RecorderContext
 from gpc_recorder.dsl.session import MicroOpStepState, Session
 from gpc_recorder.dsl.pack import _field_size
+from gpc_recorder.dsl.var_names import normalize_live_expr_casts, normalize_var_names
 from gpc_recorder.paths import (
     CONTROLLER_STATE_SEQUENCE_FIELDS,
     CONTROLLER_STATE_TICK_FIELDS,
@@ -196,6 +197,8 @@ def build_context_from_graph(graph: Dict[str, Any]) -> RecorderContext:
             name=config.get("name") or "G474_GPC_CONFIG",
             component=config.get("component") or "",
         )
+    ctx.session.var_names = normalize_var_names(graph.get("var_names"))
+    ctx.session.live_expr_casts = normalize_live_expr_casts(graph.get("live_expr_casts"))
     for container in graph.get("containers") or []:
         _apply_container(ctx, container)
     return ctx
@@ -312,6 +315,8 @@ def session_to_graph(session: Session) -> Dict[str, Any]:
             "name": session.config_name,
             "component": session.component_id,
         },
+        "var_names": list(session.var_names),
+        "live_expr_casts": list(session.live_expr_casts),
         "containers": containers,
         "one_shot_states": list(CONTROLLER_STATE_SEQUENCE_FIELDS.keys()),
         "tick_states": list(CONTROLLER_STATE_TICK_FIELDS.keys()),

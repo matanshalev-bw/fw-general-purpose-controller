@@ -9,6 +9,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from gpc_recorder.dsl.pack import _field_size, _normalize_type, resolve_array_size, unpack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session, TelemetryBindingState
+from gpc_recorder.dsl.var_names import (
+    parse_live_expr_casts_hpp_comment,
+    parse_var_names_hpp_comment,
+)
 from gpc_recorder.paths import (
     CONTROLLER_STATE_SEQUENCE_FIELDS,
     CONTROLLER_STATE_TICK_FIELDS,
@@ -317,6 +321,8 @@ def _parse_telemetry_bindings(block: str, schema: Schema) -> List[TelemetryBindi
 
 def load_config_hpp_text(text: str, schema: Schema, *, source: str = "<memory>") -> Session:
     """Parse g474_gpc_config_memory.hpp text into a Session."""
+    var_names = parse_var_names_hpp_comment(text)
+    live_expr_casts = parse_live_expr_casts_hpp_comment(text)
     text = _strip_comments(text)
 
     name_match = re.search(r'\.name\s*=\s*"([^"]+)"', text)
@@ -327,6 +333,8 @@ def load_config_hpp_text(text: str, schema: Schema, *, source: str = "<memory>")
     session = Session(
         config_name=name_match.group(1),
         component_id=component_match.group(1),
+        var_names=var_names,
+        live_expr_casts=live_expr_casts,
     )
 
     sequences_block = _find_field_block(text, "sequences_config")

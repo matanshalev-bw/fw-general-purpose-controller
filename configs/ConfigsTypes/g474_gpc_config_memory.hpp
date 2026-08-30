@@ -1,6 +1,9 @@
 #ifndef G474_GPC_CONFIG_MEMORY_HPP_
 #define G474_GPC_CONFIG_MEMORY_HPP_
 
+/* gpc-recorder:var_names=["","pos_percent","pos_mm","","pos_cmd","","","","","","","","","","",""] */
+/* gpc-recorder:live_expr_casts=["int","int","int","int","hex","int","int","int","int","int","int","int","int","int","int","int"] */
+
 #include "config_memory.hpp"
 #include "distributed_can_id.hpp"
 #include "PayloadTypes.hpp"
@@ -305,7 +308,7 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0}, 1, 4},
+                            .can_transmit = {1, 8, 0x220, {0, 0, 0, 0, 0, 0, 0, 0}, 1, 4},
                         },
                     },
                 },

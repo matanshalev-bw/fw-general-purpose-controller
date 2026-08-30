@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from gpc_recorder.dsl.var_names import empty_live_expr_casts, empty_var_names
+
 
 @dataclass
 class MicroOpStepState:
@@ -57,6 +59,8 @@ class Session:
     recording_state: Optional[str] = None
     state_tick_steps: Dict[str, List[MicroOpStepState]] = field(default_factory=dict)
     recording_state_tick: Optional[str] = None
+    var_names: List[str] = field(default_factory=empty_var_names)
+    live_expr_casts: List[str] = field(default_factory=empty_live_expr_casts)
 
     def to_dict(self) -> Dict[str, Any]:
         bindings = []
@@ -88,6 +92,8 @@ class Session:
         return {
             "config_name": self.config_name,
             "component_id": self.component_id,
+            "var_names": list(self.var_names),
+            "live_expr_casts": list(self.live_expr_casts),
             "bindings": bindings,
             "powerup_steps": _steps_to_dict(self.powerup_steps),
             "main_tick_steps": _steps_to_dict(self.main_tick_steps),

@@ -8,6 +8,7 @@ from gpc_recorder.codegen.emitter import emit_config_bin, emit_config_hpp
 from gpc_recorder.dsl.coerce import coerce_int_byte_list, coerce_var_set_value
 from gpc_recorder.dsl.pack import fill_struct_fields, pack_trigger_data
 from gpc_recorder.dsl.session import BindingState, MicroOpStepState, Session, TelemetryBindingState
+from gpc_recorder.dsl.var_names import resolve_var_ref
 from gpc_recorder.paths import CONTROLLER_STATE_SEQUENCE_FIELDS, CONTROLLER_STATE_TICK_FIELDS, DEFAULT_EXPORT_BIN_PATH, DEFAULT_EXPORT_PATH
 from gpc_recorder.schema.loader import get_schema
 from gpc_recorder.schema.component_ids import selectable_component_ids
@@ -19,7 +20,14 @@ from gpc_recorder.validate import (
     validate_powerup_step_count,
     validate_tick_step_count,
     validate_telemetry_binding_count,
-    validate_var_index,
+)
+
+_VAR_INDEX_KEYS = (
+    "var_index",
+    "first_var_index",
+    "second_var_index",
+    "dest_var_index",
+    "src_var_index",
 )
 
 
@@ -90,8 +98,7 @@ class RecorderContext:
                         f"Field {field.name!r} is an enum and must be used as a match value, "
                         f"not '{var_kw}' (store to var index is only for non-enum fields)"
                     )
-                var_index = int(raw_fields.pop(var_kw))
-                validate_var_index(var_index)
+                var_index = resolve_var_ref(raw_fields.pop(var_kw), self.session.var_names)
                 extract_field_names[field.name] = var_index
             if field.name in raw_fields:
                 match_field_values[field.name] = raw_fields.pop(field.name)
@@ -149,8 +156,7 @@ class RecorderContext:
             kw = f"{field.name}_var_index"
             if kw not in kwargs:
                 raise ValueError(f"Missing {kw} for {struct_name}")
-            var_index = int(kwargs.pop(kw))
-            validate_var_index(var_index)
+            var_index = resolve_var_ref(kwargs.pop(kw), self.session.var_names)
             byte_size = _field_size(self.schema, field)
             field_mappings.append(
                 {
@@ -385,16 +391,9 @@ class RecorderContext:
         if union_member not in self.schema.micro_ops:
             raise ValueError(f"Unknown micro-op {union_member!r}")
         op = self.schema.micro_ops[union_member]
-        if "var_index" in values:
-            validate_var_index(int(values["var_index"]))
-        if "first_var_index" in values:
-            validate_var_index(int(values["first_var_index"]))
-        if "second_var_index" in values:
-            validate_var_index(int(values["second_var_index"]))
-        if "dest_var_index" in values:
-            validate_var_index(int(values["dest_var_index"]))
-        if "src_var_index" in values:
-            validate_var_index(int(values["src_var_index"]))
+        for key in _VAR_INDEX_KEYS:
+            if key in values:
+                values[key] = resolve_var_ref(values[key], self.session.var_names)
         if len(target) >= MICRO_SEQUENCE_MAX_STEPS:
             raise ValueError(f"Maximum {MICRO_SEQUENCE_MAX_STEPS} steps per {label}")
         target.append(
@@ -453,8 +452,6 @@ class RecorderContext:
         use_var: int = 0,
         var_index: int = 0,
     ) -> None:
-        if use_var:
-            validate_var_index(var_index)
         self._add_step(
             "can_transmit",
             {
@@ -492,8 +489,6 @@ class RecorderContext:
         use_var: int = 0,
         var_index: int = 0,
     ) -> None:
-        if use_var:
-            validate_var_index(var_index)
         self._add_step(
             "uart_transmit",
             {
@@ -513,8 +508,6 @@ class RecorderContext:
         use_var: int = 0,
         var_index: int = 0,
     ) -> None:
-        if use_var:
-            validate_var_index(var_index)
         self._add_step(
             "spi_transfer",
             {
@@ -535,8 +528,6 @@ class RecorderContext:
         use_var: int = 0,
         var_index: int = 0,
     ) -> None:
-        if use_var:
-            validate_var_index(var_index)
         self._add_step(
             "i2c_write",
             {
@@ -550,21 +541,18 @@ class RecorderContext:
         )
 
     def can_receive(self, can_bus: int, id: int, dlc: int, var_index: int) -> None:
-        validate_var_index(var_index)
         self._add_step(
             "can_receive",
             {"can_bus": can_bus, "id": id, "dlc": dlc, "var_index": var_index},
         )
 
     def uart_receive(self, uart_instance: int, length: int, var_index: int) -> None:
-        validate_var_index(var_index)
         self._add_step(
             "uart_receive",
             {"uart_instance": uart_instance, "length": length, "var_index": var_index},
         )
 
     def spi_receive(self, spi_instance: int, rx_len: int, var_index: int) -> None:
-        validate_var_index(var_index)
         self._add_step(
             "spi_receive",
             {"spi_instance": spi_instance, "rx_len": rx_len, "var_index": var_index},
@@ -577,7 +565,6 @@ class RecorderContext:
         length: int,
         var_index: int,
     ) -> None:
-        validate_var_index(var_index)
         self._add_step(
             "i2c_read",
             {
@@ -589,7 +576,6 @@ class RecorderContext:
         )
 
     def var_set(self, var_index: int, value) -> None:
-        validate_var_index(var_index)
         self._add_step(
             "var_set",
             {
@@ -600,8 +586,6 @@ class RecorderContext:
         )
 
     def var_mul(self, dest_var_index: int, src_var_index: int, numerator: int, denominator: int) -> None:
-        validate_var_index(dest_var_index)
-        validate_var_index(src_var_index)
         if denominator == 0:
             raise ValueError("denominator must be non-zero")
         self._add_step(
@@ -615,8 +599,6 @@ class RecorderContext:
         )
 
     def var_add(self, dest_var_index: int, src_var_index: int, addend: int) -> None:
-        validate_var_index(dest_var_index)
-        validate_var_index(src_var_index)
         self._add_step(
             "var_add",
             {
@@ -629,8 +611,6 @@ class RecorderContext:
     def var_bytes_assign(
         self, dest_var_index: int, byte_index: int, byte_count: int, src_var_index: int
     ) -> None:
-        validate_var_index(dest_var_index)
-        validate_var_index(src_var_index)
         if not (0 <= int(byte_index) < 8):
             raise ValueError(f"byte_index must be 0..7, got {byte_index}")
         if not (1 <= int(byte_count) <= 8):
@@ -651,8 +631,6 @@ class RecorderContext:
 
     def if_condition(self, first_var_index: int, comparing_type: str, second_var_index: int) -> None:
         compare_type = _normalize_compare_type(comparing_type)
-        validate_var_index(first_var_index)
-        validate_var_index(second_var_index)
         self._add_step(
             "if_condition",
             {
@@ -708,9 +686,13 @@ class RecorderContext:
             )
         return out
 
+
     def show(self) -> str:
         d = self.session.to_dict()
         lines = [f"config={d['config_name']}, component={d['component_id']}"]
+        named = [f"v{i}={n}" for i, n in enumerate(self.session.var_names) if n]
+        if named:
+            lines.append("  var_names: " + ", ".join(named))
         pu = len(self.session.powerup_steps)
         tag = " (recording)" if self.session.recording_powerup else ""
         lines.append(f"  powerup: {pu} steps{tag}")

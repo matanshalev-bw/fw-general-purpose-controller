@@ -7,13 +7,14 @@ from typing import Any, Dict, List
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from gpc_recorder.codegen.config_build import ConfigBuildError, build_config_bin
+from gpc_recorder.dsl.pack import resolve_array_size
+from gpc_recorder.dsl.var_names import format_recorder_meta_hpp_comments
 from gpc_recorder.paths import (
     CONTROLLER_STATE_SEQUENCE_FIELDS,
     CONTROLLER_STATE_TICK_FIELDS,
     MICRO_SEQUENCE_MAX_STEPS,
     TOOL_DIR,
 )
-from gpc_recorder.dsl.pack import resolve_array_size
 
 
 def _enum_byte_init(schema, enum_type: str, wire_byte: int, enum_val: Any) -> str:
@@ -222,6 +223,9 @@ def emit_config_hpp(
     ctx = {
         "config_name": session["config_name"],
         "component_id": session["component_id"],
+        "var_names_comment": format_recorder_meta_hpp_comments(
+            session.get("var_names"), session.get("live_expr_casts")
+        ),
         "binding_count": len(bindings_out),
         "bindings": bindings_out,
         "telemetry_binding_count": len(telemetry_bindings_out),
