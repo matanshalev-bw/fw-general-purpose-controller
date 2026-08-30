@@ -18,24 +18,8 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
     },
     .sequences_config = {
         .powerup_sequence = {
-            .step_count = 4,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {0, {0, 0, 0}, 67305985},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {1, {0, 0, 0}, 11},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {2, {0, 0, 0}, 255},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
-                            .var_set = {3, {0, 0, 0}, -33},
-                        },
             },
         },
         .main_tick_sequence = {
@@ -173,32 +157,8 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             },
         },
         .operational_state_tick_sequence = {
-            .step_count = 6,
+            .step_count = 0,
             .steps = {
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN,
-                            .var_bytes_assign = {0, 4, 1, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {1300},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN,
-                            .var_bytes_assign = {0, 4, 1, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {1300},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN,
-                            .var_bytes_assign = {0, 4, 1, 3},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::DELAY_MS,
-                            .delay_ms = {1300},
-                        },
             },
         },
         .error_state_tick_sequence = {
