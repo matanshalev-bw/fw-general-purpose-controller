@@ -161,11 +161,13 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             {
                 .trigger = {
                     .payload_type = bluelink::PayloadTypeIds::BRAKES_CONTINUOUS_COMMAND,
-                    .size = 2,
+                    .size = 1,
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_RELEASED), 0, 0, 0, 0, 0, 0, 0},
                 },
-                .extract_field_count = 0,
-                .extract_fields = {},
+                .extract_field_count = 1,
+                .extract_fields = {
+                    { 1, 1, 0 },
+                },
                 .sequence = {
                     .step_count = 3,
                     .steps = {
@@ -187,11 +189,13 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
             {
                 .trigger = {
                     .payload_type = bluelink::PayloadTypeIds::BRAKES_CONTINUOUS_COMMAND,
-                    .size = 2,
+                    .size = 1,
                     .data = {static_cast<uint8_t>(bluelink::BRAKE_MODE_FULLY_PRESSED), 0, 0, 0, 0, 0, 0, 0},
                 },
-                .extract_field_count = 0,
-                .extract_fields = {},
+                .extract_field_count = 1,
+                .extract_fields = {
+                    { 1, 1, 0 },
+                },
                 .sequence = {
                     .step_count = 3,
                     .steps = {
@@ -221,63 +225,27 @@ volatile static const FLASH_CONFIG_SECTION ConfigMemory G_CONFIG_READ_ONLY_MEMOR
                     { 1, 1, 1 },
                 },
                 .sequence = {
-                    .step_count = 14,
+                    .step_count = 5,
                     .steps = {
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
                             .var_set = {0, {0, 0, 0}, 2},
                         },
                         {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE), 10, 1},
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_SET,
+                            .var_set = {4, {0, 0, 0}, 2210985082880},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_MUL,
+                            .var_mul = {2, 1, 4, 1},
+                        },
+                        {
+                            .op_type = bluelink::MicroOpsPayload::MicroOpType::VAR_BYTES_ASSIGN,
+                            .var_bytes_assign = {4, 0, 2, 2},
                         },
                         {
                             .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0x2, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::GE), 13, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0x1, 0xFB, 0xFB, 0xC8, 0x2, 0x2, 0, 0}},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::GT), 10, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE), 11, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0x84, 0x0, 0xFB, 0xFB, 0x2, 0x2, 0, 0}},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::GT), 11, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LE), 12, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0x8, 0x1, 0xFB, 0xFB, 0x2, 0x2, 0, 0}},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::GT), 12, 2},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::IF_CONDITION,
-                            .if_condition = {1, static_cast<uint8_t>(bluelink::MicroOpsPayload::MicroCompareType::LT), 13, 1},
-                        },
-                        {
-                            .op_type = bluelink::MicroOpsPayload::MicroOpType::CAN_TRANSMIT,
-                            .can_transmit = {1, 8, 0x220, {0x90, 0x1, 0xFB, 0xFB, 0x2, 0x2, 0, 0}},
+                            .can_transmit = {1, 8, 0x220, {0}, 1, 4},
                         },
                     },
                 },
