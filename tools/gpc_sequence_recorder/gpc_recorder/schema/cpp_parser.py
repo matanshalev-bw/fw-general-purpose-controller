@@ -258,6 +258,23 @@ class Schema:
                 values=_parse_enum_body(compare_match.group(1)),
             )
 
+        for enum_name in (
+            "GpioInstanceId",
+            "AdcInstanceId",
+            "DacInstanceId",
+            "PwmInstanceId",
+        ):
+            enum_match = re.search(
+                rf"enum\s+class\s+{enum_name}\s*:\s*uint8_t\s*\{{([^}}]+)\}}",
+                content,
+                re.DOTALL,
+            )
+            if enum_match:
+                self.enums[enum_name] = EnumDef(
+                    name=enum_name,
+                    values=_parse_enum_body(enum_match.group(1)),
+                )
+
         structs = self._converter.extract_structs_from_header(content, "MicroOpsPayload")
         op_to_member = {
             "NOP": None,
@@ -292,8 +309,8 @@ class Schema:
             )
             if struct_name not in structs:
                 alt = {
-                    "digital_gpio_write": "MicroDigitalGpioWrite",
-                    "digital_gpio_read": "MicroDigitalGpioRead",
+                    "digital_gpio_write": "MicroDigitalGpio",
+                    "digital_gpio_read": "MicroDigitalGpio",
                     "adc_read": "MicroAdcRead",
                     "dac_write": "MicroDacWrite",
                     "pwm_set": "MicroPwmSet",
@@ -322,7 +339,7 @@ class Schema:
             fields = [
                 FieldDef(
                     cpp_type=t,
-                    name=n,
+                    name=("var_index" if member == "digital_gpio_read" and n == "value" else n),
                     array_size=a,
                     default_raw=_default_from_comment(c),
                 )

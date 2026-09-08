@@ -12,6 +12,7 @@
 #include "non_volatile_memory_interface.hpp"
 #include "raw_can_interface.hpp"
 #include "safety_features.hpp"
+#include "expander_interface.hpp"
 
 #ifdef HAL_ADC_MODULE_ENABLED
 #include "comm_defines.hpp"
@@ -67,6 +68,9 @@ void applicationInit(void) {
     GpioInterface::startAdcDma();
   }
 #endif
+
+  // Best-effort expander bring-up (devices may be absent on some boards).
+  (void)ExpanderInterface::initAll();
 
   g_bluewhite_can =
       std::make_unique<BluewhiteCanComm>(&hfdcan2, g_sequence_executor.get(), g_gpc_controller.get());

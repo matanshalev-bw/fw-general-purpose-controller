@@ -280,18 +280,31 @@ async def usb_log_stream(port: str) -> AsyncIterator[Dict[str, Any]]:
 def micro_ops_catalog() -> List[Dict[str, Any]]:
     schema = get_schema()
     pin_hints = {
+        "gpio_write": {
+            "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER, 2=SPI_GPIO_EXPANDER",
+            "port": "MCU: 1=A..6=F; expander: 1=A, 2=B",
+            "pin": "MCU: 0–15; expander: 0–7",
+        },
+        "gpio_read": {
+            "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER, 2=SPI_GPIO_EXPANDER",
+            "port": "MCU: 1=A..6=F; expander: 1=A, 2=B",
+            "pin": "MCU: 0–15; expander: 0–7",
+        },
         "adc_read": {
-            "adc_instance": "1=PA0 (ADC1_IN1), 2=PB2 (ADC2_IN12)",
-            "channel": "use 0 (only buffer index)",
+            "adc_instance": "1=MCU_ADC1 (PA0), 2=MCU_ADC2 (PB2), 3=SPI_ADC_EXPANDER (ADS7953)",
+            "channel": "MCU: DMA index 0; ADS7953: 0–15",
             "store_raw": "1=raw ADC counts, 0=millivolts",
         },
         "dac_write": {
-            "dac_instance": "use 1 → PA4 (DAC1_OUT1)",
+            "dac_instance": "1=MCU_DAC (PA4), 2=I2C_DAC_EXPANDER (DAC7578)",
+            "channel": "DAC7578: 0–7; MCU ignores",
             "use_var": "1=value from var_index, 0=use literal_value",
             "literal_value": "12-bit code 0–4095",
         },
         "pwm_set": {
-            "frequency_hz": "Hz, e.g. 1000 = 1 kHz (output on PB11)",
+            "pwm_instance": "0/1=MCU_PWM (PB11), 2=I2C_PWM_EXPANDER (PCA9685)",
+            "channel": "PCA9685: 0–15; MCU ignores",
+            "frequency_hz": "Hz, e.g. 1000 = 1 kHz",
             "duty_percent": "0–100%",
             "use_var": "1=duty from var_index, 0=use duty_percent",
             "var_index": "var slot 0–19 when use_var=1",

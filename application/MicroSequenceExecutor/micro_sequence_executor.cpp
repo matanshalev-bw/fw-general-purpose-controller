@@ -20,6 +20,8 @@
 #include "pwm_interface.hpp"
 #endif
 
+#include "expander_interface.hpp"
+
 namespace {
 
 static CommUart uart(&HardwareMap::uart_main, bluelink::MicroOpsPayload::DEFAULT_COMM_RX_TIMEOUT);
@@ -284,9 +286,9 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
     case bluelink::MicroOpsPayload::MicroOpType::NOP:
       return true;
     case bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_WRITE:
-      return executeDigitalGpioWrite(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroDigitalGpioWrite*>(step.params));
+      return executeDigitalGpioWrite(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroDigitalGpio*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::DIGITAL_GPIO_READ:
-      return executeDigitalGpioRead(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroDigitalGpioRead*>(step.params));
+      return executeDigitalGpioRead(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroDigitalGpio*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::ADC_READ:
       return executeAdcRead(*reinterpret_cast<const bluelink::MicroOpsPayload::MicroAdcRead*>(step.params));
     case bluelink::MicroOpsPayload::MicroOpType::DAC_WRITE:
@@ -334,7 +336,22 @@ bool MicroSequenceExecutor::executeStep(const bluelink::MicroOpsPayload::MicroOp
   }
 }
 
-bool MicroSequenceExecutor::executeDigitalGpioWrite(const bluelink::MicroOpsPayload::MicroDigitalGpioWrite& op) {
+bool MicroSequenceExecutor::executeDigitalGpioWrite(const bluelink::MicroOpsPayload::MicroDigitalGpio& op) {
+  using GpioInstanceId = bluelink::MicroOpsPayload::MicroDigitalGpio::GpioInstanceId;
+  const auto instance = static_cast<GpioInstanceId>(op.gpio_instance);
+
+  if (instance == GpioInstanceId::I2C_GPIO_EXPANDER) {
+    return ExpanderInterface::gpio(ExpanderInterface::GpioKind::I2C).digitalWrite(op.port, op.pin, op.value != 0) ==
+           InterfaceStatus::INTERFACE_OK;
+  }
+  if (instance == GpioInstanceId::SPI_GPIO_EXPANDER) {
+    return ExpanderInterface::gpio(ExpanderInterface::GpioKind::SPI).digitalWrite(op.port, op.pin, op.value != 0) ==
+           InterfaceStatus::INTERFACE_OK;
+  }
+  if (instance != GpioInstanceId::MCU_GPIO) {
+    return false;
+  }
+
   if (::isSafetyFeaturePin(op.port, op.pin)) {
     return false;
   }
@@ -344,12 +361,36 @@ bool MicroSequenceExecutor::executeDigitalGpioWrite(const bluelink::MicroOpsPayl
   return GpioInterface::digitalWrite(pin, state) == InterfaceStatus::INTERFACE_OK;
 }
 
-bool MicroSequenceExecutor::executeDigitalGpioRead(const bluelink::MicroOpsPayload::MicroDigitalGpioRead& op) {
-  if (op.var_index >= MICRO_VAR_SLOT_COUNT) {
+bool MicroSequenceExecutor::executeDigitalGpioRead(const bluelink::MicroOpsPayload::MicroDigitalGpio& op) {
+  if (op.value >= MICRO_VAR_SLOT_COUNT) {
     return false;
   }
 
   if (var_store_ == nullptr) {
+    return false;
+  }
+
+  using GpioInstanceId = bluelink::MicroOpsPayload::MicroDigitalGpio::GpioInstanceId;
+  const auto instance = static_cast<GpioInstanceId>(op.gpio_instance);
+  bool expander_value = false;
+
+  if (instance == GpioInstanceId::I2C_GPIO_EXPANDER) {
+    if (ExpanderInterface::gpio(ExpanderInterface::GpioKind::I2C).digitalRead(op.port, op.pin, expander_value) !=
+        InterfaceStatus::INTERFACE_OK) {
+      return false;
+    }
+    var_store_->set(op.value, expander_value ? 1 : 0);
+    return true;
+  }
+  if (instance == GpioInstanceId::SPI_GPIO_EXPANDER) {
+    if (ExpanderInterface::gpio(ExpanderInterface::GpioKind::SPI).digitalRead(op.port, op.pin, expander_value) !=
+        InterfaceStatus::INTERFACE_OK) {
+      return false;
+    }
+    var_store_->set(op.value, expander_value ? 1 : 0);
+    return true;
+  }
+  if (instance != GpioInstanceId::MCU_GPIO) {
     return false;
   }
 
@@ -359,13 +400,30 @@ bool MicroSequenceExecutor::executeDigitalGpioRead(const bluelink::MicroOpsPaylo
     return false;
   }
 
-  var_store_->set(op.var_index, state == GpioPinState::PIN_SET ? 1 : 0);
+  var_store_->set(op.value, state == GpioPinState::PIN_SET ? 1 : 0);
   return true;
 }
 
 bool MicroSequenceExecutor::executeAdcRead(const bluelink::MicroOpsPayload::MicroAdcRead& op) {
   if (op.var_index >= MICRO_VAR_SLOT_COUNT || var_store_ == nullptr) {
     return false;
+  }
+
+  using AdcInstanceId = bluelink::MicroOpsPayload::MicroAdcRead::AdcInstanceId;
+  const auto instance = static_cast<AdcInstanceId>(op.adc_instance);
+
+  if (instance == AdcInstanceId::SPI_ADC_EXPANDER) {
+    uint16_t raw_value = 0;
+    AdcExpanderInterface& adc = ExpanderInterface::adc();
+    if (adc.readChannel(op.channel, raw_value) != InterfaceStatus::INTERFACE_OK) {
+      return false;
+    }
+    if (op.store_raw != 0) {
+      var_store_->set(op.var_index, static_cast<int64_t>(raw_value));
+    } else {
+      var_store_->set(op.var_index, static_cast<int64_t>(adc.rawToMillivolts(raw_value)));
+    }
+    return true;
   }
 
 #ifdef HAL_ADC_MODULE_ENABLED
@@ -397,13 +455,8 @@ bool MicroSequenceExecutor::executeAdcRead(const bluelink::MicroOpsPayload::Micr
 }
 
 bool MicroSequenceExecutor::executeDacWrite(const bluelink::MicroOpsPayload::MicroDacWrite& op) {
-#ifdef HAL_DAC_MODULE_ENABLED
-  extern CommDacHandle hdac1;
-
-  // Only DAC1 CH1 on PA4 is enabled.
-  if (op.dac_instance != 1) {
-    return false;
-  }
+  using DacInstanceId = bluelink::MicroOpsPayload::MicroDacWrite::DacInstanceId;
+  const auto instance = static_cast<DacInstanceId>(op.dac_instance);
 
   uint16_t value = op.literal_value;
   if (op.use_var != 0) {
@@ -413,6 +466,17 @@ bool MicroSequenceExecutor::executeDacWrite(const bluelink::MicroOpsPayload::Mic
     value = static_cast<uint16_t>(static_cast<uint64_t>(var_store_->get(op.var_index)) & 0xFFFU);
   } else if (value > 0xFFFU) {
     value = 0xFFFU;
+  }
+
+  if (instance == DacInstanceId::I2C_DAC_EXPANDER) {
+    return ExpanderInterface::dac().writeChannel(op.channel, value) == InterfaceStatus::INTERFACE_OK;
+  }
+
+#ifdef HAL_DAC_MODULE_ENABLED
+  extern CommDacHandle hdac1;
+
+  if (instance != DacInstanceId::MCU_DAC) {
+    return false;
   }
 
   if (HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, value) != HAL_OK) {
@@ -426,7 +490,6 @@ bool MicroSequenceExecutor::executeDacWrite(const bluelink::MicroOpsPayload::Mic
 }
 
 bool MicroSequenceExecutor::executePwmSet(const bluelink::MicroOpsPayload::MicroPwmSet& op) {
-#ifdef HAL_TIM_MODULE_ENABLED
   if (op.frequency_hz == 0U) {
     return false;
   }
@@ -442,6 +505,21 @@ bool MicroSequenceExecutor::executePwmSet(const bluelink::MicroOpsPayload::Micro
     duty_percent = 100U;
   }
 
+  using PwmInstanceId = bluelink::MicroOpsPayload::MicroPwmSet::PwmInstanceId;
+  uint8_t pwm_instance = op.pwm_instance;
+  if (pwm_instance == 0U) {
+    pwm_instance = static_cast<uint8_t>(PwmInstanceId::MCU_PWM);
+  }
+  const auto instance = static_cast<PwmInstanceId>(pwm_instance);
+
+  if (instance == PwmInstanceId::I2C_PWM_EXPANDER) {
+    return ExpanderInterface::pwm().setPwm(op.channel, op.frequency_hz, duty_percent) == InterfaceStatus::INTERFACE_OK;
+  }
+
+#ifdef HAL_TIM_MODULE_ENABLED
+  if (instance != PwmInstanceId::MCU_PWM) {
+    return false;
+  }
   return PwmInterface::setPwm(op.frequency_hz, duty_percent) == InterfaceStatus::INTERFACE_OK;
 #else
   (void)op;

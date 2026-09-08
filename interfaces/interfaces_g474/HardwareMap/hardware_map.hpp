@@ -17,6 +17,21 @@ constexpr GpioPinNumber WD_KA_PIN = GpioPinNumber::PIN_10;
 constexpr GpioPortType SAFETY_EN_PORT = GpioPortType::PORT_B;
 constexpr GpioPinNumber SAFETY_EN_PIN = GpioPinNumber::PIN_1;
 
+// Expander I2C 7-bit addresses (override when board straps differ).
+constexpr uint8_t MCP23017_I2C_ADDR = 0x20;
+constexpr uint8_t DAC7578_I2C_ADDR = 0x48;
+constexpr uint8_t PCA9685_I2C_ADDR = 0x40;
+
+// SPI CS placeholders — assign CubeMX GPIO to match schematic.
+constexpr GpioPortType ADS7953_CS_PORT = GpioPortType::PORT_B;
+constexpr GpioPinNumber ADS7953_CS_PIN = GpioPinNumber::PIN_5;
+constexpr GpioPortType MCP23S17_CS_PORT = GpioPortType::PORT_B;
+constexpr GpioPinNumber MCP23S17_CS_PIN = GpioPinNumber::PIN_6;
+constexpr uint8_t MCP23S17_SPI_ADDR = 0x00;  // A2–A0 when HAEN enabled
+
+// ADS7953 external VREF in millivolts (range 1: 0–VREF).
+constexpr uint16_t ADS7953_VREF_MV = 2500;
+
 #ifdef HAL_UART_MODULE_ENABLED
 extern CommUartHandle& uart_main;
 #endif

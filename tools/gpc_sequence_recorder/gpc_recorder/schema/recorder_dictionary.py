@@ -36,13 +36,13 @@ _EXAMPLES: Dict[str, str] = {
     "clear_command": "clear_command()",
     "clear_telemetry": "clear_telemetry()",
     "undo": "undo()",
-    "gpio_write": "gpio_write(port=1, pin=5, value=1)",
-    "gpio_read": "gpio_read(port=1, pin=5, var_index=0)",
+    "gpio_write": "gpio_write(port=1, pin=5, value=1, gpio_instance=0)",
+    "gpio_read": "gpio_read(port=1, pin=5, var_index=0, gpio_instance=0)",
     "adc_read": "adc_read(adc_instance=1, channel=0, var_index=0, store_raw=1)",
-    "dac_write": "dac_write(dac_instance=1, use_var=0, var_index=0, literal_value=2048)",
+    "dac_write": "dac_write(dac_instance=1, use_var=0, var_index=0, literal_value=2048, channel=0)",
     "delay_ms": "delay_ms(100)",
     "can_transmit": "can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])  # or use_var=1, var_index=0",
-    "pwm_set": "pwm_set(frequency_hz=1000, duty_percent=50)",
+    "pwm_set": "pwm_set(frequency_hz=1000, duty_percent=50, pwm_instance=1, channel=0)",
     "uart_transmit": 'uart_transmit(uart_instance=1, length=5, data=[0x48, 0x45, 0x4C, 0x4C, 0x4F])  # or USB data: "HELLO"',
     "spi_transfer": "spi_transfer(spi_instance=1, tx_len=3, tx_data=[0x9F, 0x00, 0x00])",
     "i2c_write": "i2c_write(i2c_instance=1, device_addr=0x50, length=2, data=[0x00, 0x01])",
@@ -228,18 +228,31 @@ _DATA_PARAM_NAMES = frozenset({"data", "tx_data"})
 
 # Explicit pin / channel maps shown next to param labels (same style as max-length hints).
 _PARAM_HINTS: Dict[str, Dict[str, str]] = {
+    "gpio_write": {
+        "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER (MCP23017), 2=SPI_GPIO_EXPANDER (MCP23S17)",
+        "port": "MCU: 1=A..6=F; expander: 1=A, 2=B",
+        "pin": "MCU: 0–15; expander: 0–7",
+    },
+    "gpio_read": {
+        "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER (MCP23017), 2=SPI_GPIO_EXPANDER (MCP23S17)",
+        "port": "MCU: 1=A..6=F; expander: 1=A, 2=B",
+        "pin": "MCU: 0–15; expander: 0–7",
+    },
     "adc_read": {
-        "adc_instance": "1=PA0 (ADC1_IN1), 2=PB2 (ADC2_IN12)",
-        "channel": "use 0 (only buffer index)",
+        "adc_instance": "1=MCU_ADC1 (PA0), 2=MCU_ADC2 (PB2), 3=SPI_ADC_EXPANDER (ADS7953)",
+        "channel": "MCU: DMA index 0; ADS7953: 0–15",
         "store_raw": "1=raw ADC counts, 0=millivolts",
     },
     "dac_write": {
-        "dac_instance": "use 1 → PA4 (DAC1_OUT1)",
+        "dac_instance": "1=MCU_DAC (PA4), 2=I2C_DAC_EXPANDER (DAC7578)",
+        "channel": "DAC7578: 0–7; MCU ignores",
         "use_var": "1=value from var_index, 0=use literal_value",
         "literal_value": "12-bit code 0–4095",
     },
     "pwm_set": {
-        "frequency_hz": "Hz, e.g. 1000 = 1 kHz (output on PB11)",
+        "pwm_instance": "0/1=MCU_PWM (PB11), 2=I2C_PWM_EXPANDER (PCA9685)",
+        "channel": "PCA9685: 0–15; MCU ignores",
+        "frequency_hz": "Hz, e.g. 1000 = 1 kHz",
         "duty_percent": "0–100%",
         "use_var": "1=duty from var_index, 0=use duty_percent",
         "var_index": "var slot 0–19 when use_var=1",

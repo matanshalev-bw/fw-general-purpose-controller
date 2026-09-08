@@ -400,11 +400,17 @@ class RecorderContext:
             MicroOpStepState(op_type=op.op_type_name, union_member=union_member, values=values)
         )
 
-    def gpio_write(self, port: int, pin: int, value: int) -> None:
-        self._add_step("digital_gpio_write", {"port": port, "pin": pin, "value": value})
+    def gpio_write(self, port: int, pin: int, value: int, gpio_instance: int = 0) -> None:
+        self._add_step(
+            "digital_gpio_write",
+            {"port": port, "pin": pin, "value": value, "gpio_instance": gpio_instance},
+        )
 
-    def gpio_read(self, port: int, pin: int, var_index: int) -> None:
-        self._add_step("digital_gpio_read", {"port": port, "pin": pin, "var_index": var_index})
+    def gpio_read(self, port: int, pin: int, var_index: int, gpio_instance: int = 0) -> None:
+        self._add_step(
+            "digital_gpio_read",
+            {"port": port, "pin": pin, "var_index": var_index, "gpio_instance": gpio_instance},
+        )
 
     def adc_read(
         self,
@@ -429,6 +435,7 @@ class RecorderContext:
         use_var: int = 0,
         var_index: int = 0,
         literal_value: int = 0,
+        channel: int = 0,
     ) -> None:
         self._add_step(
             "dac_write",
@@ -437,6 +444,7 @@ class RecorderContext:
                 "use_var": use_var,
                 "var_index": var_index,
                 "literal_value": literal_value,
+                "channel": channel,
             },
         )
 
@@ -470,6 +478,8 @@ class RecorderContext:
         duty_percent: int = 0,
         use_var: int = 0,
         var_index: int = 0,
+        pwm_instance: int = 0,
+        channel: int = 0,
     ) -> None:
         self._add_step(
             "pwm_set",
@@ -478,6 +488,8 @@ class RecorderContext:
                 "duty_percent": duty_percent,
                 "use_var": use_var,
                 "var_index": var_index,
+                "pwm_instance": pwm_instance,
+                "channel": channel,
             },
         )
 

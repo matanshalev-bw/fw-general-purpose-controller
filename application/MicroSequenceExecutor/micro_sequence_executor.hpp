@@ -44,8 +44,8 @@ class MicroSequenceExecutor {
   void startDelay(uint32_t delay_ms);
 
   bool executeStep(const bluelink::MicroOpsPayload::MicroOpStep& step);
-  bool executeDigitalGpioWrite(const bluelink::MicroOpsPayload::MicroDigitalGpioWrite& op);
-  bool executeDigitalGpioRead(const bluelink::MicroOpsPayload::MicroDigitalGpioRead& op);
+  bool executeDigitalGpioWrite(const bluelink::MicroOpsPayload::MicroDigitalGpio& op);
+  bool executeDigitalGpioRead(const bluelink::MicroOpsPayload::MicroDigitalGpio& op);
   bool executeAdcRead(const bluelink::MicroOpsPayload::MicroAdcRead& op);
   bool executeDacWrite(const bluelink::MicroOpsPayload::MicroDacWrite& op);
   bool executePwmSet(const bluelink::MicroOpsPayload::MicroPwmSet& op);

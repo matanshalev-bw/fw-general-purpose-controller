@@ -104,10 +104,27 @@ def _format_union_init(member: str, values: Dict[str, Any], schema=None) -> str:
                 if int(raw or 0) != 0:
                     break
                 fields.pop()
+        # Omit trailing expander routing fields when zero (MCU default).
+        if member in ("digital_gpio_write", "digital_gpio_read"):
+            while fields and fields[-1].name == "gpio_instance":
+                if int(values.get("gpio_instance", 0) or 0) != 0:
+                    break
+                fields.pop()
+        if member == "dac_write":
+            while fields and fields[-1].name == "channel":
+                if int(values.get("channel", 0) or 0) != 0:
+                    break
+                fields.pop()
+        if member == "pwm_set":
+            while fields and fields[-1].name in ("channel", "pwm_instance"):
+                trailing = fields[-1].name
+                if int(values.get(trailing, 0) or 0) != 0:
+                    break
+                fields.pop()
         for field in fields:
             v = values.get(field.name)
             if v is None:
-                if field.name in ("use_var", "var_index"):
+                if field.name in ("use_var", "var_index", "gpio_instance", "pwm_instance", "channel"):
                     v = 0
                 else:
                     raise ValueError(f"Missing field {field.name!r} for {member}")
