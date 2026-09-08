@@ -69,6 +69,10 @@ void Error_Handler(void);
 #define WD_EN_GPIO_Port GPIOA
 #define WD_KA_Pin GPIO_PIN_10
 #define WD_KA_GPIO_Port GPIOA
+#define ADS7953_CS_Pin GPIO_PIN_5
+#define ADS7953_CS_GPIO_Port GPIOB
+#define MCP23S17_CS_Pin GPIO_PIN_6
+#define MCP23S17_CS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
