@@ -66,8 +66,6 @@ include_directories(
     ${BLUELINK_SERIALIZER_DIR}/Serialization/CRC32
     ${REPO_ROOT}/configs/ConfigStructs
     ${REPO_ROOT}/configs/ConfigStructs/SequencesConfigs
-    ${INTERFACES_DIR}
-    ${INTERFACES_DIR}/AdcManager
     ${INTERFACES_DIR}/CanMessenger
     ${INTERFACES_DIR}/CommInterface
     ${INTERFACES_DIR}/CommHandler
@@ -138,7 +136,6 @@ set(INTERFACE_SOURCES
     ${INTERFACES_DIR}/CanMessenger/can_messenger.cpp
     ${INTERFACES_DIR}/CommHandler/comm_interrupts_handler.cpp
     ${INTERFACES_DIR}/CommHandler/gpc_bluelink_usb_callbacks.cpp
-    ${INTERFACES_DIR}/AdcManager/adc_manager.cpp
 )
 
 set(BLUELINK_SERIALIZER_SOURCES

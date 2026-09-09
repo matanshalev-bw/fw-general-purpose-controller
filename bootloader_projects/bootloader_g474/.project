@@ -52,9 +52,49 @@
 			<locationURI>PARENT-2-PROJECT_LOC/3rd_party/bluelink_sdk/bluelink_version</locationURI>
 		</link>
 		<link>
-			<name>Core/Src/interfaces_g474</name>
+			<name>Core/Src/interfaces_g474/CanMessenger</name>
 			<type>2</type>
-			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/CanMessenger</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/interfaces_g474/CommHandler</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/CommHandler</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/interfaces_g474/CommInterface</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/CommInterface</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/interfaces_g474/GpioInterface</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/GpioInterface</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/interfaces_g474/InterfaceDefines</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/InterfaceDefines</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/interfaces_g474/MemoryMap</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/MemoryMap</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/interfaces_g474/NonVolatileMemoryInterface</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/NonVolatileMemoryInterface</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/interfaces_g474/SchedulerInterface</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/SchedulerInterface</locationURI>
+		</link>
+		<link>
+			<name>Core/Src/interfaces_g474/SystemInterface</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/interfaces/interfaces_g474/SystemInterface</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>

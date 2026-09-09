@@ -48,14 +48,11 @@ Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/CRC32 \
 Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/Deserializer \
 Core/Src/bluelink_serializer/bluelink_serializer_include/Serialization/Serializer \
 Core/Src \
-Core/Src/interfaces_g474/AdcManager \
 Core/Src/interfaces_g474/CanMessenger \
 Core/Src/interfaces_g474/CommHandler \
 Core/Src/interfaces_g474/CommInterface \
 Core/Src/interfaces_g474/GpioInterface \
-Core/Src/interfaces_g474/HardwareMap \
 Core/Src/interfaces_g474/NonVolatileMemoryInterface \
-Core/Src/interfaces_g474/PwmInterface \
 Core/Src/interfaces_g474/SchedulerInterface \
 Core/Src/interfaces_g474/SystemInterface \
 Core/Startup \

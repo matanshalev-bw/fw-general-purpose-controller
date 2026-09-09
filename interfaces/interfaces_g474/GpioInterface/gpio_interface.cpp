@@ -6,7 +6,9 @@
  */
 
 #include "gpio_interface.hpp"
+#ifdef HAL_ADC_MODULE_ENABLED
 #include "adc_manager.hpp"
+#endif
 
 GPIO_TypeDef* GpioInterface::getGpioPort(GpioPortType port) {
     switch (port) {
