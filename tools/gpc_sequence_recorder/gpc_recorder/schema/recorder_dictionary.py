@@ -44,11 +44,11 @@ _EXAMPLES: Dict[str, str] = {
     "can_transmit": "can_transmit(can_bus=1, id=0x12, dlc=4, data=[0x12, 0x34, 0x56, 0x78])  # or use_var=1, var_index=0",
     "pwm_set": "pwm_set(frequency_hz=1000, duty_percent=50, pwm_instance=1, channel=0)",
     "uart_transmit": 'uart_transmit(uart_instance=1, length=5, data=[0x48, 0x45, 0x4C, 0x4C, 0x4F])  # or USB data: "HELLO"',
-    "spi_transfer": "spi_transfer(spi_instance=1, tx_len=3, tx_data=[0x9F, 0x00, 0x00])",
+    "spi_transfer": "spi_transfer(spi_instance=2, tx_len=3, tx_data=[0x9F, 0x00, 0x00])",
     "i2c_write": "i2c_write(i2c_instance=1, device_addr=0x50, length=2, data=[0x00, 0x01])",
     "can_receive": "can_receive(can_bus=1, id=0x12, dlc=4, var_index=0)",
     "uart_receive": "uart_receive(uart_instance=1, length=4, var_index=0)",
-    "spi_receive": "spi_receive(spi_instance=1, rx_len=3, var_index=0)",
+    "spi_receive": "spi_receive(spi_instance=2, rx_len=3, var_index=0)",
     "i2c_read": "i2c_read(i2c_instance=1, device_addr=0x50, length=2, var_index=0)",
     "var_set": "var_set(var_index=1, value=3343114)  # or value=[0x0A, 0x03, 0x33] (LE → int64)",
     "var_mul": "var_mul(dest_var_index=0, src_var_index=0, numerator=1, denominator=10)",
@@ -232,11 +232,13 @@ _PARAM_HINTS: Dict[str, Dict[str, str]] = {
         "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER (MCP23017), 2=SPI_GPIO_EXPANDER (MCP23S17)",
         "port": "MCU: 1=A..6=F; expander: 1=A, 2=B",
         "pin": "MCU: 0–15; expander: 0–7",
+        "value": "0=low, 1=high",
     },
     "gpio_read": {
         "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER (MCP23017), 2=SPI_GPIO_EXPANDER (MCP23S17)",
         "port": "MCU: 1=A..6=F; expander: 1=A, 2=B",
         "pin": "MCU: 0–15; expander: 0–7",
+        "var_index": "var slot 0–19 for pin level",
     },
     "adc_read": {
         "adc_instance": "1=MCU_ADC1 (PA0), 2=MCU_ADC2 (PB2), 3=SPI_ADC_EXPANDER (ADS7953)",
@@ -267,10 +269,12 @@ _PARAM_HINTS: Dict[str, Dict[str, str]] = {
         "var_index": "var slot 0–19 when use_var=1",
     },
     "spi_transfer": {
+        "spi_instance": "2=MCU_SPI1 (PA5 SCK / PA6 MISO / PA7 MOSI)",
         "use_var": "1=TX bytes from var_index (LE), 0=use tx_data[]",
         "var_index": "var slot 0–19 when use_var=1",
     },
     "i2c_write": {
+        "i2c_instance": "1=MCU_I2C1 (PA15 SCL / PB7 SDA)",
         "device_addr": "hex (0x)",
         "use_var": "1=TX bytes from var_index (LE), 0=use data[]",
         "var_index": "var slot 0–19 when use_var=1",
@@ -278,7 +282,11 @@ _PARAM_HINTS: Dict[str, Dict[str, str]] = {
     "can_receive": {
         "id": "hex (0x)",
     },
+    "spi_receive": {
+        "spi_instance": "2=MCU_SPI1 (PA5 SCK / PA6 MISO / PA7 MOSI)",
+    },
     "i2c_read": {
+        "i2c_instance": "1=MCU_I2C1 (PA15 SCL / PB7 SDA)",
         "device_addr": "hex (0x)",
     },
     "var_bytes_assign": {

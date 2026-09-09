@@ -280,15 +280,17 @@ async def usb_log_stream(port: str) -> AsyncIterator[Dict[str, Any]]:
 def micro_ops_catalog() -> List[Dict[str, Any]]:
     schema = get_schema()
     pin_hints = {
-        "gpio_write": {
-            "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER, 2=SPI_GPIO_EXPANDER",
+        "digital_gpio_write": {
+            "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER (MCP23017), 2=SPI_GPIO_EXPANDER (MCP23S17)",
             "port": "MCU: 1=A..6=F; expander: 1=A, 2=B",
             "pin": "MCU: 0–15; expander: 0–7",
+            "value": "0=low, 1=high",
         },
-        "gpio_read": {
-            "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER, 2=SPI_GPIO_EXPANDER",
+        "digital_gpio_read": {
+            "gpio_instance": "0=MCU_GPIO, 1=I2C_GPIO_EXPANDER (MCP23017), 2=SPI_GPIO_EXPANDER (MCP23S17)",
             "port": "MCU: 1=A..6=F; expander: 1=A, 2=B",
             "pin": "MCU: 0–15; expander: 0–7",
+            "var_index": "var slot 0–19 for pin level",
         },
         "adc_read": {
             "adc_instance": "1=MCU_ADC1 (PA0), 2=MCU_ADC2 (PB2), 3=SPI_ADC_EXPANDER (ADS7953)",
@@ -315,10 +317,22 @@ def micro_ops_catalog() -> List[Dict[str, Any]]:
         "can_receive": {
             "id": "hex (0x)",
         },
+        "spi_transfer": {
+            "spi_instance": "2=MCU_SPI1 (PA5 SCK / PA6 MISO / PA7 MOSI)",
+            "use_var": "1=TX bytes from var_index (LE), 0=use tx_data[]",
+            "var_index": "var slot 0–19 when use_var=1",
+        },
+        "spi_receive": {
+            "spi_instance": "2=MCU_SPI1 (PA5 SCK / PA6 MISO / PA7 MOSI)",
+        },
         "i2c_write": {
+            "i2c_instance": "1=MCU_I2C1 (PA15 SCL / PB7 SDA)",
             "device_addr": "hex (0x)",
+            "use_var": "1=TX bytes from var_index (LE), 0=use data[]",
+            "var_index": "var slot 0–19 when use_var=1",
         },
         "i2c_read": {
+            "i2c_instance": "1=MCU_I2C1 (PA15 SCL / PB7 SDA)",
             "device_addr": "hex (0x)",
         },
     }
